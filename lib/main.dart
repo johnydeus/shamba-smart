@@ -8,6 +8,7 @@ import 'providers/listing_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/ai_provider.dart';
 import 'providers/satellite_provider.dart';
+import 'providers/farm_provider.dart';
 import 'screens/main_shell.dart';
 import 'screens/login_screen.dart';
 
@@ -36,6 +37,12 @@ Future<void> main() async {
   final satelliteProvider = SatelliteProvider();
   await satelliteProvider.init();
 
+  final farmProvider = FarmProvider();
+  // Load farms for the already-logged-in user (if session exists)
+  if (authProvider.isLoggedIn && authProvider.currentUser != null) {
+    await farmProvider.init(authProvider.currentUser!.id);
+  }
+
   runApp(
     MultiProvider(
       providers: [
@@ -44,6 +51,7 @@ Future<void> main() async {
         ChangeNotifierProvider.value(value: chatProvider),
         ChangeNotifierProvider(create: (_) => AiProvider()),
         ChangeNotifierProvider.value(value: satelliteProvider),
+        ChangeNotifierProvider.value(value: farmProvider),
       ],
       child: const ShambaSmart(),
     ),
@@ -109,16 +117,35 @@ class ShambaSmart extends StatelessWidget {
 }
 
 // Decides whether to show home or login based on local auth session
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  String? _lastUserId;
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    if (auth.isLoggedIn) {
-      return const MainShell();
-    } else {
-      return const LoginScreen();
+
+    // Load farms whenever a new user logs in
+    if (auth.isLoggedIn && auth.currentUser?.id != _lastUserId) {
+      _lastUserId = auth.currentUser!.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<FarmProvider>().init(auth.currentUser!.id);
+      });
     }
+
+    if (!auth.isLoggedIn && _lastUserId != null) {
+      _lastUserId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<FarmProvider>().clear();
+      });
+    }
+
+    return auth.isLoggedIn ? const MainShell() : const LoginScreen();
   }
 }

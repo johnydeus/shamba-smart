@@ -3,11 +3,15 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/farm_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/common_widgets.dart';
 import 'login_screen.dart';
 import 'market_screen.dart';
 import 'forum_screen.dart';
+import 'farms_screen.dart';
+import 'irrigation_screen.dart';
+import 'soil_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -18,6 +22,7 @@ class ProfileScreen extends StatelessWidget {
     if (user == null) return const SizedBox.shrink();
 
     final roleColor = AppColors.roleColor(user.role);
+    final farmCount = context.watch<FarmProvider>().farms.length;
 
     return Scaffold(
       backgroundColor: AppColors.mist,
@@ -65,18 +70,18 @@ class ProfileScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _HeaderStat(
-                            value: '${user.listingCount}', label: 'Orodha'),
-                        Container(
-                            height: 30,
-                            width: 1,
-                            color: Colors.white24),
+                        if (user.role == UserRole.mkulima)
+                          _HeaderStat(
+                              value: '$farmCount',
+                              label: 'Mashamba'),
+                        if (user.role != UserRole.mkulima)
+                          _HeaderStat(
+                              value: '${user.listingCount}',
+                              label: 'Orodha'),
+                        Container(height: 30, width: 1, color: Colors.white24),
                         _HeaderStat(
                             value: '${user.salesCount}', label: 'Mauzo'),
-                        Container(
-                            height: 30,
-                            width: 1,
-                            color: Colors.white24),
+                        Container(height: 30, width: 1, color: Colors.white24),
                         _HeaderStat(
                             value: _joinedLabel(user.joinedAt),
                             label: 'Mwanachama'),
@@ -191,11 +196,20 @@ class ProfileScreen extends StatelessWidget {
     final items = switch (user.role) {
       UserRole.mkulima => [
           _MenuItem(
-            icon: Icons.landscape,
-            title: 'Shamba Langu',
-            subtitle: 'Angalia na hariri taarifa za shamba',
+            icon: Icons.agriculture,
+            title: 'Mashamba Yangu',
+            subtitle: 'Angalia na simamia mashamba yako',
             color: color,
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const FarmsScreen())),
+          ),
+          _MenuItem(
+            icon: Icons.landscape_outlined,
+            title: 'Udongo wa Shamba',
+            subtitle: 'Pata data za udongo kwa GPS',
+            color: color,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const SoilScreen())),
           ),
           _MenuItem(
             icon: Icons.trending_up,
@@ -206,11 +220,12 @@ class ProfileScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const MarketScreen())),
           ),
           _MenuItem(
-            icon: Icons.cloud_outlined,
-            title: 'Hali ya Hewa',
-            subtitle: 'Utabiri wa hali ya hewa shambani',
+            icon: Icons.water_drop_outlined,
+            title: 'Hali ya Hewa & Umwagiliaji',
+            subtitle: 'Utabiri wa hewa na mpango wa umwagiliaji',
             color: color,
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const IrrigationScreen())),
           ),
           _MenuItem(
             icon: Icons.psychology_outlined,
@@ -225,7 +240,7 @@ class ProfileScreen extends StatelessWidget {
             title: 'Mipangilio',
             subtitle: 'Badilisha taarifa za akaunti yako',
             color: AppColors.mid,
-            onTap: () {},
+            onTap: () => _showSettingsDialog(context, user),
           ),
         ],
       UserRole.duka => [
@@ -234,88 +249,81 @@ class ProfileScreen extends StatelessWidget {
             title: 'Bidhaa Zangu',
             subtitle: 'Angalia na simamia orodha yako',
             color: color,
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const MarketScreen())),
           ),
           _MenuItem(
-            icon: Icons.inbox_outlined,
-            title: 'Maombi ya Wateja',
-            subtitle: 'Maombi mapya: 3 yanangoja jibu',
+            icon: Icons.trending_up,
+            title: 'Bei za Soko',
+            subtitle: 'Bei za mazao Tanzania leo',
             color: color,
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const MarketScreen())),
           ),
           _MenuItem(
-            icon: Icons.bar_chart_outlined,
-            title: 'Takwimu za Mauzo',
-            subtitle: 'Angalia mwenendo wa mauzo yako',
+            icon: Icons.psychology_outlined,
+            title: 'Mshauri wa AI',
+            subtitle: 'Uliza maswali ya kilimo kwa Claude',
             color: color,
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
           _MenuItem(
             icon: Icons.settings_outlined,
             title: 'Mipangilio',
             subtitle: 'Badilisha taarifa za akaunti yako',
             color: AppColors.mid,
-            onTap: () {},
+            onTap: () => _showSettingsDialog(context, user),
           ),
         ],
       UserRole.muuzaji => [
           _MenuItem(
-            icon: Icons.shopping_basket_outlined,
-            title: 'Mazao Ninayonunua',
-            subtitle: user.cropsTraded ?? 'Weka mazao unayonunua',
-            color: color,
-            onTap: () {},
-          ),
-          _MenuItem(
             icon: Icons.storefront_outlined,
-            title: 'Biashara Yangu',
-            subtitle: 'Angalia mauzo na manunuzi yako',
+            title: 'Bei za Soko',
+            subtitle: 'Fuatilia bei za mazao Tanzania',
             color: color,
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const MarketScreen())),
           ),
           _MenuItem(
-            icon: Icons.local_shipping_outlined,
-            title: 'Usafiri',
-            subtitle: 'Panga safari za kubeba mazao',
+            icon: Icons.psychology_outlined,
+            title: 'Mshauri wa AI',
+            subtitle: 'Uliza maswali ya biashara kwa Claude',
             color: color,
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
           _MenuItem(
             icon: Icons.settings_outlined,
             title: 'Mipangilio',
             subtitle: 'Badilisha taarifa za akaunti yako',
             color: AppColors.mid,
-            onTap: () {},
+            onTap: () => _showSettingsDialog(context, user),
           ),
         ],
       UserRole.mwekezaji => [
           _MenuItem(
-            icon: Icons.landscape_outlined,
-            title: 'Mashamba Yangu',
-            subtitle: 'Angalia mashamba unayomiliki au kukodisha',
+            icon: Icons.trending_up,
+            title: 'Bei za Soko',
+            subtitle: 'Fuatilia bei za mazao Tanzania',
             color: color,
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const MarketScreen())),
           ),
           _MenuItem(
-            icon: Icons.pie_chart_outline,
-            title: 'Takwimu za Uwekezaji',
-            subtitle: 'ROI, faida, na mwenendo wa portfolio',
+            icon: Icons.psychology_outlined,
+            title: 'Mshauri wa AI',
+            subtitle: 'Uliza maswali ya uwekezaji kwa Claude',
             color: color,
-            onTap: () {},
-          ),
-          _MenuItem(
-            icon: Icons.volunteer_activism_outlined,
-            title: 'Wakulima Wanaohitaji Msaada',
-            subtitle: 'Wakulima 12 wanatafuta mwekezaji',
-            color: color,
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
           _MenuItem(
             icon: Icons.settings_outlined,
             title: 'Mipangilio',
             subtitle: 'Badilisha taarifa za akaunti yako',
             color: AppColors.mid,
-            onTap: () {},
+            onTap: () => _showSettingsDialog(context, user),
           ),
         ],
     };
@@ -326,6 +334,44 @@ class ProfileScreen extends StatelessWidget {
               child: item,
             ))
         .toList();
+  }
+
+  void _showSettingsDialog(BuildContext context, UserModel user) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Taarifa za Akaunti'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SettingRow('Jina', user.displayName),
+            _SettingRow('Barua Pepe', user.email),
+            _SettingRow('Mkoa', user.region),
+            _SettingRow('Aina ya Akaunti', user.role.label),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Funga'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'Sehemu ya kuhariri akaunti inakuja hivi karibuni.'),
+                  backgroundColor: AppColors.leaf,
+                ),
+              );
+            },
+            child: const Text('Hariri'),
+          ),
+        ],
+      ),
+    );
   }
 
   // Format join date as Swahili month + year
@@ -423,6 +469,33 @@ class _MenuItem extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SettingRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _SettingRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 100,
+              child: Text(label,
+                  style: const TextStyle(
+                      color: Colors.grey, fontSize: 12)),
+            ),
+            Expanded(
+              child: Text(value,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 13)),
+            ),
+          ],
+        ),
+      );
 }
 
 // Simple info tile for account details section

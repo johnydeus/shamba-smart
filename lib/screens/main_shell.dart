@@ -6,7 +6,8 @@ import '../theme/app_colors.dart';
 import 'home_screen.dart';
 import 'marketplace_screen.dart';
 import 'satellite_screen.dart';
-import 'stats_screen.dart';
+import 'soil_screen.dart';
+import 'farms_screen.dart';
 import 'profile_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -19,14 +20,15 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  // IndexedStack keeps each screen alive while switching tabs
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    MarketplaceScreen(),
-    SatelliteScreen(),   // NEW — Satellite Crop Analysis
-    StatsScreen(),
-    ProfileScreen(),
-  ];
+  List<Widget> _screens(UserRole role) => [
+        const HomeScreen(),
+        const SatelliteScreen(),
+        role == UserRole.mkulima
+            ? const FarmsScreen()   // farmers manage their farms here
+            : const SoilScreen(),   // others still get soil data
+        const MarketplaceScreen(),
+        const ProfileScreen(),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +39,7 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: _screens(role),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
@@ -46,32 +48,32 @@ class _MainShellState extends State<MainShell> {
         indicatorColor: roleColor.withValues(alpha: 0.12),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: [
-          // Tab 1 — Home
+          // Tab 1 — Nyumbani
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home, color: roleColor),
             label: 'Nyumbani',
           ),
-          // Tab 2 — Marketplace
-          NavigationDestination(
-            icon: const Icon(Icons.storefront_outlined),
-            selectedIcon: Icon(Icons.storefront, color: roleColor),
-            label: 'Soko',
-          ),
-          // Tab 3 — Satellite (new)
+          // Tab 2 — Sateliti
           NavigationDestination(
             icon: const Icon(Icons.satellite_alt_outlined),
             selectedIcon:
                 Icon(Icons.satellite_alt, color: AppColors.leaf),
-            label: 'Satellite',
+            label: 'Sateliti',
           ),
-          // Tab 4 — Role-specific stats
+          // Tab 3 — Udongo (Mashamba for mkulima)
           NavigationDestination(
-            icon: Icon(_tab4Icon(role)),
-            selectedIcon: Icon(_tab4Icon(role), color: roleColor),
-            label: _tab4Label(role),
+            icon: Icon(_tab3Icon(role)),
+            selectedIcon: Icon(_tab3Icon(role), color: roleColor),
+            label: _tab3Label(role),
           ),
-          // Tab 5 — Profile
+          // Tab 4 — Masoko
+          NavigationDestination(
+            icon: const Icon(Icons.storefront_outlined),
+            selectedIcon: Icon(Icons.storefront, color: roleColor),
+            label: 'Masoko',
+          ),
+          // Tab 5 — Akaunti
           NavigationDestination(
             icon: const Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person, color: roleColor),
@@ -82,17 +84,10 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  IconData _tab4Icon(UserRole role) => switch (role) {
-        UserRole.mkulima   => Icons.landscape_outlined,
-        UserRole.duka      => Icons.store_outlined,
-        UserRole.muuzaji   => Icons.show_chart,
-        UserRole.mwekezaji => Icons.account_balance_wallet_outlined,
-      };
+  // Tab 3: mkulima sees Mashamba, everyone else sees Udongo
+  IconData _tab3Icon(UserRole role) =>
+      role == UserRole.mkulima ? Icons.agriculture_outlined : Icons.landscape_outlined;
 
-  String _tab4Label(UserRole role) => switch (role) {
-        UserRole.mkulima   => 'Shamba',
-        UserRole.duka      => 'Duka',
-        UserRole.muuzaji   => 'Biashara',
-        UserRole.mwekezaji => 'Uwekezaji',
-      };
+  String _tab3Label(UserRole role) =>
+      role == UserRole.mkulima ? 'Mashamba' : 'Udongo';
 }

@@ -26,6 +26,7 @@ dependencies:
 
   # Location / GPS
   geolocator: ^10.1.0
+  permission_handler: ^11.0.0
 
   # Offline storage
   sqflite: ^2.3.0
@@ -53,6 +54,11 @@ dependencies:
   file_picker: ^8.1.2          # Pick PDF / TXT files
   open_filex: ^4.4.1           # Open files on device
   url_launcher: ^6.3.0         # Open maps for location sharing
+
+  # Offline detection + file system + animations
+  connectivity_plus: ^5.0.2
+  path_provider: ^2.1.1
+  lottie: ^2.7.0
 
 dev_dependencies:
   flutter_test:

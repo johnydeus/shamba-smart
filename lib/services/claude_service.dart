@@ -116,6 +116,60 @@ Rules:
     }
   }
 
+  // Generate irrigation advice based on soil + weather context
+  static Future<String> generateIrrigationAdvice({
+    required Map<String, dynamic> soilData,
+    required Map<String, dynamic> weatherData,
+    required String cropName,
+    required String growthStage,
+    required double farmAcres,
+  }) async {
+    final prompt = '''
+Wewe ni mtaalamu wa umwagiliaji wa kilimo Tanzania.
+
+Taarifa za shamba:
+- Zao: $cropName (hatua ya ukuaji: $growthStage)
+- Ukubwa wa shamba: $farmAcres ekari
+- Hali ya udongo: pH=${soilData['ph'] ?? 'haijulikani'}, Nitrogen=${soilData['nitrogen'] ?? 'haijulikani'}, Texture=${soilData['texture'] ?? 'haijulikani'}
+- Hali ya hewa: Joto=${weatherData['temperature'] ?? 27}°C, Unyevu=${weatherData['humidity'] ?? 65}%, Upepo=${weatherData['wind_speed'] ?? 8}km/h, Mvua=${weatherData['rain_probability'] ?? 20}%
+
+Toa ushauri wa umwagiliaji kwa Kiswahili rahisi:
+1. Kiasi cha maji kinachohitajika kwa siku (lita)
+2. Nyakati nzuri za kumwagilia
+3. Dalili za kukosa au kuzidi maji
+4. Onyo lolote kuhusu hali ya hewa ya leo
+
+Jibu kwa maneno mafupi yanayofaa simu (si zaidi ya mistari 8).
+''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': _apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'max_tokens': 400,
+          'messages': [
+            {'role': 'user', 'content': prompt},
+          ],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['content'][0]['text'] as String;
+      }
+    } catch (_) {}
+
+    return 'Mwagilia $cropName asubuhi (6am–8am) ili kupunguza uvukizi.\n'
+        'Kiasi: karibu lita ${(farmAcres * 1000).round()} kwa siku moja.\n'
+        'Dalili za kukosa maji: majani kunyauka mchana.';
+  }
+
   // Ask Claude a farming question in Swahili — used in the Expert Forum
   static Future<String> askFarmingQuestion({
     required String question,

@@ -111,12 +111,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       password: _passwordCtrl.text,
       region: _region,
       role: _selectedRole!,
-      farmSize: _selectedRole == UserRole.mkulima
-          ? double.tryParse(_farmSizeCtrl.text)
-          : null,
-      mainCrops: _selectedRole == UserRole.mkulima
-          ? _mainCropsCtrl.text.trim()
-          : null,
       shopName: _selectedRole == UserRole.duka
           ? _shopNameCtrl.text.trim()
           : null,
@@ -401,7 +395,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 20),
 
           // ── Role-specific fields ───────────────────────────────────
-          if (_selectedRole == UserRole.mkulima) ..._mkulimaFields(),
+          // Note: mkulima farm data is collected after registration
+          // via FarmsScreen to support multiple farms per farmer
           if (_selectedRole == UserRole.duka) ..._dukaFields(),
           if (_selectedRole == UserRole.muuzaji) ..._muuzajiFields(),
           if (_selectedRole == UserRole.mwekezaji) ..._mwekezajiFields(),
@@ -460,19 +455,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // ── Role-specific field groups ─────────────────────────────────────────────
 
-  List<Widget> _mkulimaFields() => [
-        Text('Taarifa za Shamba',
-            style: GoogleFonts.dmSans(
-                color: Colors.white70, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 10),
-        _field(_farmSizeCtrl, 'Ukubwa wa Shamba (Ekari)',
-            Icons.landscape_outlined,
-            type: TextInputType.number),
-        const SizedBox(height: 12),
-        _field(_mainCropsCtrl, 'Mazao Makuu (mfano: Mahindi, Nyanya)',
-            Icons.grass_outlined),
-        const SizedBox(height: 12),
-      ];
 
   List<Widget> _dukaFields() => [
         Text('Taarifa za Duka',

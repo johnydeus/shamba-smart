@@ -67,8 +67,8 @@ class SupabaseService {
     }
   }
 
-  // Get nearby agrovets from the database
-  static Future<List<Map<String, dynamic>>> getNearbyAgrovets({
+  // Get agrovets in a specific region
+  static Future<List<Map<String, dynamic>>> getAgrovetsByRegion({
     required String region,
   }) async {
     try {
@@ -76,12 +76,11 @@ class SupabaseService {
           .from('agrovets')
           .select()
           .eq('region', region)
-          .eq('verified', true)
           .limit(10);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      debugPrint('Error fetching agrovets: $e');
+      debugPrint('Error fetching agrovets by region: $e');
       return [];
     }
   }
@@ -101,6 +100,75 @@ class SupabaseService {
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error fetching prices: $e');
+      return [];
+    }
+  }
+
+  // Save soil data fetched from iSDAsoil API
+  static Future<void> saveSoilData({
+    required double lat,
+    required double lng,
+    double? ph,
+    double? nitrogen,
+    double? phosphorus,
+    double? potassium,
+    String? texture,
+    String source = 'iSDAsoil',
+  }) async {
+    try {
+      await _client.from('soil_data').insert({
+        'gps_lat': lat,
+        'gps_lng': lng,
+        'ph': ph,
+        'nitrogen': nitrogen,
+        'phosphorus': phosphorus,
+        'potassium': potassium,
+        'texture': texture,
+        'source': source,
+        'fetched_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Error saving soil data: $e');
+    }
+  }
+
+  // Get nearby agrovets by GPS distance (region fallback)
+  static Future<List<Map<String, dynamic>>> getNearbyAgrovets({
+    required double lat,
+    required double lng,
+    double radiusKm = 50,
+  }) async {
+    try {
+      final response = await _client
+          .from('agrovets')
+          .select()
+          .gte('gps_lat', lat - 0.5)
+          .lte('gps_lat', lat + 0.5)
+          .gte('gps_lng', lng - 0.5)
+          .lte('gps_lng', lng + 0.5)
+          .limit(15);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching nearby agrovets: $e');
+      return [];
+    }
+  }
+
+  // Get all diagnoses for the logged-in farmer
+  static Future<List<Map<String, dynamic>>> getFarmerDiagnoses(
+      String farmerId) async {
+    try {
+      final response = await _client
+          .from('diagnoses')
+          .select()
+          .eq('farmer_id', farmerId)
+          .order('created_at', ascending: false)
+          .limit(20);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching farmer diagnoses: $e');
       return [];
     }
   }
