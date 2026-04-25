@@ -1,0 +1,20 @@
+[
+  {
+    "brand_name": "Coragen SC",
+    "active_ingredient": "Chlorantraniliprole",
+    "target_disease": "Fall Armyworm",
+    "target_crop": "mahindi",
+    "ml_per_15L": 20,
+    "phi_days": 14,
+    "tpri_registered": true
+  },
+  {
+    "brand_name": "Ridomil Gold",
+    "active_ingredient": "Metalaxyl-M + Mancozeb",
+    "target_disease": "Late Blight",
+    "target_crop": "nyanya",
+    "ml_per_15L": 25,
+    "phi_days": 7,
+    "tpri_registered": true
+  }
+]

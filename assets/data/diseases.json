@@ -1,0 +1,18 @@
+[
+  {
+    "disease_name_en": "Fall Armyworm",
+    "disease_name_sw": "Viwavi vya Jeshi",
+    "affected_crop": "mahindi",
+    "severity": "high",
+    "description_sw": "Viwavi vinavyoshambulia mahindi na kusababisha uharibifu mkubwa.",
+    "immediate_action_sw": "Pulizia mara moja kwa dawa ya wadudu."
+  },
+  {
+    "disease_name_en": "Tomato Late Blight",
+    "disease_name_sw": "Ugonjwa wa Kuoza Nyanya",
+    "affected_crop": "nyanya",
+    "severity": "high",
+    "description_sw": "Ugonjwa wa kuvu unaosababisha madoa ya kahawia kwenye majani na matunda.",
+    "immediate_action_sw": "Ondoa majani yaliyoathirika na piga dawa ya ukungu."
+  }
+]
