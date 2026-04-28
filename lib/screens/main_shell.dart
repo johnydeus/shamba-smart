@@ -8,6 +8,7 @@ import 'marketplace_screen.dart';
 import 'satellite_screen.dart';
 import 'soil_screen.dart';
 import 'farms_screen.dart';
+import 'consultation_screen.dart';
 import 'profile_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -23,9 +24,11 @@ class _MainShellState extends State<MainShell> {
   List<Widget> _screens(UserRole role) => [
         const HomeScreen(),
         const SatelliteScreen(),
-        role == UserRole.mkulima
-            ? const FarmsScreen()   // farmers manage their farms here
-            : const SoilScreen(),   // others still get soil data
+        switch (role) {
+          UserRole.mkulima => const FarmsScreen(),
+          UserRole.afisa   => const ConsultationScreen(),
+          _                => const SoilScreen(),
+        },
         const MarketplaceScreen(),
         const ProfileScreen(),
       ];
@@ -84,10 +87,15 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  // Tab 3: mkulima sees Mashamba, everyone else sees Udongo
-  IconData _tab3Icon(UserRole role) =>
-      role == UserRole.mkulima ? Icons.agriculture_outlined : Icons.landscape_outlined;
+  IconData _tab3Icon(UserRole role) => switch (role) {
+        UserRole.mkulima => Icons.agriculture_outlined,
+        UserRole.afisa   => Icons.people_outline,
+        _                => Icons.landscape_outlined,
+      };
 
-  String _tab3Label(UserRole role) =>
-      role == UserRole.mkulima ? 'Mashamba' : 'Udongo';
+  String _tab3Label(UserRole role) => switch (role) {
+        UserRole.mkulima => 'Mashamba',
+        UserRole.afisa   => 'Wakulima',
+        _                => 'Udongo',
+      };
 }

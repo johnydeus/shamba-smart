@@ -49,6 +49,9 @@ class AuthProvider extends ChangeNotifier {
     String? businessName,
     String? cropsTraded,
     String? investmentType,
+    String? organization,
+    String? badgeNumber,
+    String? district,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
 
@@ -81,6 +84,9 @@ class AuthProvider extends ChangeNotifier {
       businessName: businessName,
       cropsTraded: cropsTraded,
       investmentType: investmentType,
+      organization: organization,
+      badgeNumber: badgeNumber,
+      district: district,
     );
 
     _users.add(newUser);
@@ -115,6 +121,94 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kSession);
     notifyListeners();
+  }
+
+  // Switch active role (user must already have this role)
+  Future<void> switchRole(UserRole newRole) async {
+    if (_currentUser == null) return;
+    if (!_currentUser!.allRoles.contains(newRole)) return;
+    _currentUser = _rebuildUser(_currentUser!, activeRole: newRole);
+    _updateUserInList(_currentUser!);
+    await _saveUsers();
+    notifyListeners();
+  }
+
+  // Add a new role to the current user's account
+  Future<String?> addRole({
+    required UserRole role,
+    String? shopName,
+    String? productType,
+    String? businessName,
+    String? cropsTraded,
+    String? investmentType,
+    String? organization,
+    String? badgeNumber,
+    String? district,
+  }) async {
+    if (_currentUser == null) return 'Tafadhali ingia kwanza.';
+    if (_currentUser!.allRoles.contains(role)) {
+      return 'Una jukumu hili tayari kwenye akaunti yako.';
+    }
+
+    final updatedRoles = [..._currentUser!.allRoles, role];
+    _currentUser = _rebuildUser(
+      _currentUser!,
+      allRoles: updatedRoles,
+      shopName: shopName ?? _currentUser!.shopName,
+      productType: productType ?? _currentUser!.productType,
+      businessName: businessName ?? _currentUser!.businessName,
+      cropsTraded: cropsTraded ?? _currentUser!.cropsTraded,
+      investmentType: investmentType ?? _currentUser!.investmentType,
+      organization: organization ?? _currentUser!.organization,
+      badgeNumber: badgeNumber ?? _currentUser!.badgeNumber,
+      district: district ?? _currentUser!.district,
+    );
+    _updateUserInList(_currentUser!);
+    await _saveUsers();
+    notifyListeners();
+    return null;
+  }
+
+  UserModel _rebuildUser(
+    UserModel u, {
+    UserRole? activeRole,
+    List<UserRole>? allRoles,
+    String? shopName,
+    String? productType,
+    String? businessName,
+    String? cropsTraded,
+    String? investmentType,
+    String? organization,
+    String? badgeNumber,
+    String? district,
+  }) =>
+      UserModel(
+        id: u.id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        password: u.password,
+        region: u.region,
+        role: activeRole ?? u.role,
+        joinedAt: u.joinedAt,
+        listingCount: u.listingCount,
+        salesCount: u.salesCount,
+        farmSize: u.farmSize,
+        mainCrops: u.mainCrops,
+        shopName: shopName ?? u.shopName,
+        productType: productType ?? u.productType,
+        businessName: businessName ?? u.businessName,
+        cropsTraded: cropsTraded ?? u.cropsTraded,
+        investmentType: investmentType ?? u.investmentType,
+        organization: organization ?? u.organization,
+        badgeNumber: badgeNumber ?? u.badgeNumber,
+        district: district ?? u.district,
+        allRoles: allRoles ?? u.allRoles,
+      );
+
+  void _updateUserInList(UserModel updated) {
+    final idx = _users.indexWhere((u) => u.id == updated.id);
+    if (idx != -1) _users[idx] = updated;
   }
 
   // Increment listing count after user posts a new listing

@@ -9,6 +9,8 @@ import '../widgets/common_widgets.dart';
 import '../widgets/ai_advisor_box.dart';
 import 'messages_screen.dart';
 import 'scan_screen.dart';
+import 'soil_screen.dart';
+import 'consultation_screen.dart';
 import 'agrovet_screen.dart';
 import 'market_screen.dart';
 import 'irrigation_screen.dart';
@@ -396,6 +398,33 @@ class HomeScreen extends StatelessWidget {
             'onTap': () => go(const ForumScreen())
           },
         ],
+      UserRole.afisa => [
+          {
+            'emoji': '👨‍🌾',
+            'label': 'Wakulima',
+            'onTap': () => go(const ConsultationScreen())
+          },
+          {
+            'emoji': '🌍',
+            'label': 'Udongo',
+            'onTap': () => go(const SoilScreen())
+          },
+          {
+            'emoji': '📊',
+            'label': 'Bei za Soko',
+            'onTap': () => go(const MarketScreen())
+          },
+          {
+            'emoji': '🔬',
+            'label': 'Ugonjwa',
+            'onTap': () => go(const ScanScreen())
+          },
+          {
+            'emoji': '🤖',
+            'label': 'Mshauri AI',
+            'onTap': () => go(const ForumScreen())
+          },
+        ],
     };
   }
 
@@ -481,6 +510,26 @@ class HomeScreen extends StatelessWidget {
               'title': 'Mkulima anahitaji msaada',
               'subtitle': 'Juma Mwangi — ekari 5 — Dodoma — mbegu+mbolea',
               'time': 'Saa 5 iliyopita',
+            },
+          ],
+        UserRole.afisa => [
+            {
+              'emoji': '💬',
+              'title': 'Ujumbe mpya wa mkulima',
+              'subtitle': 'Amina Juma — magonjwa ya mahindi — Kilosa',
+              'time': 'Dakika 15',
+            },
+            {
+              'emoji': '⚠️',
+              'title': 'Tahadhari ya maeneo',
+              'subtitle': 'Viwavi wa jeshi wameripotiwa — Morogoro',
+              'time': 'Leo',
+            },
+            {
+              'emoji': '🌱',
+              'title': 'Ziara ya shamba imepangwa',
+              'subtitle': 'Hassan Mwangi — Kilosa — kesho 9:00 asubuhi',
+              'time': 'Jana',
             },
           ],
       };

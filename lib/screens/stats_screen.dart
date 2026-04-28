@@ -79,6 +79,7 @@ class StatsScreen extends StatelessWidget {
         UserRole.duka      => '🏪 Duka Langu',
         UserRole.muuzaji   => '📈 Biashara Yangu',
         UserRole.mwekezaji => '💼 Uwekezaji Wangu',
+        UserRole.afisa     => '🏛️ Ripoti za Shamba',
       };
 
   // Build 4 stat cards based on role
@@ -188,6 +189,32 @@ class StatsScreen extends StatelessWidget {
               icon: Icons.landscape_outlined,
             ),
           ],
+        UserRole.afisa => [
+            StatCard(
+              value: '8',
+              label: 'Wakulima',
+              color: const Color(0xFF00695C),
+              icon: Icons.people,
+            ),
+            StatCard(
+              value: '12',
+              label: 'Ziara za Shamba',
+              color: AppColors.harvest,
+              icon: Icons.directions_walk,
+            ),
+            StatCard(
+              value: '3',
+              label: 'Ripoti',
+              color: AppColors.leaf,
+              icon: Icons.description_outlined,
+            ),
+            StatCard(
+              value: user.district ?? '—',
+              label: 'Wilaya',
+              color: AppColors.mid,
+              icon: Icons.map_outlined,
+            ),
+          ],
       };
 
   // Role-specific detail cards below the grid
@@ -251,6 +278,26 @@ class StatsScreen extends StatelessWidget {
               title: 'Mazao Ninayonunua',
               subtitle: user.cropsTraded ?? 'Bado haujaweka',
               color: color,
+            ),
+          ],
+        UserRole.afisa => [
+            _DetailCard(
+              icon: Icons.people,
+              title: 'Mazungumzo ya Hivi Karibuni',
+              subtitle: 'Amina Juma — magonjwa ya mahindi',
+              color: const Color(0xFF00695C),
+            ),
+            _DetailCard(
+              icon: Icons.warning_amber_outlined,
+              title: 'Tahadhari ya Maeneo',
+              subtitle: 'Viwavi wa jeshi wameripotiwa — Kilosa',
+              color: const Color(0xFFB71C1C),
+            ),
+            _DetailCard(
+              icon: Icons.account_balance_outlined,
+              title: 'Shirika',
+              subtitle: user.organization ?? 'Haijawekwa',
+              color: const Color(0xFF00695C),
             ),
           ],
         UserRole.mwekezaji => [

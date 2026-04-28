@@ -1,5 +1,5 @@
 // User roles supported by Shamba Smart
-enum UserRole { mkulima, duka, muuzaji, mwekezaji }
+enum UserRole { mkulima, duka, muuzaji, mwekezaji, afisa }
 
 enum ProductType { pesticides, fertilizers, seeds, tools, all }
 enum InvestmentType { landLease, projectFunding, bulkPurchase, infrastructure }
@@ -12,6 +12,7 @@ extension UserRoleX on UserRole {
         UserRole.duka      => 'Duka la Dawa',
         UserRole.muuzaji   => 'Muuzaji/Dalali',
         UserRole.mwekezaji => 'Mwekezaji',
+        UserRole.afisa     => 'Afisa Kilimo',
       };
 
   String get shortLabel => switch (this) {
@@ -19,6 +20,7 @@ extension UserRoleX on UserRole {
         UserRole.duka      => 'Duka',
         UserRole.muuzaji   => 'Muuzaji',
         UserRole.mwekezaji => 'Mwekezaji',
+        UserRole.afisa     => 'Afisa',
       };
 
   String get colorHex => switch (this) {
@@ -26,6 +28,7 @@ extension UserRoleX on UserRole {
         UserRole.duka      => '#1565C0',
         UserRole.muuzaji   => '#6A1B9A',
         UserRole.mwekezaji => '#C8860A',
+        UserRole.afisa     => '#00695C',
       };
 
   static UserRole fromKey(String key) =>
@@ -60,6 +63,14 @@ class UserModel {
   // Mwekezaji fields
   final String? investmentType;
 
+  // Afisa Kilimo fields
+  final String? organization;
+  final String? badgeNumber;
+  final String? district;
+
+  // All roles this account holds — enables multi-role switching
+  final List<UserRole> allRoles;
+
   UserModel({
     required this.id,
     required this.firstName,
@@ -78,7 +89,11 @@ class UserModel {
     this.businessName,
     this.cropsTraded,
     this.investmentType,
-  });
+    this.organization,
+    this.badgeNumber,
+    this.district,
+    List<UserRole>? allRoles,
+  }) : allRoles = allRoles ?? [role];
 
   String get displayName => '$firstName $lastName';
 
@@ -105,6 +120,13 @@ class UserModel {
         businessName: j['businessName'] as String?,
         cropsTraded: j['cropsTraded'] as String?,
         investmentType: j['investmentType'] as String?,
+        organization: j['organization'] as String?,
+        badgeNumber: j['badgeNumber'] as String?,
+        district: j['district'] as String?,
+        // Backward compat: existing users without allRoles default to [role]
+        allRoles: (j['allRoles'] as List?)
+            ?.map((r) => UserRoleX.fromKey(r as String))
+            .toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -125,5 +147,9 @@ class UserModel {
         if (businessName != null) 'businessName': businessName,
         if (cropsTraded != null) 'cropsTraded': cropsTraded,
         if (investmentType != null) 'investmentType': investmentType,
+        if (organization != null) 'organization': organization,
+        if (badgeNumber != null) 'badgeNumber': badgeNumber,
+        if (district != null) 'district': district,
+        'allRoles': allRoles.map((r) => r.key).toList(),
       };
 }

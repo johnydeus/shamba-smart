@@ -50,6 +50,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Mwekezaji
   String _investmentType = 'land_lease';
 
+  // Afisa Kilimo controllers
+  final _organizationCtrl = TextEditingController();
+  final _badgeNumberCtrl = TextEditingController();
+  String _afikasDistrict = 'Morogoro';
+
   @override
   void dispose() {
     _firstNameCtrl.dispose();
@@ -61,6 +66,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _shopNameCtrl.dispose();
     _businessNameCtrl.dispose();
     _cropsTradedCtrl.dispose();
+    _organizationCtrl.dispose();
+    _badgeNumberCtrl.dispose();
     super.dispose();
   }
 
@@ -94,6 +101,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'subtitle': 'Nawekeza katika kilimo',
           'color': const Color(0xFFC8860A),
         },
+        {
+          'role': UserRole.afisa,
+          'emoji': '🏛️',
+          'title': 'Afisa Kilimo',
+          'subtitle': 'Nasaidia wakulima shambani',
+          'color': const Color(0xFF00695C),
+        },
       ];
 
   Future<void> _submit() async {
@@ -111,6 +125,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       password: _passwordCtrl.text,
       region: _region,
       role: _selectedRole!,
+      organization: _selectedRole == UserRole.afisa
+          ? _organizationCtrl.text.trim()
+          : null,
+      badgeNumber: _selectedRole == UserRole.afisa
+          ? _badgeNumberCtrl.text.trim()
+          : null,
+      district:
+          _selectedRole == UserRole.afisa ? _afikasDistrict : null,
       shopName: _selectedRole == UserRole.duka
           ? _shopNameCtrl.text.trim()
           : null,
@@ -398,6 +420,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           // Note: mkulima farm data is collected after registration
           // via FarmsScreen to support multiple farms per farmer
           if (_selectedRole == UserRole.duka) ..._dukaFields(),
+          if (_selectedRole == UserRole.afisa) ..._afisaFields(),
           if (_selectedRole == UserRole.muuzaji) ..._muuzajiFields(),
           if (_selectedRole == UserRole.mwekezaji) ..._mwekezajiFields(),
 
@@ -492,6 +515,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _field(_cropsTradedCtrl,
             'Mazao Unayonunua (mfano: Mahindi, Maharage)',
             Icons.shopping_basket_outlined),
+        const SizedBox(height: 12),
+      ];
+
+  List<Widget> _afisaFields() => [
+        Text('Taarifa za Kazi',
+            style: GoogleFonts.dmSans(
+                color: Colors.white70, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        _field(_organizationCtrl, 'Shirika / Wizara (mfano: Wizara ya Kilimo)',
+            Icons.account_balance_outlined),
+        const SizedBox(height: 12),
+        _field(_badgeNumberCtrl, 'Nambari ya Kitambulisho (Badge No.)',
+            Icons.badge_outlined),
+        const SizedBox(height: 12),
+        _dropdown(
+          label: 'Wilaya Unayohudumia',
+          value: _afikasDistrict,
+          items: kRegions,
+          onChanged: (v) => setState(() => _afikasDistrict = v!),
+        ),
         const SizedBox(height: 12),
       ];
 

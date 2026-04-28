@@ -12,6 +12,7 @@ import 'forum_screen.dart';
 import 'farms_screen.dart';
 import 'irrigation_screen.dart';
 import 'soil_screen.dart';
+import 'consultation_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -93,6 +94,14 @@ class ProfileScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
+              // ── Role switcher ──────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _RoleSwitcherCard(user: user),
+              ),
+
+              const SizedBox(height: 4),
+
               // ── Role-specific menu ────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -146,6 +155,24 @@ class ProfileScreen extends StatelessWidget {
                           icon: Icons.business_outlined,
                           label: 'Jina la Biashara',
                           value: user.businessName!),
+                    if (user.role == UserRole.afisa &&
+                        user.organization != null)
+                      _InfoTile(
+                          icon: Icons.account_balance_outlined,
+                          label: 'Shirika',
+                          value: user.organization!),
+                    if (user.role == UserRole.afisa &&
+                        user.badgeNumber != null)
+                      _InfoTile(
+                          icon: Icons.badge_outlined,
+                          label: 'Badge No.',
+                          value: user.badgeNumber!),
+                    if (user.role == UserRole.afisa &&
+                        user.district != null)
+                      _InfoTile(
+                          icon: Icons.map_outlined,
+                          label: 'Wilaya',
+                          value: user.district!),
 
                     const SizedBox(height: 20),
 
@@ -297,6 +324,48 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.settings_outlined,
             title: 'Mipangilio',
             subtitle: 'Badilisha taarifa za akaunti yako',
+            color: AppColors.mid,
+            onTap: () => _showSettingsDialog(context, user),
+          ),
+        ],
+      UserRole.afisa => [
+          _MenuItem(
+            icon: Icons.people,
+            title: 'Ushauri wa Wakulima',
+            subtitle: 'Ongea na wakulima wa eneo lako',
+            color: color,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) => const ConsultationScreen())),
+          ),
+          _MenuItem(
+            icon: Icons.landscape_outlined,
+            title: 'Data za Udongo',
+            subtitle: 'Angalia hali ya udongo shambani',
+            color: color,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const SoilScreen())),
+          ),
+          _MenuItem(
+            icon: Icons.satellite_alt_outlined,
+            title: 'Bei za Soko',
+            subtitle: 'Bei za mazao Tanzania leo',
+            color: color,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const MarketScreen())),
+          ),
+          _MenuItem(
+            icon: Icons.psychology_outlined,
+            title: 'Mshauri wa AI',
+            subtitle: 'Uliza maswali ya kilimo kwa Claude',
+            color: color,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const ForumScreen())),
+          ),
+          _MenuItem(
+            icon: Icons.settings_outlined,
+            title: 'Mipangilio',
+            subtitle: 'Taarifa za akaunti yako',
             color: AppColors.mid,
             onTap: () => _showSettingsDialog(context, user),
           ),
@@ -469,6 +538,399 @@ class _MenuItem extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Role switcher card ────────────────────────────────────────────────────────
+
+class _RoleSwitcherCard extends StatelessWidget {
+  final UserModel user;
+  const _RoleSwitcherCard({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final allRoles = user.allRoles;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.swap_horiz, color: AppColors.leaf, size: 20),
+                const SizedBox(width: 8),
+                Text('Majukumu Yangu',
+                    style: GoogleFonts.dmSans(
+                        fontWeight: FontWeight.bold, fontSize: 15)),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () => _showAddRoleSheet(context),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Ongeza', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                      foregroundColor: AppColors.leaf,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: allRoles.map((role) {
+                final isActive = role == user.role;
+                final color = AppColors.roleColor(role);
+                return GestureDetector(
+                  onTap: isActive
+                      ? null
+                      : () {
+                          context.read<AuthProvider>().switchRole(role);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  'Umebadilisha jukumu → ${role.label}'),
+                              backgroundColor: color,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? color
+                          : color.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isActive
+                            ? color
+                            : color.withValues(alpha: 0.3),
+                        width: isActive ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isActive)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 4),
+                            child: Icon(Icons.check_circle,
+                                color: Colors.white, size: 14),
+                          ),
+                        Text(
+                          role.label,
+                          style: TextStyle(
+                            color: isActive ? Colors.white : color,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        if (!isActive) ...[
+                          const SizedBox(width: 4),
+                          Icon(Icons.touch_app,
+                              color: color.withValues(alpha: 0.6),
+                              size: 13),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            if (allRoles.length == 1) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Gonga "Ongeza" kuongeza jukumu lingine bila akaunti mpya.',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                    fontStyle: FontStyle.italic),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddRoleSheet(BuildContext context) {
+    final user = context.read<AuthProvider>().currentUser!;
+    final available = UserRole.values
+        .where((r) => !user.allRoles.contains(r))
+        .toList();
+
+    if (available.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Una majukumu yote tayari kwenye akaunti hii.')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AddRoleSheet(availableRoles: available),
+    );
+  }
+}
+
+// ── Add Role bottom sheet ─────────────────────────────────────────────────────
+
+class _AddRoleSheet extends StatefulWidget {
+  final List<UserRole> availableRoles;
+  const _AddRoleSheet({required this.availableRoles});
+
+  @override
+  State<_AddRoleSheet> createState() => _AddRoleSheetState();
+}
+
+class _AddRoleSheetState extends State<_AddRoleSheet> {
+  UserRole? _selected;
+  final _shopNameCtrl = TextEditingController();
+  final _businessCtrl = TextEditingController();
+  final _orgCtrl = TextEditingController();
+  final _badgeCtrl = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  static const Map<UserRole, Map<String, dynamic>> _roleMeta = {
+    UserRole.mkulima:   {'emoji': '🌿', 'color': Color(0xFF2E7D32)},
+    UserRole.duka:      {'emoji': '🏪', 'color': Color(0xFF1565C0)},
+    UserRole.muuzaji:   {'emoji': '📈', 'color': Color(0xFF6A1B9A)},
+    UserRole.mwekezaji: {'emoji': '💼', 'color': Color(0xFFC8860A)},
+    UserRole.afisa:     {'emoji': '🏛️', 'color': Color(0xFF00695C)},
+  };
+
+  @override
+  void dispose() {
+    _shopNameCtrl.dispose();
+    _businessCtrl.dispose();
+    _orgCtrl.dispose();
+    _badgeCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_selected == null) return;
+    setState(() { _saving = true; _error = null; });
+
+    final error = await context.read<AuthProvider>().addRole(
+      role: _selected!,
+      shopName: _selected == UserRole.duka
+          ? _shopNameCtrl.text.trim() : null,
+      businessName: _selected == UserRole.muuzaji
+          ? _businessCtrl.text.trim() : null,
+      organization: _selected == UserRole.afisa
+          ? _orgCtrl.text.trim() : null,
+      badgeNumber: _selected == UserRole.afisa
+          ? _badgeCtrl.text.trim() : null,
+    );
+
+    setState(() => _saving = false);
+
+    if (error != null) {
+      setState(() => _error = error);
+    } else if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '✅ Jukumu la ${_selected!.label} limeongezwa! Gonga kuchagua.'),
+          backgroundColor: AppColors.leaf,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.92,
+      minChildSize: 0.4,
+      builder: (_, ctrl) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFFDF6EE),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: ListView(
+          controller: ctrl,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2))),
+            ),
+            const SizedBox(height: 16),
+
+            Text('Ongeza Jukumu Jipya',
+                style: GoogleFonts.playfairDisplay(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('Chagua jukumu unalotaka kuongeza bila kuunda akaunti mpya.',
+                style: TextStyle(
+                    color: Colors.grey.shade600, fontSize: 13)),
+            const SizedBox(height: 20),
+
+            // Role selector chips
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: widget.availableRoles.map((role) {
+                final meta = _roleMeta[role]!;
+                final color = meta['color'] as Color;
+                final isSelected = _selected == role;
+                return GestureDetector(
+                  onTap: () => setState(() => _selected = role),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? color
+                          : color.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: isSelected
+                              ? color
+                              : color.withValues(alpha: 0.3),
+                          width: isSelected ? 2 : 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(meta['emoji'] as String,
+                            style: const TextStyle(fontSize: 20)),
+                        const SizedBox(width: 8),
+                        Text(role.label,
+                            style: TextStyle(
+                                color: isSelected ? Colors.white : color,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+
+            // Role-specific fields
+            if (_selected != null) ...[
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 12),
+              if (_selected == UserRole.duka) ...[
+                _buildField(_shopNameCtrl, 'Jina la Duka',
+                    Icons.store_outlined),
+              ],
+              if (_selected == UserRole.muuzaji) ...[
+                _buildField(_businessCtrl, 'Jina la Biashara',
+                    Icons.business_outlined),
+              ],
+              if (_selected == UserRole.afisa) ...[
+                _buildField(_orgCtrl, 'Shirika / Wizara',
+                    Icons.account_balance_outlined),
+                const SizedBox(height: 10),
+                _buildField(_badgeCtrl, 'Nambari ya Kitambulisho',
+                    Icons.badge_outlined),
+              ],
+              if (_selected == UserRole.mkulima ||
+                  _selected == UserRole.mwekezaji)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.leaf.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_outline,
+                            color: AppColors.leaf, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _selected == UserRole.mkulima
+                                ? 'Utaweza kuongeza mashamba yako baada ya kuchagua jukumu hili.'
+                                : 'Taarifa za uwekezaji zinaweza kuongezwa kutoka menyu yako.',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppColors.leaf),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8)),
+                child: Text(_error!,
+                    style: TextStyle(color: Colors.red.shade700,
+                        fontSize: 13)),
+              ),
+            ],
+
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: (_selected == null || _saving) ? null : _save,
+              icon: _saving
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.add_circle_outline),
+              label: Text(
+                _saving ? 'Inaongeza...' : 'Ongeza Jukumu',
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildField(TextEditingController ctrl, String hint, IconData icon) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: TextField(
+          controller: ctrl,
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: Icon(icon, size: 20, color: Colors.grey),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.black12),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.black12),
+            ),
+          ),
+        ),
+      );
 }
 
 class _SettingRow extends StatelessWidget {
