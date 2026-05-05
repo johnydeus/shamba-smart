@@ -9,6 +9,8 @@ import 'providers/chat_provider.dart';
 import 'providers/ai_provider.dart';
 import 'providers/satellite_provider.dart';
 import 'providers/farm_provider.dart';
+import 'providers/community_provider.dart';
+import 'models/user_model.dart';
 import 'screens/main_shell.dart';
 import 'screens/login_screen.dart';
 
@@ -32,16 +34,22 @@ Future<void> main() async {
   await listingProvider.init();
 
   final chatProvider = ChatProvider();
-  await chatProvider.init();
+  // Initialize immediately if user is already logged in
+  if (authProvider.isLoggedIn && authProvider.currentUser != null) {
+    final u = authProvider.currentUser!;
+    await chatProvider.init(u.id, u.displayName, u.role.name);
+  }
 
   final satelliteProvider = SatelliteProvider();
   await satelliteProvider.init();
 
   final farmProvider = FarmProvider();
-  // Load farms for the already-logged-in user (if session exists)
   if (authProvider.isLoggedIn && authProvider.currentUser != null) {
     await farmProvider.init(authProvider.currentUser!.id);
   }
+
+  final communityProvider = CommunityProvider();
+  await communityProvider.init();
 
   runApp(
     MultiProvider(
@@ -52,6 +60,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => AiProvider()),
         ChangeNotifierProvider.value(value: satelliteProvider),
         ChangeNotifierProvider.value(value: farmProvider),
+        ChangeNotifierProvider.value(value: communityProvider),
       ],
       child: const ShambaSmart(),
     ),
@@ -131,11 +140,14 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
-    // Load farms whenever a new user logs in
+    // When a new user logs in, initialise all per-user providers
     if (auth.isLoggedIn && auth.currentUser?.id != _lastUserId) {
       _lastUserId = auth.currentUser!.id;
+      final user = auth.currentUser!;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.read<FarmProvider>().init(auth.currentUser!.id);
+        context.read<FarmProvider>().init(user.id);
+        context.read<ChatProvider>().init(user.id, user.displayName, user.role.key);
+        context.read<CommunityProvider>().loadPosts();
       });
     }
 
@@ -143,6 +155,7 @@ class _AuthGateState extends State<AuthGate> {
       _lastUserId = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<FarmProvider>().clear();
+        context.read<ChatProvider>().clear();
       });
     }
 

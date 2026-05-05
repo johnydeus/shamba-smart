@@ -494,7 +494,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ],
           itemLabels: const {
             'all': 'Bidhaa Zote',
-            'pesticides': 'Dawa za Kilimo',
+            'pesticides': 'Viuatilifu',
             'fertilizers': 'Mbolea',
             'seeds': 'Mbegu',
             'tools': 'Zana za Kilimo',

@@ -2,7 +2,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/satellite_models.dart';
 import '../providers/satellite_provider.dart';
@@ -126,16 +125,11 @@ class _SetupFieldView extends StatefulWidget {
 }
 
 class _SetupFieldViewState extends State<_SetupFieldView> {
-  final _nameCtrl   = TextEditingController(text: 'Shamba Langu');
-  final _latCtrl    = TextEditingController();
-  final _lngCtrl    = TextEditingController();
-  bool _useManual   = false;
+  final _nameCtrl = TextEditingController(text: 'Shamba Langu');
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _latCtrl.dispose();
-    _lngCtrl.dispose();
     super.dispose();
   }
 
@@ -198,46 +192,30 @@ class _SetupFieldViewState extends State<_SetupFieldView> {
                 _Field(_nameCtrl, 'Jina la Shamba', Icons.landscape_outlined),
                 const SizedBox(height: 14),
 
-                // Location method toggle
-                Row(
-                  children: [
-                    Expanded(
-                      child: _MethodBtn(
-                        icon: Icons.gps_fixed,
-                        label: 'Tumia GPS',
-                        selected: !_useManual,
-                        onTap: () => setState(() => _useManual = false),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _MethodBtn(
-                        icon: Icons.edit_location_alt_outlined,
-                        label: 'Weka Mikono',
-                        selected: _useManual,
-                        onTap: () => setState(() => _useManual = true),
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Manual coordinate fields
-                if (_useManual) ...[
-                  const SizedBox(height: 14),
-                  Row(
+                // GPS note
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.mint,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: AppColors.leaf.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
                     children: [
+                      const Icon(Icons.gps_fixed,
+                          color: AppColors.leaf, size: 16),
+                      const SizedBox(width: 8),
                       Expanded(
-                        child: _Field(_latCtrl, 'Latitudo (-6.8)',
-                            Icons.north, TextInputType.number),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _Field(_lngCtrl, 'Longitudo (37.6)',
-                            Icons.east, TextInputType.number),
+                        child: Text(
+                          'Eneo lako la GPS litatumika kupata picha za satellite za shamba lako.',
+                          style: GoogleFonts.dmSans(
+                              fontSize: 12, color: AppColors.leaf),
+                        ),
                       ),
                     ],
                   ),
-                ],
+                ),
 
                 const SizedBox(height: 20),
 
@@ -342,24 +320,7 @@ class _SetupFieldViewState extends State<_SetupFieldView> {
 
   Future<void> _setup(BuildContext ctx, SatelliteProvider sat) async {
     if (_nameCtrl.text.trim().isEmpty) return;
-
-    if (_useManual) {
-      final lat = double.tryParse(_latCtrl.text);
-      final lng = double.tryParse(_lngCtrl.text);
-      if (lat == null || lng == null) {
-        ScaffoldMessenger.of(ctx).showSnackBar(
-          const SnackBar(
-              content: Text('Weka latitudo na longitudo sahihi.')),
-        );
-        return;
-      }
-      await sat.createFieldFromCoordinates(
-        fieldName: _nameCtrl.text.trim(),
-        center: LatLng(lat, lng),
-      );
-    } else {
-      await sat.createFieldFromGps(fieldName: _nameCtrl.text.trim());
-    }
+    await sat.createFieldFromGps(fieldName: _nameCtrl.text.trim());
   }
 }
 
@@ -1603,64 +1564,16 @@ class _Row extends StatelessWidget {
 }
 
 // Setup screen helper widgets
-class _MethodBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _MethodBtn(
-      {required this.icon,
-      required this.label,
-      required this.selected,
-      required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.leaf : AppColors.mist,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected
-                ? AppColors.leaf
-                : AppColors.mid.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon,
-                color: selected ? Colors.white : AppColors.mid,
-                size: 22),
-            const SizedBox(height: 4),
-            Text(label,
-                style: GoogleFonts.dmSans(
-                    fontSize: 12,
-                    color: selected ? Colors.white : AppColors.mid,
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _Field extends StatelessWidget {
   final TextEditingController ctrl;
   final String label;
   final IconData icon;
-  final TextInputType type;
-  const _Field(this.ctrl, this.label, this.icon,
-      [this.type = TextInputType.text]);
+  const _Field(this.ctrl, this.label, this.icon);
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: ctrl,
-      keyboardType: type,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: AppColors.mid),

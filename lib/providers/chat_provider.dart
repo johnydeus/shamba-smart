@@ -1,85 +1,132 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
 
-const _kMsgs = 'ss_msgs';
-
-// Auto-replies in Kiswahili for each message type
-const _textReplies = [
-  'Asante kwa mawasiliano. Nitajibu hivi karibuni. 🙏',
-  'Ndio, bidhaa bado ipo. Tunaweza kuzungumza zaidi. Bei inaweza kujadiliwa.',
-  'Karibu sana! Tutafanya biashara nzuri pamoja. 📞',
-  'Samahani kwa kuchelewa. Niko shambani sasa. Nitawasiliana nawe baadaye. 🌿',
-  'Ndiyo, ninaweza kusaidia. Tuma nambari yako nikusisitize zaidi. ✅',
-];
-
-const _imageReplies = [
-  'Picha nzuri! Asante kwa kutuma. 👍',
-  'Nimeona picha yako. Bidhaa inaonekana nzuri sana! 😊',
-  'Asante kwa picha. Nitatoa jibu hivi karibuni. 📷',
-];
-
-const _locationReplies = [
-  'Asante kwa eneo lako. Nitafika hivi karibuni! 📍',
-  'Nimepokea eneo. Niko karibu nawe, nitakuja saa 2. 🗺️',
-  'Eneo limepokewa. Tunaweza kukutana kesho asubuhi? 📍',
-];
-
-const _fileReplies = [
-  'Nimeipokea faili. Nitaisoma hivi karibuni. 📄',
-  'Asante kwa faili. Nitakagua bei na kukujibu. 📋',
-  'Faili imefika vizuri. Nitashiriki na timu yangu. ✅',
-];
-
 class ChatProvider extends ChangeNotifier {
-  final Map<String, ConversationModel> _conversations = {};
-  final _rand = Random();
+  String? _myId;
+  String? _myName;
+  String? _myRole;
 
+  final Map<String, ConversationModel> _conversations = {};
   Map<String, ConversationModel> get conversations => _conversations;
+
+  bool get isReady => _myId != null && _myId!.isNotEmpty;
 
   int get totalUnread =>
       _conversations.values.fold(0, (sum, c) => sum + c.unreadCount);
 
-  Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_kMsgs);
-    if (raw != null) {
-      final map = jsonDecode(raw) as Map<String, dynamic>;
-      for (final entry in map.entries) {
-        _conversations[entry.key] = ConversationModel.fromJson(
-            entry.value as Map<String, dynamic>);
-      }
-    }
-    if (_conversations.isEmpty) {
-      _seedDemo();
-      await _save();
-    }
+  RealtimeChannel? _channel;
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+
+  Future<void> init(String userId, String userName, String userRole) async {
+    _myId   = userId;
+    _myName = userName;
+    _myRole = userRole;
+    _conversations.clear();
+
+    await loadMessages();
+    _subscribeRealtime();  // listen for instant incoming messages
+  }
+
+  void clear() {
+    _channel?.unsubscribe();
+    _channel = null;
+    _myId   = null;
+    _myName = null;
+    _myRole = null;
+    _conversations.clear();
     notifyListeners();
   }
 
-  ConversationModel getConversation(
-    String contactId,
-    String contactName,
-    UserRole contactRole,
-    String contactColorHex,
-  ) {
-    return _conversations.putIfAbsent(
-      contactId,
-      () => ConversationModel(
-        contactId: contactId,
-        contactName: contactName,
-        contactRole: contactRole,
-        contactColorHex: contactColorHex,
-        messages: [],
-      ),
-    );
+  // ── Supabase Realtime — instant delivery ────────────────────────────────────
+
+  void _subscribeRealtime() {
+    _channel?.unsubscribe();
+    if (_myId == null) return;
+
+    _channel = Supabase.instance.client
+        .channel('messages_$_myId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'direct_messages',
+          callback: (payload) {
+            // Only process messages addressed TO me
+            final row = payload.newRecord;
+            if (row['to_id'] == _myId || row['from_id'] == _myId) {
+              loadMessages(); // refresh the full conversation
+            }
+          },
+        )
+        .subscribe();
+
+    debugPrint('ChatProvider: realtime subscribed for $_myId');
   }
 
-  // ── Send methods ───────────────────────────────────────────────────────────
+  // ── Load conversations from Supabase ────────────────────────────────────────
+
+  Future<void> loadMessages() async {
+    if (!isReady) return;
+    try {
+      final rows = await Supabase.instance.client
+          .from('direct_messages')
+          .select()
+          .or('from_id.eq.$_myId,to_id.eq.$_myId')
+          .order('created_at');
+
+      final newConvs = <String, ConversationModel>{};
+
+      for (final row in rows as List) {
+        final fromId    = row['from_id']   as String;
+        final toId      = row['to_id']     as String;
+        final fromName  = row['from_name'] as String;
+        final toName    = row['to_name']   as String;
+        final fromRole  = row['from_role'] as String? ?? 'mkulima';
+        final toRole    = row['to_role']   as String? ?? 'mkulima';
+        final isFromMe  = fromId == _myId;
+
+        final partnerId    = isFromMe ? toId     : fromId;
+        final partnerName  = isFromMe ? toName   : fromName;
+        final partnerRole  = isFromMe ? toRole   : fromRole;
+        final partnerColor = UserRoleX.fromKey(partnerRole).colorHex;
+
+        final conv = newConvs.putIfAbsent(
+          partnerId,
+          () => ConversationModel(
+            contactId:       partnerId,
+            contactName:     partnerName,
+            contactRole:     UserRoleX.fromKey(partnerRole),
+            contactColorHex: partnerColor,
+            messages:        [],
+          ),
+        );
+
+        conv.messages.add(MessageModel(
+          id:        row['id'] as String,
+          senderId:  fromId,
+          text:      row['content'] as String,
+          timestamp: DateTime.parse(row['created_at'] as String).toLocal(),
+          isFromMe:  isFromMe,
+          type:      MessageType.text,
+        ));
+
+        if (!isFromMe && !(row['is_read'] as bool? ?? false)) {
+          conv.unreadCount++;
+        }
+      }
+
+      _conversations.clear();
+      _conversations.addAll(newConvs);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('ChatProvider.loadMessages error: $e');
+      rethrow; // let callers handle it
+    }
+  }
+
+  // ── Send message ─────────────────────────────────────────────────────────────
 
   Future<void> sendMessage({
     required String currentUserId,
@@ -89,22 +136,29 @@ class ChatProvider extends ChangeNotifier {
     required String contactColorHex,
     required String text,
   }) async {
-    await _addOutgoing(
-      currentUserId: currentUserId,
-      contactId: contactId,
-      contactName: contactName,
-      contactRole: contactRole,
-      contactColorHex: contactColorHex,
-      message: MessageModel(
-        id: _newId(),
-        senderId: currentUserId,
-        text: text,
-        timestamp: DateTime.now(),
-        isFromMe: true,
-        type: MessageType.text,
-      ),
-      replies: _textReplies,
-    );
+    if (!isReady) {
+      throw Exception(
+          'Hujaunganika bado. Funga app na uifungue tena kisha jaribu.');
+    }
+    if (text.trim().isEmpty) return;
+
+    final id  = DateTime.now().microsecondsSinceEpoch.toString();
+
+    await Supabase.instance.client.from('direct_messages').insert({
+      'id':        id,
+      'from_id':   _myId,
+      'from_name': _myName ?? 'Mkulima',
+      'from_role': _myRole ?? 'mkulima',
+      'to_id':     contactId,
+      'to_name':   contactName,
+      'to_role':   contactRole.key,
+      'content':   text.trim(),
+      'type':      'text',
+      'is_read':   false,
+    });
+
+    // Refresh immediately so sender sees their message
+    await loadMessages();
   }
 
   Future<void> sendImage({
@@ -116,22 +170,11 @@ class ChatProvider extends ChangeNotifier {
     required String imagePath,
     String caption = '',
   }) async {
-    await _addOutgoing(
-      currentUserId: currentUserId,
-      contactId: contactId,
-      contactName: contactName,
-      contactRole: contactRole,
-      contactColorHex: contactColorHex,
-      message: MessageModel(
-        id: _newId(),
-        senderId: currentUserId,
-        text: caption,
-        timestamp: DateTime.now(),
-        isFromMe: true,
-        type: MessageType.image,
-        imagePath: imagePath,
-      ),
-      replies: _imageReplies,
+    final notice = caption.isNotEmpty ? '📷 Picha: $caption' : '📷 Ametuma picha';
+    await sendMessage(
+      currentUserId: currentUserId, contactId: contactId,
+      contactName: contactName, contactRole: contactRole,
+      contactColorHex: contactColorHex, text: notice,
     );
   }
 
@@ -145,24 +188,12 @@ class ChatProvider extends ChangeNotifier {
     required double lng,
     String locationName = 'Eneo Langu',
   }) async {
-    await _addOutgoing(
-      currentUserId: currentUserId,
-      contactId: contactId,
-      contactName: contactName,
-      contactRole: contactRole,
-      contactColorHex: contactColorHex,
-      message: MessageModel(
-        id: _newId(),
-        senderId: currentUserId,
-        text: '',
-        timestamp: DateTime.now(),
-        isFromMe: true,
-        type: MessageType.location,
-        locationLat: lat,
-        locationLng: lng,
-        locationName: locationName,
-      ),
-      replies: _locationReplies,
+    final text =
+        '📍 $locationName\nLat: ${lat.toStringAsFixed(5)}, Lng: ${lng.toStringAsFixed(5)}\nhttps://maps.google.com/?q=$lat,$lng';
+    await sendMessage(
+      currentUserId: currentUserId, contactId: contactId,
+      contactName: contactName, contactRole: contactRole,
+      contactColorHex: contactColorHex, text: text,
     );
   }
 
@@ -177,188 +208,48 @@ class ChatProvider extends ChangeNotifier {
     required String fileType,
     required int fileSize,
   }) async {
-    await _addOutgoing(
-      currentUserId: currentUserId,
-      contactId: contactId,
-      contactName: contactName,
-      contactRole: contactRole,
-      contactColorHex: contactColorHex,
-      message: MessageModel(
-        id: _newId(),
-        senderId: currentUserId,
-        text: '',
-        timestamp: DateTime.now(),
-        isFromMe: true,
-        type: MessageType.file,
-        filePath: filePath,
-        fileName: fileName,
-        fileType: fileType,
-        fileSize: fileSize,
-      ),
-      replies: _fileReplies,
+    final kb = (fileSize / 1024).toStringAsFixed(1);
+    await sendMessage(
+      currentUserId: currentUserId, contactId: contactId,
+      contactName: contactName, contactRole: contactRole,
+      contactColorHex: contactColorHex, text: '📄 Faili: $fileName ($kb KB)',
     );
   }
 
-  // ── Internal helpers ───────────────────────────────────────────────────────
-
-  Future<void> _addOutgoing({
-    required String currentUserId,
-    required String contactId,
-    required String contactName,
-    required UserRole contactRole,
-    required String contactColorHex,
-    required MessageModel message,
-    required List<String> replies,
-  }) async {
-    final conv = getConversation(
-        contactId, contactName, contactRole, contactColorHex);
-    conv.messages.add(message);
-    await _save();
-    notifyListeners();
-
-    // Auto-reply after 1800ms
-    Future.delayed(const Duration(milliseconds: 1800), () async {
-      if (_conversations.containsKey(contactId)) {
-        final reply = replies[_rand.nextInt(replies.length)];
-        _conversations[contactId]!.messages.add(MessageModel(
-          id: '${_newId()}_r',
-          senderId: contactId,
-          text: reply,
-          timestamp: DateTime.now(),
-          isFromMe: false,
-          type: MessageType.text,
-        ));
-        _conversations[contactId]!.unreadCount++;
-        await _save();
-        notifyListeners();
-      }
-    });
-  }
+  // ── Mark read ────────────────────────────────────────────────────────────────
 
   Future<void> markRead(String contactId) async {
     if (_conversations.containsKey(contactId)) {
       _conversations[contactId]!.unreadCount = 0;
-      await _save();
       notifyListeners();
+    }
+    if (!isReady) return;
+    try {
+      await Supabase.instance.client
+          .from('direct_messages')
+          .update({'is_read': true})
+          .eq('to_id', _myId!)
+          .eq('from_id', contactId)
+          .eq('is_read', false);
+    } catch (e) {
+      debugPrint('ChatProvider.markRead error: $e');
     }
   }
 
-  String _newId() => DateTime.now().microsecondsSinceEpoch.toString();
+  // ── Helper ───────────────────────────────────────────────────────────────────
 
-  Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _kMsgs,
-        jsonEncode(
-            _conversations.map((k, v) => MapEntry(k, v.toJson()))));
-  }
-
-  // ── Demo seed data ─────────────────────────────────────────────────────────
-
-  void _seedDemo() {
-    final now = DateTime.now();
-
-    _addDemoConv(
-      contactId: 'seller_001',
-      contactName: 'Amina Rashid',
-      role: UserRole.mkulima,
-      colorHex: '#2E7D32',
-      messages: [
-        _txt('seller_001', 'Habari! Bado una pilipili kali? 🌶️',
-            now.subtract(const Duration(minutes: 45)), false),
-        _txt('me', 'Ndio, tuna kilo 500 zinapatikana. Bei ni TZS 3,200/kg.',
-            now.subtract(const Duration(minutes: 40)), true),
-        _txt('seller_001',
-            'Vizuri! Ninaweza kununua kilo 100. Unitumie eneo la shamba.',
-            now.subtract(const Duration(minutes: 35)), false),
-      ],
-    );
-
-    _addDemoConv(
-      contactId: 'seller_002',
-      contactName: 'AgriPlus Morogoro',
-      role: UserRole.duka,
-      colorHex: '#1565C0',
-      messages: [
-        _txt('me', 'Mnazo Coragen SC 500ml? Ninahitaji haraka kwa viwavi.',
-            now.subtract(const Duration(hours: 3)), true),
-        _txt('seller_002',
-            'Ndio tuna! TZS 18,500 kwa chupa. Nitumie PDF ya bei zetu zote.',
-            now.subtract(const Duration(hours: 2, minutes: 55)), false),
-      ],
-    );
-
-    _addDemoConv(
-      contactId: 'seller_004',
-      contactName: 'Musa Komba',
-      role: UserRole.mwekezaji,
-      colorHex: '#C8860A',
-      messages: [
-        _txt('seller_004',
-            'Habari! Shamba la ekari 10 Chalinze linapatikana.',
-            now.subtract(const Duration(days: 1, hours: 2)), false),
-        _txt('me', 'Ndiyo, nina nia. Piga picha ya shamba unitumie.',
-            now.subtract(const Duration(days: 1, hours: 1)), true),
-        _txt('seller_004', 'Sawa! Nitatuma picha na eneo sasa hivi.',
-            now.subtract(const Duration(days: 1)), false),
-      ],
-    );
-
-    _addDemoConv(
-      contactId: 'seller_005',
-      contactName: 'Hassan Ikungi Farm',
-      role: UserRole.mkulima,
-      colorHex: '#2E7D32',
-      messages: [
-        _txt('me',
-            'Vitunguu vyako vya Singida — naweza kununua tani 10?',
-            now.subtract(const Duration(days: 2)), true),
-        _txt('seller_005',
-            'Ndiyo! Tuna tani 15. Nitumie faili ya bei na masharti.',
-            now.subtract(const Duration(days: 1, hours: 23)), false),
-      ],
-    );
-
-    _addDemoConv(
-      contactId: 'seller_007',
-      contactName: 'Mbogamboga Logistics',
-      role: UserRole.muuzaji,
-      colorHex: '#6A1B9A',
-      messages: [
-        _txt('me', 'Mnatoa usafiri DSM hadi Morogoro?',
-            now.subtract(const Duration(days: 3)), true),
-        _txt('seller_007',
-            'Ndio! TZS 120,000 kwa safari. Tutumiane eneo la kupakia mazao.',
-            now.subtract(const Duration(days: 2, hours: 22)), false),
-      ],
-    );
-  }
-
-  void _addDemoConv({
-    required String contactId,
-    required String contactName,
-    required UserRole role,
-    required String colorHex,
-    required List<MessageModel> messages,
-  }) {
-    final unread = messages.where((m) => !m.isFromMe).length;
-    _conversations[contactId] = ConversationModel(
-      contactId: contactId,
-      contactName: contactName,
-      contactRole: role,
-      contactColorHex: colorHex,
-      messages: messages,
-      unreadCount: unread > 1 ? 1 : 0,
-    );
-  }
-
-  MessageModel _txt(String sender, String text, DateTime time, bool fromMe) =>
-      MessageModel(
-        id: '${time.millisecondsSinceEpoch}_$sender',
-        senderId: sender,
-        text: text,
-        timestamp: time,
-        isFromMe: fromMe,
-        type: MessageType.text,
+  ConversationModel getConversation(
+    String contactId,
+    String contactName,
+    UserRole contactRole,
+    String contactColorHex,
+  ) =>
+      _conversations.putIfAbsent(
+        contactId,
+        () => ConversationModel(
+          contactId: contactId, contactName: contactName,
+          contactRole: contactRole, contactColorHex: contactColorHex,
+          messages: [],
+        ),
       );
 }

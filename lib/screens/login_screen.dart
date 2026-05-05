@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import 'home_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -44,13 +43,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _loading = false);
 
-    if (error == null && mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-    } else {
-      setState(() => _errorMessage = error ?? 'Hitilafu isiyojulikana.');
+    if (error != null) {
+      setState(() => _errorMessage = error);
     }
+    // On success, AuthGate in main.dart watches auth.isLoggedIn and automatically
+    // swaps LoginScreen → MainShell. No manual Navigator push needed.
   }
 
   @override

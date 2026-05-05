@@ -1,80 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
+import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/common_widgets.dart';
 import 'chat_screen.dart';
-
-// Demo farmers the field officer can consult with
-// In a production app these would come from Supabase
-const List<Map<String, dynamic>> _demoFarmers = [
-  {
-    'id': 'farmer_001',
-    'name': 'Amina Juma',
-    'region': 'Morogoro',
-    'crops': ['Mahindi', 'Nyanya'],
-    'acres': 2.5,
-    'issue': 'Magonjwa ya mahindi',
-  },
-  {
-    'id': 'farmer_002',
-    'name': 'Hassan Mwangi',
-    'region': 'Kilosa',
-    'crops': ['Muhogo', 'Maharagwe'],
-    'acres': 4.0,
-    'issue': 'Udongo wenye tindikali',
-  },
-  {
-    'id': 'farmer_003',
-    'name': 'Fatuma Said',
-    'region': 'Arusha',
-    'crops': ['Nyanya', 'Pilipili hoho'],
-    'acres': 1.5,
-    'issue': 'Wadudu kwenye nyanya',
-  },
-  {
-    'id': 'farmer_004',
-    'name': 'John Mwambene',
-    'region': 'Mbeya',
-    'crops': ['Mchele', 'Mahindi'],
-    'acres': 6.0,
-    'issue': 'Umwagiliaji',
-  },
-  {
-    'id': 'farmer_005',
-    'name': 'Zena Komba',
-    'region': 'Dodoma',
-    'crops': ['Alizeti', 'Mtama'],
-    'acres': 3.0,
-    'issue': 'Ukame na mbolea',
-  },
-  {
-    'id': 'farmer_006',
-    'name': 'Peter Chaula',
-    'region': 'Iringa',
-    'crops': ['Viazi vitamu', 'Maharagwe'],
-    'acres': 2.0,
-    'issue': 'Kuoza kwa viazi',
-  },
-  {
-    'id': 'farmer_007',
-    'name': 'Mariam Ally',
-    'region': 'Tanga',
-    'crops': ['Muhogo', 'Ndizi'],
-    'acres': 5.0,
-    'issue': 'Ugonjwa wa mosaic muhogo',
-  },
-  {
-    'id': 'farmer_008',
-    'name': 'Rashidi Bakari',
-    'region': 'Mwanza',
-    'crops': ['Pamba', 'Mahindi'],
-    'acres': 8.0,
-    'issue': 'Viwavi wa jeshi',
-  },
-];
 
 class ConsultationScreen extends StatefulWidget {
   const ConsultationScreen({super.key});
@@ -89,10 +22,16 @@ class _ConsultationScreenState extends State<ConsultationScreen>
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
+  // Real farmers from Supabase
+  List<Map<String, dynamic>> _farmers = [];
+  bool _loadingFarmers = false;
+  String? _farmersError;
+
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
+    _loadFarmers();
   }
 
   @override
@@ -100,6 +39,42 @@ class _ConsultationScreenState extends State<ConsultationScreen>
     _tabCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadFarmers() async {
+    setState(() { _loadingFarmers = true; _farmersError = null; });
+    try {
+      final myId = context.read<AuthProvider>().currentUser?.id ?? '';
+      final rows = await Supabase.instance.client
+          .from('farmers')
+          .select('id, name, region, role, color_hex, extra_info, created_at')
+          .neq('id', myId)
+          .order('created_at', ascending: false);
+      if (mounted) {
+        setState(() {
+          _farmers = (rows as List).cast<Map<String, dynamic>>();
+          _loadingFarmers = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _farmersError = 'Hitilafu ya mtandao. Angalia intaneti na ujaribu tena.';
+          _loadingFarmers = false;
+        });
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredFarmers {
+    if (_searchQuery.isEmpty) return _farmers;
+    final q = _searchQuery.toLowerCase();
+    return _farmers.where((f) {
+      return (f['name'] as String? ?? '').toLowerCase().contains(q) ||
+          (f['region'] as String? ?? '').toLowerCase().contains(q) ||
+          (f['extra_info'] as String? ?? '').toLowerCase().contains(q) ||
+          (f['role'] as String? ?? '').toLowerCase().contains(q);
+    }).toList();
   }
 
   @override
@@ -111,15 +86,6 @@ class _ConsultationScreenState extends State<ConsultationScreen>
         final tb = b.lastMessageTime ?? DateTime(2000);
         return tb.compareTo(ta);
       });
-
-    final filtered = _demoFarmers.where((f) {
-      if (_searchQuery.isEmpty) return true;
-      final q = _searchQuery.toLowerCase();
-      return (f['name'] as String).toLowerCase().contains(q) ||
-          (f['region'] as String).toLowerCase().contains(q) ||
-          (f['crops'] as List).any(
-              (c) => c.toString().toLowerCase().contains(q));
-    }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.mist,
@@ -156,13 +122,29 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                 ],
               ),
             ),
-            const Tab(
+            Tab(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.people_outline, size: 16),
-                  SizedBox(width: 6),
-                  Text('Wakulima'),
+                  const Icon(Icons.people_outline, size: 16),
+                  const SizedBox(width: 6),
+                  const Text('Wakulima'),
+                  if (_farmers.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text('${_farmers.length}',
+                          style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white)),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -173,7 +155,7 @@ class _ConsultationScreenState extends State<ConsultationScreen>
         controller: _tabCtrl,
         children: [
           _buildConversationsTab(activeConvs, chatProv),
-          _buildFarmersTab(filtered),
+          _buildFarmersTab(),
         ],
       ),
     );
@@ -297,12 +279,12 @@ class _ConsultationScreenState extends State<ConsultationScreen>
     );
   }
 
-  // ── Tab 2: Farmers directory ──────────────────────────────────────────────
+  // ── Tab 2: Real farmers directory from Supabase ───────────────────────────
 
-  Widget _buildFarmersTab(List<Map<String, dynamic>> farmers) {
+  Widget _buildFarmersTab() {
     return Column(
       children: [
-        // Search bar
+        // Search + refresh bar
         Padding(
           padding: const EdgeInsets.all(12),
           child: TextField(
@@ -314,15 +296,22 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                   const TextStyle(color: Colors.grey, fontSize: 13),
               prefixIcon:
                   const Icon(Icons.search, color: Colors.grey),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 18),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() => _searchQuery = '');
-                      },
+              suffixIcon: _loadingFarmers
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF1A5C2E))),
                     )
-                  : null,
+                  : IconButton(
+                      icon: const Icon(Icons.refresh, size: 20,
+                          color: Color(0xFF1A5C2E)),
+                      tooltip: 'Pakia upya',
+                      onPressed: _loadFarmers,
+                    ),
               contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
@@ -335,147 +324,207 @@ class _ConsultationScreenState extends State<ConsultationScreen>
           ),
         ),
 
-        Expanded(
-          child: farmers.isEmpty
-              ? Center(
-                  child: Text('Hakuna wakulima wanaofanana na utafutaji.',
-                      style: GoogleFonts.dmSans(color: Colors.grey)),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-                  itemCount: farmers.length,
-                  separatorBuilder: (context, _) =>
-                      const SizedBox(height: 10),
-                  itemBuilder: (context, i) =>
-                      _FarmerContactCard(farmer: farmers[i]),
+        // Error banner
+        if (_farmersError != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.wifi_off, color: Colors.red.shade400, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Text(_farmersError!,
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.red.shade700))),
+                  TextButton(
+                      onPressed: _loadFarmers,
+                      child: const Text('Jaribu Tena',
+                          style: TextStyle(fontSize: 12))),
+                ],
+              ),
+            ),
+          ),
+
+        // Count
+        if (!_loadingFarmers && _farmersError == null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+            child: Row(
+              children: [
+                Text(
+                  '${_filteredFarmers.length} watumiaji wamepatikana',
+                  style: const TextStyle(
+                      fontSize: 12, color: Colors.grey),
                 ),
+              ],
+            ),
+          ),
+
+        Expanded(
+          child: _loadingFarmers
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: Color(0xFF1A5C2E)),
+                      SizedBox(height: 12),
+                      Text('Inapakia watumiaji...',
+                          style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    ],
+                  ),
+                )
+              : _filteredFarmers.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.people_outline,
+                              size: 60, color: Colors.grey),
+                          const SizedBox(height: 12),
+                          Text(
+                            _searchQuery.isNotEmpty
+                                ? 'Hakuna watumiaji wanaofanana\nna utafutaji wako.'
+                                : 'Hakuna watumiaji wengine bado.\nWaalike wenzako wajisajili!',
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 14),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Pakia Tena'),
+                            onPressed: _loadFarmers,
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding:
+                          const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                      itemCount: _filteredFarmers.length,
+                      separatorBuilder: (context, _) =>
+                          const SizedBox(height: 10),
+                      itemBuilder: (context, i) =>
+                          _RealFarmerCard(farmer: _filteredFarmers[i]),
+                    ),
         ),
       ],
     );
   }
 }
 
-// ── Farmer contact card ───────────────────────────────────────────────────────
+// ── Real farmer card — data from Supabase ────────────────────────────────────
 
-class _FarmerContactCard extends StatelessWidget {
+class _RealFarmerCard extends StatelessWidget {
   final Map<String, dynamic> farmer;
 
-  const _FarmerContactCard({required this.farmer});
+  const _RealFarmerCard({required this.farmer});
 
   @override
   Widget build(BuildContext context) {
-    final crops = (farmer['crops'] as List).cast<String>();
+    final name = farmer['name'] as String? ?? 'Mtumiaji';
+    final region = farmer['region'] as String? ?? '';
+    final roleKey = farmer['role'] as String? ?? 'mkulima';
+    final extraInfo = farmer['extra_info'] as String? ?? '';
+    final colorHex = farmer['color_hex'] as String? ?? '#2E7D32';
+    final farmerId = farmer['id'] as String;
+    final role = UserRoleX.fromKey(roleKey);
+
+    Color avatarColor;
+    try {
+      final hex = colorHex.replaceAll('#', '');
+      avatarColor = Color(int.parse('FF$hex', radix: 16));
+    } catch (_) {
+      avatarColor = const Color(0xFF2E7D32);
+    }
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            // Avatar
             CircleAvatar(
               radius: 26,
-              backgroundColor:
-                  const Color(0xFF2E7D32).withValues(alpha: 0.12),
+              backgroundColor: avatarColor.withValues(alpha: 0.15),
               child: Text(
-                (farmer['name'] as String)[0].toUpperCase(),
-                style: const TextStyle(
-                    color: Color(0xFF2E7D32),
+                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                style: TextStyle(
+                    color: avatarColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 18),
               ),
             ),
             const SizedBox(width: 12),
-
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    farmer['name'] as String,
-                    style: GoogleFonts.dmSans(
-                        fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
+                  Text(name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on,
-                          size: 12, color: Colors.grey),
-                      const SizedBox(width: 3),
-                      Text(farmer['region'] as String,
-                          style: const TextStyle(
-                              color: Colors.grey, fontSize: 12)),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.landscape,
-                          size: 12, color: Colors.grey),
-                      const SizedBox(width: 3),
-                      Text('${farmer['acres']} ekari',
-                          style: const TextStyle(
-                              color: Colors.grey, fontSize: 12)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 4,
-                    children: crops
-                        .map((c) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2E7D32)
-                                    .withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(c,
-                                  style: const TextStyle(
-                                      fontSize: 10,
-                                      color: Color(0xFF2E7D32),
-                                      fontWeight: FontWeight.w600)),
-                            ))
-                        .toList(),
-                  ),
-                  if ((farmer['issue'] as String).isNotEmpty) ...[
-                    const SizedBox(height: 5),
+                  RoleChip(role, fontSize: 10),
+                  if (region.isNotEmpty) ...[
+                    const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.info_outline,
-                            size: 12, color: Colors.orange),
-                        const SizedBox(width: 4),
-                        Text(
-                          farmer['issue'] as String,
-                          style: const TextStyle(
-                              fontSize: 11, color: Colors.orange),
-                        ),
+                        const Icon(Icons.location_on,
+                            size: 12, color: Colors.grey),
+                        const SizedBox(width: 3),
+                        Text(region,
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey)),
                       ],
                     ),
+                  ],
+                  if (extraInfo.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(extraInfo,
+                        style: const TextStyle(
+                            fontSize: 11, color: Colors.grey),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                   ],
                 ],
               ),
             ),
-
-            // Chat button
             ElevatedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatScreen(
-                    contactId: farmer['id'] as String,
-                    contactName: farmer['name'] as String,
-                    contactRole: UserRole.mkulima,
-                    contactColorHex: '#2E7D32',
+              onPressed: () {
+                final chatProv = context.read<ChatProvider>();
+                if (!chatProv.isReady) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text(
+                            'Bado hujaunganika. Subiri sekunde moja.')),
+                  );
+                  return;
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatScreen(
+                      contactId: farmerId,
+                      contactName: name,
+                      contactRole: role,
+                      contactColorHex: colorHex,
+                    ),
                   ),
-                ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                textStyle: const TextStyle(fontSize: 12),
               ),
               icon: const Icon(Icons.chat_bubble_outline, size: 14),
-              label: const Text('Ongea',
-                  style: TextStyle(fontSize: 12)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00695C),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 8),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
+              label: const Text('Wasiliana'),
             ),
           ],
         ),

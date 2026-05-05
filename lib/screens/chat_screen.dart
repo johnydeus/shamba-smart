@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -49,18 +50,45 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollCtrl = ScrollController();
   final _picker     = ImagePicker();
   bool _sending     = false;
+  bool _loadingInit = true;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ChatProvider>().markRead(widget.contactId);
+    // Load messages immediately when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final chat = context.read<ChatProvider>();
+      try {
+        await chat.loadMessages();
+      } catch (_) {}
+      if (!mounted) return;
+      chat.markRead(widget.contactId);
+      setState(() => _loadingInit = false);
       _scrollToBottom();
+    });
+
+    // Poll every 3 seconds as backup (Realtime is primary)
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (!mounted) return;
+      final chat = context.read<ChatProvider>();
+      if (!chat.isReady) return;
+      final prevCount =
+          chat.conversations[widget.contactId]?.messages.length ?? 0;
+      try {
+        await chat.loadMessages();
+      } catch (_) {}
+      if (!mounted) return;
+      final newCount =
+          chat.conversations[widget.contactId]?.messages.length ?? 0;
+      if (newCount > prevCount) _scrollToBottom();
     });
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _textCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -86,18 +114,35 @@ class _ChatScreenState extends State<ChatScreen> {
     _textCtrl.clear();
     setState(() => _sending = true);
 
-    final user = context.read<AuthProvider>().currentUser!;
-    await context.read<ChatProvider>().sendMessage(
-          currentUserId: user.id,
-          contactId: widget.contactId,
-          contactName: widget.contactName,
-          contactRole: widget.contactRole,
-          contactColorHex: widget.contactColorHex,
-          text: text,
-        );
-
-    setState(() => _sending = false);
-    _scheduleScrollAfterReply();
+    try {
+      final user = context.read<AuthProvider>().currentUser!;
+      await context.read<ChatProvider>().sendMessage(
+            currentUserId: user.id,
+            contactId: widget.contactId,
+            contactName: widget.contactName,
+            contactRole: widget.contactRole,
+            contactColorHex: widget.contactColorHex,
+            text: text,
+          );
+      _scrollToBottom();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Imeshindwa kutuma: ${e.toString()}'),
+          backgroundColor: Colors.red.shade700,
+          action: SnackBarAction(
+            label: 'Jaribu Tena',
+            textColor: Colors.white,
+            onPressed: () {
+              _textCtrl.text = text;
+              _sendText();
+            },
+          ),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   // ── Send image ───────────────────────────────────────────────────────────────
@@ -300,13 +345,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final chatProv = context.watch<ChatProvider>();
     final contactColor = _hexColor(widget.contactColorHex);
 
-    final conv = chatProv.getConversation(
-      widget.contactId,
-      widget.contactName,
-      widget.contactRole,
-      widget.contactColorHex,
-    );
-    final messages = conv.messages;
+    // Use direct map lookup — never use getConversation() in build
+    // (getConversation uses putIfAbsent which modifies state during build)
+    final conv = chatProv.conversations[widget.contactId];
+    final messages = conv?.messages ?? const [];
 
     return Scaffold(
       backgroundColor: AppColors.mist,
@@ -329,9 +371,16 @@ class _ChatScreenState extends State<ChatScreen> {
                           fontWeight: FontWeight.bold,
                           color: Colors.white),
                       overflow: TextOverflow.ellipsis),
-                  Text(widget.contactRole.label,
-                      style: GoogleFonts.dmSans(
-                          fontSize: 11, color: Colors.white60)),
+                  Text(
+                    chatProv.isReady
+                        ? widget.contactRole.label
+                        : 'Inaunganika...',
+                    style: GoogleFonts.dmSans(
+                        fontSize: 11,
+                        color: chatProv.isReady
+                            ? Colors.white60
+                            : Colors.orange),
+                  ),
                 ],
               ),
             ),
@@ -339,33 +388,74 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.phone_outlined, color: Colors.white),
-            onPressed: () {},
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Onyesha upya',
+            onPressed: () async {
+              try {
+                await chatProv.loadMessages();
+                _scrollToBottom();
+              } catch (e) {
+                if (mounted) _showError('Hitilafu: ${e.toString()}');
+              }
+            },
           ),
         ],
       ),
 
       body: Column(
         children: [
+          // ── Not-connected warning ──────────────────────────────────────────
+          if (!chatProv.isReady)
+            Container(
+              width: double.infinity,
+              color: Colors.orange,
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber, color: Colors.white, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Hujaunganika. Funga app na uifungue tena.',
+                      style: GoogleFonts.dmSans(
+                          color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // ── Messages list ──────────────────────────────────────────────────
           Expanded(
-            child: messages.isEmpty
-                ? Center(
+            child: _loadingInit
+                ? const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('👋', style: TextStyle(fontSize: 40)),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Anza mazungumzo na\n${widget.contactName.split(' ').first}!',
-                          style: GoogleFonts.dmSans(
-                              color: AppColors.mid, fontSize: 14),
-                          textAlign: TextAlign.center,
-                        ),
+                        CircularProgressIndicator(color: AppColors.leaf),
+                        SizedBox(height: 12),
+                        Text('Inapakia mazungumzo...',
+                            style: TextStyle(color: AppColors.mid)),
                       ],
                     ),
                   )
-                : ListView.builder(
+                : messages.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text('👋', style: TextStyle(fontSize: 40)),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Anza mazungumzo na\n${widget.contactName.split(' ').first}!',
+                              style: GoogleFonts.dmSans(
+                                  color: AppColors.mid, fontSize: 14),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
                     controller: _scrollCtrl,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 10),
