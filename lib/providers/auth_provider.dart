@@ -1,40 +1,39 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 
-const _kUsers   = 'ss_users';
-const _kSession = 'last_user_id';
+const _kCachedProfile = 'ss_cached_profile';
 
 class AuthProvider extends ChangeNotifier {
   UserModel? _currentUser;
-  List<UserModel> _users = [];
+
+  static SupabaseClient get _client => Supabase.instance.client;
 
   UserModel? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
 
-  // Load users and auto-login from saved session on app start
+  // Restore session on app start — Supabase persists tokens across restarts
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_kUsers);
-    if (raw != null) {
-      final list = jsonDecode(raw) as List;
-      _users = list
-          .map((e) => UserModel.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
+    final session = _client.auth.currentSession;
+    if (session == null) return;
 
-    final lastId = prefs.getString(_kSession);
-    if (lastId != null) {
+    // Show cached profile instantly while fetching fresh data
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kCachedProfile);
+    if (raw != null) {
       try {
-        _currentUser = _users.firstWhere((u) => u.id == lastId);
+        _currentUser =
+            UserModel.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        notifyListeners();
       } catch (_) {}
     }
 
-    notifyListeners();
+    await _fetchAndCacheProfile(session.user.id);
   }
 
-  // Register a new user — returns null on success, error message on failure
+  // Register new user — creates Supabase auth account + saves profile to DB
   Future<String?> register({
     required String firstName,
     required String lastName,
@@ -58,78 +57,115 @@ class AuthProvider extends ChangeNotifier {
     if (!cleanEmail.contains('@') || !cleanEmail.contains('.')) {
       return 'Weka barua pepe sahihi (mfano: jina@gmail.com).';
     }
-
-    final exists = _users.any((u) => u.email == cleanEmail);
-    if (exists) {
-      return 'Barua pepe hii tayari imesajiliwa. Ingia badala yake.';
-    }
-
     if (password.length < 6) {
       return 'Nywila lazima iwe na herufi 6 au zaidi.';
     }
 
-    final newUser = UserModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: cleanEmail,
-      password: password,
-      region: region,
-      role: role,
-      joinedAt: DateTime.now(),
-      farmSize: farmSize,
-      mainCrops: mainCrops,
-      shopName: shopName,
-      productType: productType,
-      businessName: businessName,
-      cropsTraded: cropsTraded,
-      investmentType: investmentType,
-      organization: organization,
-      badgeNumber: badgeNumber,
-      district: district,
-    );
-
-    _users.add(newUser);
-    await _saveUsers();
-
-    _currentUser = newUser;
-    await _saveSession(newUser.id);
-    notifyListeners();
-    return null;
-  }
-
-  // Login by email + password — returns null on success, error on failure
-  Future<String?> login(String email, String password) async {
     try {
-      final user = _users.firstWhere(
-        (u) =>
-            u.email == email.trim().toLowerCase() &&
-            u.password == password,
+      final res =
+          await _client.auth.signUp(email: cleanEmail, password: password);
+      if (res.user == null) return 'Usajili haujafanikiwa. Jaribu tena.';
+
+      final uid = res.user!.id;
+      final now = DateTime.now();
+
+      await _client.from('profiles').insert({
+        'id': uid,
+        'first_name': firstName.trim(),
+        'last_name': lastName.trim(),
+        'email': cleanEmail,
+        'region': region,
+        'role': role.key,
+        'joined_at': now.toIso8601String(),
+        'listing_count': 0,
+        'sales_count': 0,
+        if (farmSize != null) 'farm_size': farmSize,
+        if (mainCrops != null) 'main_crops': mainCrops,
+        if (shopName != null) 'shop_name': shopName,
+        if (productType != null) 'product_type': productType,
+        if (businessName != null) 'business_name': businessName,
+        if (cropsTraded != null) 'crops_traded': cropsTraded,
+        if (investmentType != null) 'investment_type': investmentType,
+        if (organization != null) 'organization': organization,
+        if (badgeNumber != null) 'badge_number': badgeNumber,
+        if (district != null) 'district': district,
+        'all_roles': [role.key],
+      });
+
+      _currentUser = UserModel(
+        id: uid,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: cleanEmail,
+        password: '',
+        region: region,
+        role: role,
+        joinedAt: now,
+        farmSize: farmSize,
+        mainCrops: mainCrops,
+        shopName: shopName,
+        productType: productType,
+        businessName: businessName,
+        cropsTraded: cropsTraded,
+        investmentType: investmentType,
+        organization: organization,
+        badgeNumber: badgeNumber,
+        district: district,
+        allRoles: [role],
       );
-      _currentUser = user;
-      await _saveSession(user.id);
+      await _cacheProfile(_currentUser!);
       notifyListeners();
       return null;
-    } catch (_) {
-      return 'Barua pepe au nywila si sahihi. Jaribu tena.';
+    } on AuthException catch (e) {
+      if (e.message.toLowerCase().contains('already registered') ||
+          e.message.toLowerCase().contains('already exists') ||
+          e.message.toLowerCase().contains('user already')) {
+        return 'Barua pepe hii tayari imesajiliwa. Ingia badala yake.';
+      }
+      return 'Hitilafu: ${e.message}';
+    } catch (e) {
+      return 'Hitilafu: ${e.toString()}';
     }
   }
 
-  // Log out and clear session
+  // Login — uses Supabase auth then fetches profile from DB
+  Future<String?> login(String email, String password) async {
+    try {
+      final res = await _client.auth.signInWithPassword(
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
+      if (res.user == null) {
+        return 'Barua pepe au nywila si sahihi. Jaribu tena.';
+      }
+      await _fetchAndCacheProfile(res.user!.id);
+      if (_currentUser == null) {
+        return 'Wasifu wako haukupatikana. Wasiliana na msaada.';
+      }
+      notifyListeners();
+      return null;
+    } on AuthException {
+      return 'Barua pepe au nywila si sahihi. Jaribu tena.';
+    } catch (_) {
+      return 'Hitilafu ya mtandao. Angalia muunganisho wako wa intaneti.';
+    }
+  }
+
+  // Log out — clears Supabase session and local cache
   Future<void> logout() async {
-    _currentUser = null;
+    await _client.auth.signOut();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kSession);
+    await prefs.remove(_kCachedProfile);
+    _currentUser = null;
     notifyListeners();
   }
 
-  // Switch active role (user must already have this role)
+  // Switch active role (user must already hold this role)
   Future<void> switchRole(UserRole newRole) async {
     if (_currentUser == null) return;
     if (!_currentUser!.allRoles.contains(newRole)) return;
     _currentUser = _rebuildUser(_currentUser!, activeRole: newRole);
-    _updateUserInList(_currentUser!);
-    await _saveUsers();
+    await _updateProfile({'role': newRole.key});
     notifyListeners();
   }
 
@@ -163,10 +199,63 @@ class AuthProvider extends ChangeNotifier {
       badgeNumber: badgeNumber ?? _currentUser!.badgeNumber,
       district: district ?? _currentUser!.district,
     );
-    _updateUserInList(_currentUser!);
-    await _saveUsers();
+
+    await _updateProfile({
+      'all_roles': updatedRoles.map((r) => r.key).toList(),
+      if (shopName != null) 'shop_name': shopName,
+      if (productType != null) 'product_type': productType,
+      if (businessName != null) 'business_name': businessName,
+      if (cropsTraded != null) 'crops_traded': cropsTraded,
+      if (investmentType != null) 'investment_type': investmentType,
+      if (organization != null) 'organization': organization,
+      if (badgeNumber != null) 'badge_number': badgeNumber,
+      if (district != null) 'district': district,
+    });
+
     notifyListeners();
     return null;
+  }
+
+  Future<void> incrementListingCount() async {
+    if (_currentUser == null) return;
+    _currentUser!.listingCount++;
+    await _updateProfile({'listing_count': _currentUser!.listingCount});
+    notifyListeners();
+  }
+
+  // ── Private helpers ───────────────────────────────────────────────────────
+
+  Future<void> _fetchAndCacheProfile(String userId) async {
+    try {
+      final data = await _client
+          .from('profiles')
+          .select()
+          .eq('id', userId)
+          .single();
+      _currentUser = UserModel.fromSupabase(data);
+      await _cacheProfile(_currentUser!);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error fetching profile: $e');
+    }
+  }
+
+  Future<void> _updateProfile(Map<String, dynamic> fields) async {
+    if (_currentUser == null) return;
+    try {
+      await _client
+          .from('profiles')
+          .update(fields)
+          .eq('id', _currentUser!.id);
+      await _cacheProfile(_currentUser!);
+    } catch (e) {
+      debugPrint('Error updating profile: $e');
+    }
+  }
+
+  Future<void> _cacheProfile(UserModel user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kCachedProfile, jsonEncode(user.toJson()));
   }
 
   UserModel _rebuildUser(
@@ -205,28 +294,4 @@ class AuthProvider extends ChangeNotifier {
         district: district ?? u.district,
         allRoles: allRoles ?? u.allRoles,
       );
-
-  void _updateUserInList(UserModel updated) {
-    final idx = _users.indexWhere((u) => u.id == updated.id);
-    if (idx != -1) _users[idx] = updated;
-  }
-
-  // Increment listing count after user posts a new listing
-  Future<void> incrementListingCount() async {
-    if (_currentUser == null) return;
-    _currentUser!.listingCount++;
-    await _saveUsers();
-    notifyListeners();
-  }
-
-  Future<void> _saveUsers() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _kUsers, jsonEncode(_users.map((u) => u.toJson()).toList()));
-  }
-
-  Future<void> _saveSession(String id) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kSession, id);
-  }
 }

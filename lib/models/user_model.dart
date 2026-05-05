@@ -101,6 +101,33 @@ class UserModel {
       '${firstName.isNotEmpty ? firstName[0] : ''}${lastName.isNotEmpty ? lastName[0] : ''}'
           .toUpperCase();
 
+  // Build UserModel from Supabase profiles table row (snake_case keys)
+  factory UserModel.fromSupabase(Map<String, dynamic> j) => UserModel(
+        id: j['id'] as String,
+        firstName: j['first_name'] as String,
+        lastName: j['last_name'] as String,
+        email: j['email'] as String,
+        password: '',
+        region: j['region'] as String,
+        role: UserRoleX.fromKey(j['role'] as String),
+        joinedAt: DateTime.parse(j['joined_at'] as String),
+        listingCount: (j['listing_count'] as int?) ?? 0,
+        salesCount: (j['sales_count'] as int?) ?? 0,
+        farmSize: (j['farm_size'] as num?)?.toDouble(),
+        mainCrops: j['main_crops'] as String?,
+        shopName: j['shop_name'] as String?,
+        productType: j['product_type'] as String?,
+        businessName: j['business_name'] as String?,
+        cropsTraded: j['crops_traded'] as String?,
+        investmentType: j['investment_type'] as String?,
+        organization: j['organization'] as String?,
+        badgeNumber: j['badge_number'] as String?,
+        district: j['district'] as String?,
+        allRoles: (j['all_roles'] as List?)
+            ?.map((r) => UserRoleX.fromKey(r as String))
+            .toList(),
+      );
+
   factory UserModel.fromJson(Map<String, dynamic> j) => UserModel(
         id: j['id'] as String,
         firstName: j['firstName'] as String,
