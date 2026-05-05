@@ -8,7 +8,7 @@ import 'farms_screen.dart';
 import 'scan_screen.dart';
 import 'messages_screen.dart';
 import 'profile_screen.dart';
-import 'consultation_screen.dart';
+import 'afisa_hub_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -23,9 +23,8 @@ class _MainShellState extends State<MainShell> {
   List<Widget> _screens(UserRole role) => [
         const HomeScreen(),
         switch (role) {
-          UserRole.mkulima => const FarmsScreen(),
-          UserRole.afisa   => const ConsultationScreen(),
-          _                => const FarmsScreen(),
+          UserRole.afisa => const AfisaHubScreen(),
+          _              => const FarmsScreen(),
         },
         const ScanScreen(),
         const MessagesScreen(),
