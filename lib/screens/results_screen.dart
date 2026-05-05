@@ -68,6 +68,8 @@ class ResultsScreen extends StatelessWidget {
     final pest2Name = diagnosis['pesticide_2_name'] ?? '';
     final pest2Dose = diagnosis['pesticide_2_dose'] ?? '';
     final daysCritical = diagnosis['days_until_critical'] ?? 0;
+    final preventionSw = diagnosis['prevention_sw'] as String? ?? '';
+    final threatType = diagnosis['threat_type'] as String? ?? '';
 
     return Scaffold(
       backgroundColor: AppColors.mist,
@@ -339,6 +341,60 @@ class ResultsScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+
+              // Prevention (text diagnosis only)
+              if (preventionSw.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.shield,
+                                color: Color(0xFF2E7D32), size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'Kinga na Uzuiaji:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2E7D32),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(preventionSw,
+                            style: const TextStyle(fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              // Threat type badge (text diagnosis)
+              if (threatType.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A5C2E).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Aina: $threatType',
+                      style: const TextStyle(
+                          color: Color(0xFF1A5C2E),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
             ],
 
             const SizedBox(height: 24),

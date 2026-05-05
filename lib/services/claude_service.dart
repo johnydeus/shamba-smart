@@ -11,50 +11,19 @@ class ClaudeService {
   // Read API key safely from .env file
   static String get _apiKey => dotenv.env['CLAUDE_API_KEY'] ?? '';
 
-  // Analyse a leaf photo — returns a Map with disease details
+  // Analyse a photo — handles disease, weed, or insect pest detection
   static Future<Map<String, dynamic>> analyseLeafPhoto({
     required File imageFile,
     required String cropName,
+    String scanType = 'ugonjwa', // 'ugonjwa' | 'magugu' | 'wadudu'
   }) async {
-    // Convert the photo file to a base64 text string
     final imageBytes = await imageFile.readAsBytes();
     final base64Image = base64Encode(imageBytes);
 
-    // Detect if image is PNG or JPEG
     final extension = imageFile.path.split('.').last.toLowerCase();
     final mediaType = extension == 'png' ? 'image/png' : 'image/jpeg';
 
-    // The prompt we send to Claude — tells it exactly what to do
-    final prompt = '''
-You are an expert agricultural pathologist specialising in East African smallholder farming.
-A farmer in Tanzania has photographed this leaf from their $cropName crop.
-
-Analyse the image carefully and respond ONLY with a valid JSON object — no other text:
-
-{
-  "disease_name_en": "English disease name",
-  "disease_name_sw": "Jina la ugonjwa kwa Kiswahili",
-  "confidence": 0.0,
-  "severity": "low or medium or high or critical",
-  "affected_crop": "$cropName",
-  "description_sw": "Maelezo mafupi kwa Kiswahili",
-  "immediate_action_sw": "Hatua ya haraka kwa Kiswahili",
-  "pesticide_1_name": "Brand name of first pesticide",
-  "pesticide_1_dose": "Dose per 15L sprayer",
-  "pesticide_1_type": "chemical or organic",
-  "pesticide_2_name": "Brand name of second pesticide",
-  "pesticide_2_dose": "Dose per 15L sprayer",
-  "pesticide_2_type": "chemical or organic",
-  "days_until_critical": 0,
-  "is_healthy": false
-}
-
-Rules:
-- Only recommend pesticides registered in Tanzania (TPRI)
-- All description fields must be in Swahili
-- confidence must be a decimal between 0.0 and 1.0
-- If the leaf looks healthy, set is_healthy to true
-''';
+    final prompt = _buildPhotoPrompt(cropName, scanType);
 
     try {
       final response = await http.post(
@@ -99,6 +68,177 @@ Rules:
             .replaceAll('```', '')
             .trim();
 
+        return jsonDecode(cleanJson) as Map<String, dynamic>;
+      } else {
+        return {
+          'error': true,
+          'message': 'Hitilafu ya mtandao. Jaribu tena.',
+          'is_healthy': false,
+        };
+      }
+    } catch (e) {
+      return {
+        'error': true,
+        'message': 'Hitilafu: ${e.toString()}',
+        'is_healthy': false,
+      };
+    }
+  }
+
+  // Build the correct prompt based on what the farmer is scanning for
+  static String _buildPhotoPrompt(String cropName, String scanType) {
+    const jsonTemplate = '''
+{
+  "disease_name_en": "English name",
+  "disease_name_sw": "Jina kwa Kiswahili",
+  "confidence": 0.0,
+  "severity": "low or medium or high or critical",
+  "affected_crop": "cropName",
+  "description_sw": "Maelezo kwa Kiswahili",
+  "immediate_action_sw": "Hatua ya haraka kwa Kiswahili",
+  "pesticide_1_name": "Jina la dawa",
+  "pesticide_1_dose": "Kipimo kwa dumu la lita 15",
+  "pesticide_1_type": "chemical or organic or herbicide or insecticide",
+  "pesticide_2_name": "Dawa ya pili au Hakuna",
+  "pesticide_2_dose": "Kipimo kwa dumu la lita 15",
+  "pesticide_2_type": "chemical or organic or herbicide or insecticide",
+  "days_until_critical": 0,
+  "is_healthy": false
+}''';
+
+    if (scanType == 'magugu') {
+      return '''
+You are an expert weed scientist specialising in East African smallholder farming in Tanzania.
+A farmer has photographed a plant growing in or near their $cropName field.
+
+Identify the weed in the image and respond ONLY with a valid JSON object — no other text:
+
+$jsonTemplate
+
+Rules:
+- disease_name_sw = weed name in Swahili (e.g. "Striga / Mgalagala")
+- disease_name_en = scientific name of the weed
+- description_sw = brief description of the weed and why it is harmful
+- immediate_action_sw = exactly how to remove or control this weed RIGHT NOW
+- pesticide_1_name = the correct herbicide registered in Tanzania (TPRI) for this weed
+- pesticide_1_type must be "herbicide"
+- pesticide_2_name = second herbicide option or alternative organic method
+- If no weed is visible (just crop), set is_healthy to true
+- confidence = 0.0 to 1.0
+- severity = how badly it will harm the crop if left untreated
+- All Swahili fields must be in simple Swahili
+''';
+    }
+
+    if (scanType == 'wadudu') {
+      return '''
+You are an expert entomologist specialising in crop pest management for East African smallholder farmers in Tanzania.
+A farmer has photographed damage or an insect on their $cropName crop.
+
+Identify the insect pest in the image and respond ONLY with a valid JSON object — no other text:
+
+$jsonTemplate
+
+Rules:
+- disease_name_sw = pest name in Swahili (e.g. "Viwavi wa Jeshi", "Inzi Weupe")
+- disease_name_en = scientific name of the pest
+- description_sw = brief description of the pest, how it feeds, and what damage it causes
+- immediate_action_sw = exactly what the farmer must do TODAY to stop this pest
+- pesticide_1_name = the best insecticide registered in Tanzania (TPRI) for this pest
+- pesticide_1_type must be "insecticide"
+- pesticide_2_name = second option (organic/biopesticide preferred as alternative)
+- If no pest damage is visible, set is_healthy to true
+- confidence = 0.0 to 1.0
+- severity = how urgently the farmer must act (low/medium/high/critical)
+- Mark is_healthy false even for early-stage infestations
+- All Swahili fields must be in simple Swahili understandable by a rural farmer
+''';
+    }
+
+    // Default: disease scan (ugonjwa)
+    return '''
+You are an expert agricultural pathologist specialising in East African smallholder farming.
+A farmer in Tanzania has photographed this leaf from their $cropName crop.
+
+Analyse the image carefully and respond ONLY with a valid JSON object — no other text:
+
+$jsonTemplate
+
+Rules:
+- Only recommend pesticides/fungicides registered in Tanzania (TPRI)
+- All description fields must be in Swahili
+- confidence must be a decimal between 0.0 and 1.0
+- If the leaf looks healthy, set is_healthy to true
+- pesticide_1_type = "fungicide" for fungal diseases, "bactericide" for bacterial
+''';
+  }
+
+  // Diagnose by text symptoms (no photo needed — for offline/text-only situations)
+  static Future<Map<String, dynamic>> diagnoseBySymptoms({
+    required String cropName,
+    required String symptomsDescription,
+    String region = 'Tanzania',
+  }) async {
+    final prompt = '''
+Wewe ni mtaalamu wa kilimo wa Tanzania anayejua magonjwa, wadudu, magugu na matatizo yote ya mazao.
+
+Mkulima kutoka $region anaelezea tatizo lake kwenye zao la $cropName:
+"$symptomsDescription"
+
+Changanua maelezo haya kwa makini na jibu ONLY kwa JSON hii (hakuna maandishi mengine):
+
+{
+  "threat_type": "ugonjwa au wadudu au magugu au lishe au hali_ya_hewa",
+  "disease_name_en": "Jina la kisayansi au la Kiingereza",
+  "disease_name_sw": "Jina kwa Kiswahili",
+  "confidence": 0.0,
+  "severity": "low au medium au high au critical",
+  "affected_crop": "$cropName",
+  "description_sw": "Maelezo mafupi ya tatizo kwa Kiswahili",
+  "immediate_action_sw": "Hatua ya HARAKA kufanya SASA kwa Kiswahili",
+  "pesticide_1_name": "Jina la dawa inayofaa (au 'Hakuna' kama si wadudu/ugonjwa)",
+  "pesticide_1_dose": "Kipimo kwa dumu la lita 15",
+  "pesticide_1_type": "chemical au organic au none",
+  "pesticide_2_name": "Dawa ya pili au 'Hakuna'",
+  "pesticide_2_dose": "Kipimo kwa dumu la lita 15",
+  "pesticide_2_type": "chemical au organic au none",
+  "prevention_sw": "Jinsi ya kuzuia tatizo hili mara ya pili kwa Kiswahili",
+  "days_until_critical": 0,
+  "is_healthy": false
+}
+
+Kanuni:
+- Pendekeza tu dawa zilizosajiliwa Tanzania (TPRI/TFDA)
+- Kama ni magugu: andika herbicide inayofaa na wakati wa kupuliza
+- Kama ni nzige/wadudu mkubwa: andika HATUA ZA DHARURA kwanza
+- Kama ni upungufu wa virutubisho: pendekeza mbolea sahihi
+- confidence ni nambari kati ya 0.0 na 1.0
+''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': _apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'max_tokens': 1024,
+          'messages': [
+            {'role': 'user', 'content': prompt},
+          ],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['content'][0]['text'] as String;
+        final cleanJson = content
+            .replaceAll('```json', '')
+            .replaceAll('```', '')
+            .trim();
         return jsonDecode(cleanJson) as Map<String, dynamic>;
       } else {
         return {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/data_sync_service.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/local_data.dart';
+import '../theme/app_colors.dart';
 
 class PesticidesScreen extends StatefulWidget {
   const PesticidesScreen({super.key});
@@ -11,282 +12,359 @@ class PesticidesScreen extends StatefulWidget {
 
 class _PesticidesScreenState extends State<PesticidesScreen>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  List<Map<String, dynamic>> _allPesticides = [];
-  bool _loading = true;
+  // Top toggle: 0 = Viuatilifu, 1 = Mbolea
+  int _section = 0;
+  late TabController _tabCtrl;
   String _searchQuery = '';
+  final _searchCtrl = TextEditingController();
 
-  // Category tabs
-  final List<String> _categories = [
-    'Zote',
-    'Insecticide',
-    'Fungicide',
-    'Herbicide',
-    'Biopesticide',
+  // ── Viuatilifu categories ────────────────────────────────────────────────
+  static const _pesticideCategories = [
+    {'key': 'Zote',        'label': 'Zote',          'color': 0xFF1A5C2E},
+    {'key': 'Insecticide', 'label': 'Wadudu',         'color': 0xFFB71C1C},
+    {'key': 'Fungicide',   'label': 'Ukungu',         'color': 0xFF1A5C2E},
+    {'key': 'Herbicide',   'label': 'Magugu',         'color': 0xFFFF6F00},
+    {'key': 'Biopesticide','label': 'Asili',          'color': 0xFF0277BD},
   ];
 
-  // Swahili labels for each category
-  final Map<String, String> _categoryLabels = {
-    'Zote': 'Zote',
-    'Insecticide': 'Dawa za Wadudu',
-    'Fungicide': 'Dawa za Ukungu',
-    'Herbicide': 'Dawa za Magugu',
-    'Biopesticide': 'Dawa za Asili',
-  };
+  // ── Mbolea categories ────────────────────────────────────────────────────
+  static const _fertilizerCategories = [
+    {'key': 'Zote',         'label': 'Zote',           'color': 0xFF1A5C2E},
+    {'key': 'Nitrojeni',    'label': 'Nitrojeni (N)',   'color': 0xFF1565C0},
+    {'key': 'Fosfeti',      'label': 'Fosfeti (P)',     'color': 0xFF6A1B9A},
+    {'key': 'Potasiamu',    'label': 'Potasiamu (K)',   'color': 0xFFC8860A},
+    {'key': 'NPK',          'label': 'NPK/Mchanganyiko','color': 0xFF2E7D32},
+    {'key': 'Kikaboni',     'label': 'Kikaboni',        'color': 0xFF4E342E},
+    {'key': 'Virutubisho',  'label': 'Virutubisho',    'color': 0xFF00695C},
+  ];
 
-  // Colours for each category badge
-  final Map<String, Color> _categoryColors = {
-    'Insecticide': const Color(0xFFB71C1C),
-    'Fungicide': const Color(0xFF1A5C2E),
-    'Herbicide': const Color(0xFFFF6F00),
-    'Biopesticide': const Color(0xFF0277BD),
-  };
+  List<Map<String, dynamic>> get _currentCategories =>
+      _section == 0 ? _pesticideCategories : _fertilizerCategories;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _categories.length, vsync: this);
-    _tabController.addListener(() => setState(() {}));
-    _loadData();
+    _tabCtrl = TabController(
+        length: _pesticideCategories.length, vsync: this);
+    _tabCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
-  // Load pesticides: local data instantly, Claude updates in background
-  Future<void> _loadData() async {
-    setState(() => _loading = true);
-
-    // Step 1 — local data instantly
+  void _switchSection(int index) {
+    _tabCtrl.dispose();
     setState(() {
-      _allPesticides = LocalData.pesticides;
-      _loading = false;
-    });
-
-    // Step 2 — try Claude silently in background
-    DataSyncService.fetchPesticidesDatabase().then((fresh) {
-      if (fresh.isNotEmpty && mounted) {
-        setState(() => _allPesticides = fresh);
-      }
+      _section = index;
+      _tabCtrl = TabController(
+          length: _currentCategories.length, vsync: this);
+      _tabCtrl.addListener(() => setState(() {}));
+      _searchQuery = '';
+      _searchCtrl.clear();
     });
   }
 
-  // Filter list by selected category and search text
+  // ── Filtered list ────────────────────────────────────────────────────────
+
   List<Map<String, dynamic>> get _filtered {
-    final category = _categories[_tabController.index];
-    return _allPesticides.where((p) {
-      final matchesCategory =
-          category == 'Zote' || p['category'] == category;
-      final matchesSearch = _searchQuery.isEmpty ||
-          (p['brand_name'] ?? '')
+    final all =
+        _section == 0 ? LocalData.pesticides : LocalData.fertilizers;
+    final cats = _currentCategories;
+    final catKey = cats[_tabCtrl.index]['key'] as String;
+    final q = _searchQuery.toLowerCase();
+
+    return all.where((item) {
+      final matchCat = catKey == 'Zote' ||
+          item['category'] == catKey;
+      final matchSearch = q.isEmpty ||
+          (item['brand_name'] ?? '').toString().toLowerCase().contains(q) ||
+          (item['npk'] ?? item['active_ingredient'] ?? '')
               .toString()
               .toLowerCase()
-              .contains(_searchQuery.toLowerCase()) ||
-          (p['active_ingredient'] ?? '')
+              .contains(q) ||
+          (item['crops'] ?? item['target_crops'] ?? '')
               .toString()
               .toLowerCase()
-              .contains(_searchQuery.toLowerCase()) ||
-          (p['target_pests'] ?? '')
+              .contains(q) ||
+          (item['description_sw'] ?? '')
               .toString()
               .toLowerCase()
-              .contains(_searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
+              .contains(q);
+      return matchCat && matchSearch;
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final items = _filtered;
+
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        title: const Text('Dawa za Kilimo — Tanzania'),
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          indicatorColor: Colors.white,
-          tabs: _categories
-              .map((c) => Tab(text: _categoryLabels[c] ?? c))
-              .toList(),
+        title: Text(
+          'Viuatilifu & Mbolea',
+          style: GoogleFonts.playfairDisplay(
+              color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(96),
+          child: Column(
+            children: [
+              // ── Top segment: Viuatilifu | Mbolea ──────────────────────
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      _SegmentBtn(
+                          label: '🧪 Viuatilifu',
+                          active: _section == 0,
+                          onTap: () => _switchSection(0)),
+                      _SegmentBtn(
+                          label: '🌿 Mbolea',
+                          active: _section == 1,
+                          onTap: () => _switchSection(1)),
+                    ],
+                  ),
+                ),
+              ),
+              // ── Category tabs ──────────────────────────────────────────
+              TabBar(
+                controller: _tabCtrl,
+                isScrollable: true,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                indicatorColor: Colors.white,
+                tabAlignment: TabAlignment.start,
+                tabs: _currentCategories
+                    .map((c) => Tab(text: c['label'] as String))
+                    .toList(),
+              ),
+            ],
+          ),
         ),
       ),
       body: Column(
         children: [
-          // Source info banner
+          // Source banner
           Container(
             width: double.infinity,
             padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: const Color(0xFFE8F5E9),
-            child: const Row(
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+            color: AppColors.mint,
+            child: Row(
               children: [
-                Icon(Icons.verified, color: Color(0xFF1A5C2E), size: 16),
-                SizedBox(width: 6),
+                const Icon(Icons.verified,
+                    color: AppColors.leaf, size: 15),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Chanzo: TFDA • TPRI Tanzania • Wizara ya Kilimo',
-                    style: TextStyle(
-                        fontSize: 12, color: Color(0xFF1A5C2E)),
+                    _section == 0
+                        ? 'Chanzo: TFDA • TPRI Tanzania • Wizara ya Kilimo'
+                        : 'Chanzo: TFRA Tanzania • Wizara ya Kilimo',
+                    style: GoogleFonts.dmSans(
+                        fontSize: 11, color: AppColors.leaf),
                   ),
                 ),
               ],
             ),
           ),
 
-          // Search bar
+          // Search
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
             child: TextField(
+              controller: _searchCtrl,
               onChanged: (v) => setState(() => _searchQuery = v),
               decoration: InputDecoration(
-                hintText: 'Tafuta dawa, wadudu, au zao...',
-                prefixIcon: const Icon(Icons.search),
+                hintText: _section == 0
+                    ? 'Tafuta dawa, wadudu, au zao...'
+                    : 'Tafuta mbolea, NPK, au zao...',
+                hintStyle:
+                    const TextStyle(color: Colors.grey, fontSize: 13),
+                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() => _searchQuery = '');
+                        })
+                    : null,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
               ),
             ),
           ),
 
-          // Content
+          // Count
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            child: Row(
+              children: [
+                Text(
+                  '${items.length} ${_section == 0 ? "dawa" : "mbolea"} zimepatikana',
+                  style: const TextStyle(
+                      fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+
+          // List
           Expanded(
-            child: _loading
-                ? const Center(
+            child: items.isEmpty
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        CircularProgressIndicator(
-                            color: Color(0xFF1A5C2E)),
-                        SizedBox(height: 16),
+                        Icon(
+                          _section == 0
+                              ? Icons.bug_report_outlined
+                              : Icons.eco_outlined,
+                          size: 56,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 12),
                         Text(
-                          'Inapakia data kutoka TFDA / TPRI...',
-                          style: TextStyle(color: Color(0xFF9E9E9E)),
+                          'Hakuna ${_section == 0 ? "dawa" : "mbolea"} iliyopatikana.',
+                          style: const TextStyle(color: Colors.grey),
                         ),
                       ],
                     ),
                   )
-                : _filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.search_off,
-                                size: 48, color: Color(0xFF9E9E9E)),
-                            const SizedBox(height: 12),
-                            const Text('Hakuna dawa iliyopatikana.',
-                                style:
-                                    TextStyle(color: Color(0xFF9E9E9E))),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Jaribu Tena'),
-                              onPressed: _loadData,
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        itemCount: _filtered.length,
-                        itemBuilder: (context, index) {
-                          return _PesticideCard(
-                            pesticide: _filtered[index],
-                            categoryColors: _categoryColors,
-                          );
-                        },
-                      ),
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                    itemCount: items.length,
+                    itemBuilder: (ctx, i) => _section == 0
+                        ? _PesticideCard(item: items[i])
+                        : _FertilizerCard(item: items[i]),
+                  ),
           ),
         ],
-      ),
-
-      // Refresh button
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF1A5C2E),
-        icon: const Icon(Icons.refresh, color: Colors.white),
-        label: const Text('Sasisha',
-            style: TextStyle(color: Colors.white)),
-        onPressed: _loadData,
       ),
     );
   }
 }
 
-// Card widget for a single pesticide
-class _PesticideCard extends StatelessWidget {
-  final Map<String, dynamic> pesticide;
-  final Map<String, Color> categoryColors;
+// ── Segment button ────────────────────────────────────────────────────────────
 
-  const _PesticideCard({
-    required this.pesticide,
-    required this.categoryColors,
-  });
+class _SegmentBtn extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _SegmentBtn(
+      {required this.label, required this.active, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final category = pesticide['category'] ?? 'Insecticide';
-    final color = categoryColors[category] ?? const Color(0xFF1A5C2E);
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.all(3),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: active ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight:
+                  active ? FontWeight.bold : FontWeight.normal,
+              color: active
+                  ? AppColors.soil
+                  : Colors.white.withValues(alpha: 0.85),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Pesticide card ────────────────────────────────────────────────────────────
+
+class _PesticideCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  const _PesticideCard({required this.item});
+
+  static const _catColors = {
+    'Insecticide': Color(0xFFB71C1C),
+    'Fungicide':   Color(0xFF1A5C2E),
+    'Herbicide':   Color(0xFFFF6F00),
+    'Biopesticide':Color(0xFF0277BD),
+  };
+
+  static const _catIcons = {
+    'Insecticide': Icons.bug_report,
+    'Fungicide':   Icons.coronavirus,
+    'Herbicide':   Icons.grass,
+    'Biopesticide':Icons.eco,
+  };
+
+  static const _catLabels = {
+    'Insecticide': 'Dawa ya Wadudu',
+    'Fungicide':   'Dawa ya Ukungu',
+    'Herbicide':   'Dawa ya Magugu',
+    'Biopesticide':'Dawa ya Asili',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final cat   = item['category'] as String? ?? 'Insecticide';
+    final color = _catColors[cat] ?? AppColors.leaf;
+    final icon  = _catIcons[cat]  ?? Icons.science;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
-        // Collapsed view: brand name + category badge
         leading: CircleAvatar(
           backgroundColor: color.withValues(alpha: 0.1),
-          child: Icon(_categoryIcon(category), color: color, size: 20),
+          child: Icon(icon, color: color, size: 20),
         ),
-        title: Text(
-          pesticide['brand_name'] ?? '',
-          style: const TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 15),
-        ),
+        title: Text(item['brand_name'] ?? '',
+            style: GoogleFonts.dmSans(
+                fontWeight: FontWeight.bold, fontSize: 14)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              pesticide['active_ingredient'] ?? '',
-              style: const TextStyle(
-                  fontSize: 12, color: Color(0xFF9E9E9E)),
-            ),
+            Text(item['active_ingredient'] ?? '',
+                style: const TextStyle(fontSize: 11, color: Colors.grey)),
             const SizedBox(height: 4),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    _swahiliCategory(category),
+            Row(children: [
+              _Badge(_catLabels[cat] ?? cat, color),
+              if (item['tpri_registered'] == true) ...[
+                const SizedBox(width: 6),
+                const Icon(Icons.verified,
+                    size: 13, color: AppColors.leaf),
+                const Text(' TPRI',
                     style: TextStyle(
-                        color: color,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-                if (pesticide['tpri_registered'] == true) ...[
-                  const SizedBox(width: 6),
-                  const Icon(Icons.verified,
-                      size: 14, color: Color(0xFF1A5C2E)),
-                  const Text(' TPRI',
-                      style: TextStyle(
-                          fontSize: 11, color: Color(0xFF1A5C2E))),
-                ],
+                        fontSize: 11, color: AppColors.leaf)),
               ],
-            ),
+            ]),
           ],
         ),
-
-        // Expanded view: full details
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -294,102 +372,27 @@ class _PesticideCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Divider(),
-
-                // Target pests
-                if ((pesticide['target_pests'] ?? '').isNotEmpty)
-                  _DetailRow(
-                    icon: Icons.bug_report,
-                    label: 'Wadudu / Magonjwa:',
-                    value: pesticide['target_pests'],
-                    color: color,
-                  ),
-
-                // Target crops
-                if ((pesticide['target_crops'] ?? '').isNotEmpty)
-                  _DetailRow(
-                    icon: Icons.grass,
-                    label: 'Mazao:',
-                    value: pesticide['target_crops'],
-                    color: color,
-                  ),
-
-                // Dose
-                if ((pesticide['dose_per_15L'] ?? '').isNotEmpty)
-                  _DetailRow(
-                    icon: Icons.water_drop,
-                    label: 'Kipimo kwa dumu la 15L:',
-                    value: pesticide['dose_per_15L'],
-                    color: color,
-                  ),
-
-                // PHI
-                if (pesticide['phi_days'] != null)
-                  _DetailRow(
-                    icon: Icons.timer,
-                    label: 'Muda wa kusubiri (PHI):',
-                    value: '${pesticide['phi_days']} siku kabla ya kuvuna',
-                    color: color,
-                  ),
-
-                // Price
-                if ((pesticide['price_range_tzs'] ?? '').isNotEmpty)
-                  _DetailRow(
-                    icon: Icons.attach_money,
-                    label: 'Bei takriban:',
-                    value: 'TZS ${pesticide['price_range_tzs']}',
-                    color: color,
-                  ),
-
-                // Manufacturer
-                if ((pesticide['manufacturer'] ?? '').isNotEmpty)
-                  _DetailRow(
-                    icon: Icons.factory,
-                    label: 'Mtengenezaji:',
-                    value: pesticide['manufacturer'],
-                    color: color,
-                  ),
-
-                // Description
-                if ((pesticide['description_sw'] ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      pesticide['description_sw'],
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ],
-
-                // Safety warning
-                if ((pesticide['safety_sw'] ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF8E1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.warning_amber,
-                            color: Color(0xFFFF6F00), size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            pesticide['safety_sw'],
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                _Row(Icons.bug_report, 'Wadudu/Magonjwa:',
+                    item['target_pests'], color),
+                _Row(Icons.grass, 'Mazao:',
+                    item['target_crops'], color),
+                _Row(Icons.water_drop, 'Kipimo (dumu 15L):',
+                    item['dose_per_15L'], color),
+                if (item['phi_days'] != null)
+                  _Row(Icons.timer, 'Muda kabla kuvuna (PHI):',
+                      '${item['phi_days']} siku', color),
+                _Row(Icons.attach_money, 'Bei:',
+                    item['price_range_tzs'] != null
+                        ? 'TZS ${item['price_range_tzs']}'
+                        : null,
+                    color),
+                _Row(Icons.factory, 'Mtengenezaji:',
+                    item['manufacturer'], color),
+                _InfoBox(item['description_sw'], AppColors.mint,
+                    AppColors.leaf),
+                _InfoBox(item['safety_sw'],
+                    const Color(0xFFFFF8E1), const Color(0xFFFF6F00),
+                    icon: Icons.warning_amber),
               ],
             ),
           ),
@@ -397,67 +400,212 @@ class _PesticideCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  IconData _categoryIcon(String category) {
-    switch (category) {
-      case 'Fungicide':
-        return Icons.coronavirus;
-      case 'Herbicide':
-        return Icons.grass;
-      case 'Biopesticide':
-        return Icons.eco;
-      default:
-        return Icons.bug_report;
-    }
-  }
+// ── Fertilizer card ───────────────────────────────────────────────────────────
 
-  String _swahiliCategory(String category) {
-    switch (category) {
-      case 'Insecticide':
-        return 'Dawa ya Wadudu';
-      case 'Fungicide':
-        return 'Dawa ya Ukungu';
-      case 'Herbicide':
-        return 'Dawa ya Magugu';
-      case 'Biopesticide':
-        return 'Dawa ya Asili';
-      default:
-        return category;
-    }
+class _FertilizerCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  const _FertilizerCard({required this.item});
+
+  static const _catColors = {
+    'Nitrojeni':   Color(0xFF1565C0),
+    'Fosfeti':     Color(0xFF6A1B9A),
+    'Potasiamu':   Color(0xFFC8860A),
+    'NPK':         Color(0xFF2E7D32),
+    'Kikaboni':    Color(0xFF4E342E),
+    'Virutubisho': Color(0xFF00695C),
+  };
+
+  static const _catIcons = {
+    'Nitrojeni':   Icons.air,
+    'Fosfeti':     Icons.science,
+    'Potasiamu':   Icons.water,
+    'NPK':         Icons.auto_awesome,
+    'Kikaboni':    Icons.compost,
+    'Virutubisho': Icons.biotech,
+  };
+
+  static const _catLabels = {
+    'Nitrojeni':   'Nitrojeni (N)',
+    'Fosfeti':     'Fosfeti (P)',
+    'Potasiamu':   'Potasiamu (K)',
+    'NPK':         'NPK / Mchanganyiko',
+    'Kikaboni':    'Mbolea ya Kikaboni',
+    'Virutubisho': 'Virutubisho Vidogo',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final cat   = item['category'] as String? ?? 'NPK';
+    final color = _catColors[cat] ?? AppColors.leaf;
+    final icon  = _catIcons[cat]  ?? Icons.eco;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ExpansionTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withValues(alpha: 0.1),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        title: Text(item['brand_name'] ?? '',
+            style: GoogleFonts.dmSans(
+                fontWeight: FontWeight.bold, fontSize: 14)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // NPK formula — prominent display
+            if ((item['npk'] ?? '').isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(top: 2, bottom: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                      color: color.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  item['npk'],
+                  style: TextStyle(
+                      color: color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace'),
+                ),
+              ),
+            Row(children: [
+              _Badge(_catLabels[cat] ?? cat, color),
+              if (item['tfra_registered'] == true) ...[
+                const SizedBox(width: 6),
+                const Icon(Icons.verified,
+                    size: 13, color: AppColors.leaf),
+                const Text(' TFRA',
+                    style: TextStyle(
+                        fontSize: 11, color: AppColors.leaf)),
+              ],
+            ]),
+          ],
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Divider(),
+                _Row(Icons.grass, 'Mazao:',
+                    item['crops'], color),
+                _Row(Icons.scale, 'Kipimo kwa ekari:',
+                    item['dose_per_acre'], color),
+                _Row(Icons.how_to_reg, 'Jinsi ya kutumia:',
+                    item['application'], color),
+                _Row(Icons.schedule, 'Wakati:',
+                    item['timing'], color),
+                _Row(Icons.attach_money, 'Bei takriban:',
+                    item['price_range_tzs'] != null
+                        ? 'TZS ${item['price_range_tzs']}'
+                        : null,
+                    color),
+                _Row(Icons.factory, 'Mtengenezaji/Chanzo:',
+                    item['manufacturer'], color),
+                _InfoBox(item['description_sw'],
+                    color.withValues(alpha: 0.06),
+                    color),
+                _InfoBox(item['warning_sw'],
+                    const Color(0xFFFFF8E1),
+                    const Color(0xFFFF6F00),
+                    icon: Icons.warning_amber),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-// One detail row inside the expanded card
-class _DetailRow extends StatelessWidget {
+// ── Shared small widgets ──────────────────────────────────────────────────────
+
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _Badge(this.label, this.color);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.bold)),
+    );
+  }
+}
+
+class _Row extends StatelessWidget {
   final IconData icon;
   final String label;
   final dynamic value;
   final Color color;
 
-  const _DetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
+  const _Row(this.icon, this.label, this.value, this.color);
 
   @override
   Widget build(BuildContext context) {
+    if (value == null || value.toString().isEmpty) return const SizedBox();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: color),
+          Icon(icon, size: 15, color: color),
           const SizedBox(width: 6),
           Text('$label ',
               style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13)),
+                  fontWeight: FontWeight.bold, fontSize: 12)),
           Expanded(
-            child: Text(
-              value?.toString() ?? '',
-              style: const TextStyle(fontSize: 13),
-            ),
+            child: Text(value.toString(),
+                style: const TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoBox extends StatelessWidget {
+  final dynamic text;
+  final Color bg;
+  final Color fg;
+  final IconData icon;
+
+  const _InfoBox(this.text, this.bg, this.fg,
+      {this.icon = Icons.info_outline});
+
+  @override
+  Widget build(BuildContext context) {
+    if (text == null || text.toString().isEmpty) return const SizedBox();
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(8)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: fg, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text.toString(),
+                style: const TextStyle(fontSize: 12)),
           ),
         ],
       ),

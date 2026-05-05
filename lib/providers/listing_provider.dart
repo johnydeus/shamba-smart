@@ -32,7 +32,7 @@ class ListingProvider extends ChangeNotifier {
     return list;
   }
 
-  // Load listings from SharedPreferences; seeds demo data if empty
+  // Load listings from SharedPreferences — starts empty for real users
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kListings);
@@ -41,11 +41,12 @@ class ListingProvider extends ChangeNotifier {
       _listings = list
           .map((e) => ListingModel.fromJson(e as Map<String, dynamic>))
           .toList();
-    }
-    // Seed demo listings on first launch
-    if (_listings.isEmpty) {
-      _listings = _seedListings();
-      await _save();
+      // Remove any old demo listings (IDs that start with '100000')
+      final hadDemo = _listings.any((l) => l.id.startsWith('100000'));
+      if (hadDemo) {
+        _listings.removeWhere((l) => l.id.startsWith('100000'));
+        await _save();
+      }
     }
     notifyListeners();
   }
@@ -83,8 +84,9 @@ class ListingProvider extends ChangeNotifier {
     await prefs.setString(_kListings, encoded);
   }
 
-  // ── Demo seed data (8 listings) ───────────────────────────────────────────
-  List<ListingModel> _seedListings() => [
+  // (Removed demo seed data — marketplace starts fresh with real user listings)
+  // ignore: unused_element
+  List<ListingModel> _unusedSeedListings() => [
         ListingModel(
           id: '1000001',
           type: ListingType.mazao,

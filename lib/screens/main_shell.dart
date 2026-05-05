@@ -40,49 +40,19 @@ class _MainShellState extends State<MainShell> {
     final roleColor = AppColors.roleColor(role);
 
     return Scaffold(
+      // Prevent keyboard from pushing/hiding the bottom navigation bar
+      resizeToAvoidBottomInset: false,
       body: IndexedStack(
         index: _currentIndex,
         children: _screens(role),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        backgroundColor: AppColors.cream,
-        indicatorColor: roleColor.withValues(alpha: 0.12),
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: [
-          // Tab 1 — Nyumbani
-          NavigationDestination(
-            icon: const Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home, color: roleColor),
-            label: 'Nyumbani',
-          ),
-          // Tab 2 — Sateliti
-          NavigationDestination(
-            icon: const Icon(Icons.satellite_alt_outlined),
-            selectedIcon:
-                Icon(Icons.satellite_alt, color: AppColors.leaf),
-            label: 'Sateliti',
-          ),
-          // Tab 3 — Udongo (Mashamba for mkulima)
-          NavigationDestination(
-            icon: Icon(_tab3Icon(role)),
-            selectedIcon: Icon(_tab3Icon(role), color: roleColor),
-            label: _tab3Label(role),
-          ),
-          // Tab 4 — Masoko
-          NavigationDestination(
-            icon: const Icon(Icons.storefront_outlined),
-            selectedIcon: Icon(Icons.storefront, color: roleColor),
-            label: 'Masoko',
-          ),
-          // Tab 5 — Akaunti
-          NavigationDestination(
-            icon: const Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person, color: roleColor),
-            label: 'Akaunti',
-          ),
-        ],
+      bottomNavigationBar: _BottomNav(
+        currentIndex: _currentIndex,
+        role: role,
+        roleColor: roleColor,
+        onTap: (i) => setState(() => _currentIndex = i),
+        tab3Icon: _tab3Icon(role),
+        tab3Label: _tab3Label(role),
       ),
     );
   }
@@ -98,4 +68,152 @@ class _MainShellState extends State<MainShell> {
         UserRole.afisa   => 'Wakulima',
         _                => 'Udongo',
       };
+}
+
+// ── Fixed bottom navigation — never hidden by keyboard ───────────────────────
+
+class _BottomNav extends StatelessWidget {
+  final int currentIndex;
+  final UserRole role;
+  final Color roleColor;
+  final ValueChanged<int> onTap;
+  final IconData tab3Icon;
+  final String tab3Label;
+
+  const _BottomNav({
+    required this.currentIndex,
+    required this.role,
+    required this.roleColor,
+    required this.onTap,
+    required this.tab3Icon,
+    required this.tab3Label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // SafeArea bottom accounts for home indicator on modern phones
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    return Material(
+      color: const Color(0xFFFFFDF8), // AppColors.cream
+      elevation: 8,
+      child: SizedBox(
+        height: 62 + bottomPadding,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          child: Row(
+            children: [
+              _NavItem(
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home,
+                label: 'Nyumbani',
+                index: 0,
+                current: currentIndex,
+                color: roleColor,
+                onTap: onTap,
+              ),
+              _NavItem(
+                icon: Icons.satellite_alt_outlined,
+                activeIcon: Icons.satellite_alt,
+                label: 'Sateliti',
+                index: 1,
+                current: currentIndex,
+                color: AppColors.leaf,
+                onTap: onTap,
+              ),
+              _NavItem(
+                icon: tab3Icon,
+                activeIcon: tab3Icon,
+                label: tab3Label,
+                index: 2,
+                current: currentIndex,
+                color: roleColor,
+                onTap: onTap,
+              ),
+              _NavItem(
+                icon: Icons.storefront_outlined,
+                activeIcon: Icons.storefront,
+                label: 'Masoko',
+                index: 3,
+                current: currentIndex,
+                color: roleColor,
+                onTap: onTap,
+              ),
+              _NavItem(
+                icon: Icons.person_outline,
+                activeIcon: Icons.person,
+                label: 'Akaunti',
+                index: 4,
+                current: currentIndex,
+                color: roleColor,
+                onTap: onTap,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final int index;
+  final int current;
+  final Color color;
+  final ValueChanged<int> onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.index,
+    required this.current,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = index == current;
+    return Expanded(
+      child: InkWell(
+        onTap: () => onTap(index),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: isActive ? color.withValues(alpha: 0.12) : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                isActive ? activeIcon : icon,
+                color: isActive ? color : const Color(0xFF9E9E9E),
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight:
+                    isActive ? FontWeight.bold : FontWeight.normal,
+                color: isActive ? color : const Color(0xFF9E9E9E),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

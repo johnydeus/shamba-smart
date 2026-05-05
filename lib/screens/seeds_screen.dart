@@ -2,21 +2,54 @@ import 'package:flutter/material.dart';
 import '../services/data_sync_service.dart';
 import '../services/local_data.dart';
 
-// Crops available in the TOSCI seed database
-const List<String> kSeedCrops = [
-  'Mahindi',
-  'Nyanya',
-  'Maharagwe',
-  'Mchele',
-  'Muhogo',
-  'Alizeti',
-  'Pilipili hoho',
-  'Vitunguu',
-  'Viazi vitamu',
-  'Ngano',
-  'Mtama',
-  'Choroko',
-];
+// All Tanzania crops organised by category (Ministry of Agriculture / TAHA / TOSCI)
+const Map<String, Map<String, dynamic>> kCropCategories = {
+  'Nafaka': {
+    'emoji': '🌾',
+    'label': 'Nafaka',
+    'color': 0xFFE65100,
+    'crops': ['Mahindi', 'Mchele', 'Ngano', 'Mtama', 'Uwele', 'Ulezi', 'Shayiri'],
+  },
+  'Mikunde': {
+    'emoji': '🫘',
+    'label': 'Mikunde',
+    'color': 0xFF6A1B9A,
+    'crops': ['Maharagwe', 'Choroko', 'Karanga', 'Soya', 'Mbaazi', 'Kunde'],
+  },
+  'Mbogamboga': {
+    'emoji': '🥦',
+    'label': 'Mboga',
+    'color': 0xFF2E7D32,
+    'crops': [
+      'Nyanya', 'Kabichi', 'Sukuma wiki', 'Vitunguu', 'Pilipili hoho',
+      'Pilipili manga', 'Karoti', 'Bamia', 'Tango', 'Bilinganya',
+      'Mchicha', 'Tikiti maji', 'Njegere', 'Maharage ya Kata',
+    ],
+  },
+  'Mizizi': {
+    'emoji': '🥔',
+    'label': 'Mizizi',
+    'color': 0xFF795548,
+    'crops': ['Muhogo', 'Viazi vitamu', 'Viazi'],
+  },
+  'Matunda': {
+    'emoji': '🍎',
+    'label': 'Matunda',
+    'color': 0xFFE91E63,
+    'crops': ['Ndizi', 'Embe', 'Papai', 'Nanasi', 'Avokado', 'Marakuja', 'Chungwa', 'Zabibu', 'Stroberri'],
+  },
+  'Biashara': {
+    'emoji': '☕',
+    'label': 'Biashara',
+    'color': 0xFF1565C0,
+    'crops': ['Pamba', 'Alizeti', 'Kahawa', 'Chai', 'Korosho', 'Miwa', 'Katani', 'Tumbaku', 'Karafuu'],
+  },
+};
+
+// Flat list derived from all categories (used for scan screen etc.)
+List<String> get kAllCrops => kCropCategories.values
+    .expand((c) => (c['crops'] as List<String>))
+    .toList();
 
 // Filter options for stress tolerance
 const List<Map<String, dynamic>> kFilters = [
@@ -36,6 +69,7 @@ class SeedsScreen extends StatefulWidget {
 }
 
 class _SeedsScreenState extends State<SeedsScreen> {
+  String _selectedCategory = 'Nafaka';
   String _selectedCrop = 'Mahindi';
   String _selectedFilter = 'all';
   List<Map<String, dynamic>> _varieties = [];
@@ -184,16 +218,69 @@ class _SeedsScreenState extends State<SeedsScreen> {
             ),
           ),
 
-          // Crop selector row
+          // ── Category tabs ──────────────────────────────────────────────
           SizedBox(
-            height: 50,
-            child: ListView.builder(
+            height: 52,
+            child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 8),
-              itemCount: kSeedCrops.length,
-              itemBuilder: (context, i) {
-                final crop = kSeedCrops[i];
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              children: kCropCategories.entries.map((e) {
+                final key = e.key;
+                final cat = e.value;
+                final selected = key == _selectedCategory;
+                final color = Color(cat['color'] as int);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () {
+                      final crops = cat['crops'] as List<String>;
+                      setState(() {
+                        _selectedCategory = key;
+                        _selectedCrop = crops.first;
+                      });
+                      _loadVarieties();
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: selected ? color : color.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: selected ? color : color.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(cat['emoji'] as String,
+                              style: const TextStyle(fontSize: 15)),
+                          const SizedBox(width: 5),
+                          Text(
+                            cat['label'] as String,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: selected ? Colors.white : color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
+          // ── Crop chips within selected category ───────────────────────
+          SizedBox(
+            height: 48,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              children: (kCropCategories[_selectedCategory]!['crops'] as List<String>)
+                  .map((crop) {
                 final selected = crop == _selectedCrop;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -209,11 +296,11 @@ class _SeedsScreenState extends State<SeedsScreen> {
                     selectedColor: const Color(0xFF1A5C2E),
                     labelStyle: TextStyle(
                       color: selected ? Colors.white : Colors.black87,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                   ),
                 );
-              },
+              }).toList(),
             ),
           ),
 
@@ -712,6 +799,31 @@ class _SeedCard extends StatelessWidget {
                     ),
                   ),
                 ],
+
+                // ── Nunua Wapi (Where to Buy) ─────────────────────────────
+                if ((variety['dealers'] as List?)?.isNotEmpty == true) ...[
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 4),
+                  const Row(
+                    children: [
+                      Icon(Icons.storefront,
+                          size: 16, color: Color(0xFF1565C0)),
+                      SizedBox(width: 6),
+                      Text(
+                        'Nunua Wapi (Maduka/Vituo):',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Color(0xFF1565C0)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...(variety['dealers'] as List)
+                      .cast<Map<String, dynamic>>()
+                      .map((d) => _DealerTile(dealer: d)),
+                ],
               ],
             ),
           ),
@@ -773,6 +885,103 @@ class _Row extends StatelessWidget {
           Expanded(
             child: Text(value?.toString() ?? '',
                 style: const TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Dealer / where-to-buy tile
+class _DealerTile extends StatelessWidget {
+  final Map<String, dynamic> dealer;
+  const _DealerTile({required this.dealer});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = dealer['name'] as String? ?? '';
+    final region = dealer['region'] as String? ?? '';
+    final phone = dealer['phone'] as String? ?? '';
+    final type = dealer['type'] as String? ?? '';
+
+    Color typeColor;
+    IconData typeIcon;
+    if (type.contains('TARI') || type.contains('Utafiti')) {
+      typeColor = const Color(0xFF2E7D32);
+      typeIcon = Icons.science;
+    } else if (type.contains('Kampuni') || type.contains('Ofisi')) {
+      typeColor = const Color(0xFF1565C0);
+      typeIcon = Icons.business;
+    } else if (type.contains('Serikali')) {
+      typeColor = const Color(0xFF00695C);
+      typeIcon = Icons.account_balance;
+    } else {
+      typeColor = const Color(0xFF6A1B9A);
+      typeIcon = Icons.storefront;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: typeColor.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: typeColor.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(typeIcon, color: typeColor, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: typeColor)),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 11, color: Colors.grey),
+                    const SizedBox(width: 3),
+                    Text(region,
+                        style: const TextStyle(
+                            fontSize: 11, color: Colors.grey)),
+                  ],
+                ),
+                if (phone.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(Icons.phone, size: 11, color: Colors.grey),
+                      const SizedBox(width: 3),
+                      Text(phone,
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF1565C0),
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: typeColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(type,
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: typeColor,
+                          fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
           ),
         ],
       ),
