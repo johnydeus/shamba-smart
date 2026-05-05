@@ -10,6 +10,7 @@ import 'add_farm_screen.dart';
 import 'scan_screen.dart';
 import 'soil_screen.dart';
 import 'irrigation_screen.dart';
+import 'iot_dashboard_screen.dart';
 
 class FarmDetailScreen extends StatefulWidget {
   final FarmModel farm;
@@ -580,6 +581,19 @@ class _HealthTab extends StatelessWidget {
           buttonColor: const Color(0xFF0277BD),
           onTap: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => const IrrigationScreen())),
+        ),
+
+        const SizedBox(height: 14),
+
+        // IoT Dashboard card
+        _HealthCard(
+          emoji: '📡',
+          title: 'Sensa za IoT — Uangalizi wa Wakati Halisi',
+          subtitle: 'Angalia data za unyevu, joto, NPK, pH kutoka kwa sensa zilizounganishwa shambani (kipengele cha hiari)',
+          buttonLabel: 'Fungua IoT Dashboard',
+          buttonColor: const Color(0xFF1A237E),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => IoTDashboardScreen(farm: farm))),
         ),
 
         const SizedBox(height: 14),
