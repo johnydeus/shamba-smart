@@ -69,28 +69,54 @@ class AuthProvider extends ChangeNotifier {
       final uid = res.user!.id;
       final now = DateTime.now();
 
-      await _client.from('profiles').insert({
-        'id': uid,
-        'first_name': firstName.trim(),
-        'last_name': lastName.trim(),
-        'email': cleanEmail,
-        'region': region,
-        'role': role.key,
-        'joined_at': now.toIso8601String(),
-        'listing_count': 0,
-        'sales_count': 0,
-        if (farmSize != null) 'farm_size': farmSize,
-        if (mainCrops != null) 'main_crops': mainCrops,
-        if (shopName != null) 'shop_name': shopName,
-        if (productType != null) 'product_type': productType,
-        if (businessName != null) 'business_name': businessName,
-        if (cropsTraded != null) 'crops_traded': cropsTraded,
-        if (investmentType != null) 'investment_type': investmentType,
-        if (organization != null) 'organization': organization,
-        if (badgeNumber != null) 'badge_number': badgeNumber,
-        if (district != null) 'district': district,
-        'all_roles': [role.key],
-      });
+      final displayName = '${firstName.trim()} ${lastName.trim()}'.trim();
+      final extraInfo = mainCrops ?? shopName ?? businessName ?? '';
+
+      // Write to profiles table (friend's new schema)
+      try {
+        await _client.from('profiles').insert({
+          'id': uid,
+          'first_name': firstName.trim(),
+          'last_name': lastName.trim(),
+          'email': cleanEmail,
+          'region': region,
+          'role': role.key,
+          'joined_at': now.toIso8601String(),
+          'listing_count': 0,
+          'sales_count': 0,
+          'farm_size': farmSize,
+          'main_crops': mainCrops,
+          'shop_name': shopName,
+          'product_type': productType,
+          'business_name': businessName,
+          'crops_traded': cropsTraded,
+          'investment_type': investmentType,
+          'organization': organization,
+          'badge_number': badgeNumber,
+          'district': district,
+          'all_roles': [role.key],
+        });
+      } catch (e) {
+        debugPrint('profiles insert error (non-fatal): $e');
+      }
+
+      // Also write to farmers table so the user directory always finds them
+      try {
+        await _client.from('farmers').upsert({
+          'id': uid,
+          'phone': cleanEmail,
+          'name': displayName,
+          'region': region,
+          'role': role.key,
+          'color_hex': role.colorHex,
+          'extra_info': extraInfo,
+          'subscription': 'free',
+          'language': 'sw',
+          'created_at': now.toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('farmers upsert error (non-fatal): $e');
+      }
 
       _currentUser = UserModel(
         id: uid,
@@ -153,11 +179,15 @@ class AuthProvider extends ChangeNotifier {
 
   // Log out — clears Supabase session and local cache
   Future<void> logout() async {
-    await _client.auth.signOut();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kCachedProfile);
+    // Clear local state first so UI responds immediately
     _currentUser = null;
     notifyListeners();
+    // Then clean up backend + cache (errors here must not block logout)
+    try { await _client.auth.signOut(); } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kCachedProfile);
+    } catch (_) {}
   }
 
   // Switch active role (user must already hold this role)
@@ -202,14 +232,14 @@ class AuthProvider extends ChangeNotifier {
 
     await _updateProfile({
       'all_roles': updatedRoles.map((r) => r.key).toList(),
-      if (shopName != null) 'shop_name': shopName,
-      if (productType != null) 'product_type': productType,
-      if (businessName != null) 'business_name': businessName,
-      if (cropsTraded != null) 'crops_traded': cropsTraded,
-      if (investmentType != null) 'investment_type': investmentType,
-      if (organization != null) 'organization': organization,
-      if (badgeNumber != null) 'badge_number': badgeNumber,
-      if (district != null) 'district': district,
+      'shop_name': shopName,
+      'product_type': productType,
+      'business_name': businessName,
+      'crops_traded': cropsTraded,
+      'investment_type': investmentType,
+      'organization': organization,
+      'badge_number': badgeNumber,
+      'district': district,
     });
 
     notifyListeners();
@@ -226,17 +256,79 @@ class AuthProvider extends ChangeNotifier {
   // ── Private helpers ───────────────────────────────────────────────────────
 
   Future<void> _fetchAndCacheProfile(String userId) async {
+    // 1. Try profiles table (friend's new schema)
     try {
       final data = await _client
           .from('profiles')
           .select()
           .eq('id', userId)
-          .single();
-      _currentUser = UserModel.fromSupabase(data);
+          .maybeSingle();
+      if (data != null) {
+        _currentUser = UserModel.fromSupabase(data);
+        await _cacheProfile(_currentUser!);
+        notifyListeners();
+        return;
+      }
+    } catch (e) {
+      debugPrint('profiles table fetch error: $e');
+    }
+
+    // 2. Fall back to farmers table (existing schema)
+    try {
+      final data = await _client
+          .from('farmers')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      if (data != null) {
+        // Reconstruct UserModel from farmers row
+        final profileRaw = data['profile_json'] as String?;
+        if (profileRaw != null && profileRaw.isNotEmpty) {
+          final json = jsonDecode(profileRaw) as Map<String, dynamic>;
+          json['id'] = userId;
+          json['password'] = '';
+          _currentUser = UserModel.fromJson(json);
+        } else {
+          final fullName = (data['name'] as String? ?? 'Mtumiaji').trim();
+          final parts = fullName.split(' ');
+          _currentUser = UserModel(
+            id: userId,
+            firstName: parts.isNotEmpty ? parts.first : 'Mtumiaji',
+            lastName: parts.length > 1 ? parts.sublist(1).join(' ') : '',
+            email: data['phone'] as String? ?? '',
+            password: '',
+            region: data['region'] as String? ?? '',
+            role: UserRoleX.fromKey(data['role'] as String? ?? 'mkulima'),
+            joinedAt: DateTime.tryParse(
+                    data['created_at'] as String? ?? '') ??
+                DateTime.now(),
+          );
+        }
+        await _cacheProfile(_currentUser!);
+        notifyListeners();
+        return;
+      }
+    } catch (e) {
+      debugPrint('farmers table fetch error: $e');
+    }
+
+    // 3. Last resort: build a minimal user from the auth session so login
+    //    always succeeds even if both tables are missing/empty.
+    final authUser = _client.auth.currentUser;
+    if (authUser != null) {
+      final email = authUser.email ?? '';
+      _currentUser = UserModel(
+        id: userId,
+        firstName: email.split('@').first,
+        lastName: '',
+        email: email,
+        password: '',
+        region: '',
+        role: UserRole.mkulima,
+        joinedAt: DateTime.now(),
+      );
       await _cacheProfile(_currentUser!);
       notifyListeners();
-    } catch (e) {
-      debugPrint('Error fetching profile: $e');
     }
   }
 

@@ -828,12 +828,43 @@ class _DirectoryTabState extends State<_DirectoryTab> {
     setState(() { _loading = true; _error = null; });
     try {
       final myId = context.read<AuthProvider>().currentUser?.id ?? "";
-      final rows = await Supabase.instance.client
-          .from("profiles")
-          .select("id, first_name, last_name, region, role")
-          .neq("id", myId)
-          .order("joined_at", ascending: false);
-      setState(() { _users = (rows as List).cast<Map<String, dynamic>>(); });
+      final combined = <String, Map<String, dynamic>>{};
+
+      // 1. Query farmers table (old registrations)
+      try {
+        final rows = await Supabase.instance.client
+            .from("farmers")
+            .select("id, name, region, role, color_hex, extra_info")
+            .neq("id", myId)
+            .order("created_at", ascending: false);
+        for (final r in (rows as List).cast<Map<String, dynamic>>()) {
+          combined[r['id'] as String] = r;
+        }
+      } catch (_) {}
+
+      // 2. Query profiles table (new registrations) — merge on top
+      try {
+        final rows = await Supabase.instance.client
+            .from("profiles")
+            .select("id, first_name, last_name, email, region, role")
+            .neq("id", myId)
+            .order("joined_at", ascending: false);
+        for (final r in (rows as List).cast<Map<String, dynamic>>()) {
+          final id = r['id'] as String;
+          final name = '${r['first_name'] ?? ''} ${r['last_name'] ?? ''}'.trim();
+          final roleKey = r['role'] as String? ?? 'mkulima';
+          combined[id] = {
+            'id': id,
+            'name': name.isEmpty ? (r['email'] as String? ?? 'Mtumiaji') : name,
+            'region': r['region'] ?? '',
+            'role': roleKey,
+            'color_hex': UserRoleX.fromKey(roleKey).colorHex,
+            'extra_info': '',
+          };
+        }
+      } catch (_) {}
+
+      setState(() { _users = combined.values.toList(); });
     } catch (e) {
       setState(() { _error = "Hitilafu ya mtandao. Angalia intaneti."; });
     }

@@ -45,14 +45,46 @@ class _ConsultationScreenState extends State<ConsultationScreen>
     setState(() { _loadingFarmers = true; _farmersError = null; });
     try {
       final myId = context.read<AuthProvider>().currentUser?.id ?? '';
-      final rows = await Supabase.instance.client
-          .from('farmers')
-          .select('id, name, region, role, color_hex, extra_info, created_at')
-          .neq('id', myId)
-          .order('created_at', ascending: false);
+      final combined = <String, Map<String, dynamic>>{};
+
+      // 1. farmers table (old users)
+      try {
+        final rows = await Supabase.instance.client
+            .from('farmers')
+            .select('id, name, region, role, color_hex, extra_info, created_at')
+            .neq('id', myId)
+            .order('created_at', ascending: false);
+        for (final r in (rows as List).cast<Map<String, dynamic>>()) {
+          combined[r['id'] as String] = r;
+        }
+      } catch (_) {}
+
+      // 2. profiles table (new users) — merges on top
+      try {
+        final rows = await Supabase.instance.client
+            .from('profiles')
+            .select('id, first_name, last_name, email, region, role, joined_at')
+            .neq('id', myId)
+            .order('joined_at', ascending: false);
+        for (final r in (rows as List).cast<Map<String, dynamic>>()) {
+          final id = r['id'] as String;
+          final name = '${r['first_name'] ?? ''} ${r['last_name'] ?? ''}'.trim();
+          final roleKey = r['role'] as String? ?? 'mkulima';
+          combined[id] = {
+            'id': id,
+            'name': name.isEmpty ? (r['email'] as String? ?? 'Mtumiaji') : name,
+            'region': r['region'] ?? '',
+            'role': roleKey,
+            'color_hex': UserRoleX.fromKey(roleKey).colorHex,
+            'extra_info': '',
+            'created_at': r['joined_at'] ?? '',
+          };
+        }
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
-          _farmers = (rows as List).cast<Map<String, dynamic>>();
+          _farmers = combined.values.toList();
           _loadingFarmers = false;
         });
       }

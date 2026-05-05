@@ -206,7 +206,7 @@ class _Header extends StatelessWidget {
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
-                          const Icon(Icons.notifications_outlined,
+                          const Icon(Icons.chat_bubble_outline_rounded,
                               color: Colors.white, size: 22),
                           if (unread > 0)
                             Positioned(
