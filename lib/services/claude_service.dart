@@ -352,4 +352,68 @@ Jibu kwa maneno mafupi yanayofaa simu (si zaidi ya mistari 8).
       return 'Hitilafu ya mtandao: ${e.toString()}';
     }
   }
+
+  // Generate full crop advisory from soil data — used in Soil screen
+  static Future<String> getCropAdvisory({
+    required double ph,
+    required String texture,
+    required double? nitrogen,
+    required double? organicCarbon,
+    required String region,
+    required double lat,
+    required double lng,
+  }) async {
+    final nText  = nitrogen     != null ? '${nitrogen.toStringAsFixed(2)} g/kg' : 'haijapimwa';
+    final socText = organicCarbon != null ? '${organicCarbon.toStringAsFixed(1)} g/kg' : 'haijapimwa';
+
+    final prompt = '''
+Mkulima kutoka eneo la $region (GPS: $lat, $lng) ana data hii ya udongo:
+- pH ya udongo: $ph
+- Muundo wa udongo (Texture): $texture
+- Nitrojeni (N): $nText
+- Kaboni ya Udongo (SOC): $socText
+
+Toa ushauri kamili wa kilimo kwa lugha ya Kiswahili rahisi ukijumuisha:
+
+1. 🌱 MAZAO BORA (orodha mazao 5 yanayofaa udongo huu na mkoa huu wa Tanzania)
+2. 📅 RATIBA YA KILIMO (miezi ya kupanda, kupalilia, na kuvuna kwa kila zao kuu)
+3. 🌧️ MVUA NA MSIMU (misimu ya mvua inayotarajiwa maeneo hayo na jinsi ya kuitumia)
+4. 💧 UMWAGILIAJI (kama mvua haitoshi, zao lipi linahitaji umwagiliaji na mara ngapi)
+5. 🌿 MATAYARISHO YA SHAMBA (jinsi ya kuandaa udongo huu kabla ya kupanda)
+6. ⚠️ TAHADHARI (mambo ya kuangalia kulingana na hali ya udongo huu)
+
+Jibu liwe fupi, la vitendo, na linafaa kwa mkulima mdogo wa Tanzania.
+''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': _apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'max_tokens': 1200,
+          'system':
+              'Wewe ni mtaalamu wa kilimo wa Tanzania mwenye uzoefu wa miaka 20. '
+              'Unajua hali ya hewa, udongo, na mazao ya kila mkoa wa Tanzania. '
+              'Daima jibu kwa Kiswahili rahisi kinachoeleweka kwa mkulima wa kawaida. '
+              'Toa ushauri wa vitendo unaoweza kutekelezwa na mkulima mdogo.',
+          'messages': [
+            {'role': 'user', 'content': prompt},
+          ],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['content'][0]['text'] as String;
+      }
+      return 'Samahani, kuna hitilafu ya kupata ushauri. Jaribu tena.';
+    } catch (e) {
+      return 'Hitilafu ya mtandao: ${e.toString()}';
+    }
+  }
 }

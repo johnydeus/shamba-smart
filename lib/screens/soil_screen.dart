@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/soil_data_model.dart';
+import '../services/claude_service.dart';
 import '../services/location_service.dart';
 import '../services/soil_service.dart';
 import '../theme/app_colors.dart';
@@ -24,6 +26,11 @@ class _SoilScreenState extends State<SoilScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _isFromCache = false;
+
+  // Crop advisory state
+  String? _advisoryText;
+  bool _advisoryLoading = false;
+  bool _advisoryExpanded = false;
 
   @override
   void initState() {
@@ -125,6 +132,8 @@ class _SoilScreenState extends State<SoilScreen> {
               _buildNutrientsCard(),
               const SizedBox(height: 12),
               _buildRecommendationCard(),
+              const SizedBox(height: 12),
+              _buildAdvisoryCard(),
               const SizedBox(height: 16),
               _buildMap(),
               const SizedBox(height: 24),
@@ -557,6 +566,130 @@ class _SoilScreenState extends State<SoilScreen> {
           style: const TextStyle(fontSize: 14, height: 1.5),
         ),
       );
+
+  // ── AI Crop Advisory ─────────────────────────────────────
+
+  Future<void> _fetchAdvisory() async {
+    if (_soilData == null) return;
+    setState(() { _advisoryLoading = true; _advisoryExpanded = true; });
+
+    final region = LocationService.regionFromCoords(
+        _soilData!.latitude, _soilData!.longitude);
+
+    final text = await ClaudeService.getCropAdvisory(
+      ph: _soilData!.ph ?? 6.5,
+      texture: _soilData!.textureClass,
+      nitrogen: _soilData!.nitrogen,
+      organicCarbon: _soilData!.organicCarbon,
+      region: region,
+      lat: _soilData!.latitude,
+      lng: _soilData!.longitude,
+    );
+    setState(() { _advisoryText = text; _advisoryLoading = false; });
+  }
+
+  Widget _buildAdvisoryCard() {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      color: const Color(0xFFF1F8E9),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.leaf.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Text('🤖', style: TextStyle(fontSize: 20)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Mshauri wa Mazao — AI',
+                          style: GoogleFonts.playfairDisplay(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.soil,
+                          )),
+                      Text('Kutumia data ya udongo wako',
+                          style: GoogleFonts.dmSans(
+                              fontSize: 12, color: AppColors.mid)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            if (!_advisoryExpanded) ...[
+              // Prompt button
+              ElevatedButton.icon(
+                onPressed: _fetchAdvisory,
+                icon: const Icon(Icons.agriculture_outlined, size: 18),
+                label: const Text('Pata Ushauri wa Mazao Bora'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.leaf,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Claude AI atakuambia: mazao bora, wakati wa kupanda, mvua, ratiba ya kulima na umwagiliaji — yote kutokana na data ya udongo wako.',
+                style: GoogleFonts.dmSans(
+                    fontSize: 12, color: AppColors.mid, height: 1.4),
+                textAlign: TextAlign.center,
+              ),
+            ] else if (_advisoryLoading) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(
+                        color: AppColors.leaf, strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('Claude AI anaandaa ushauri wako...',
+                      style: GoogleFonts.dmSans(
+                          color: AppColors.leaf, fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ] else if (_advisoryText != null) ...[
+              const Divider(height: 20),
+              Text(_advisoryText!,
+                  style: GoogleFonts.dmSans(
+                      fontSize: 13.5, height: 1.6, color: AppColors.ink)),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _fetchAdvisory,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Pata Ushauri Mpya'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.leaf,
+                  side: const BorderSide(color: AppColors.leaf),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   // ── OpenStreetMap ─────────────────────────────────────────
 
