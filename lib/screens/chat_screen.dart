@@ -651,9 +651,26 @@ class _MessageBubble extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 3),
-              Text(_bubbleTime(message.timestamp),
-                  style: GoogleFonts.dmSans(
-                      fontSize: 10, color: AppColors.mid)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_bubbleTime(message.timestamp),
+                      style: GoogleFonts.dmSans(
+                          fontSize: 10, color: AppColors.mid)),
+                  if (sent) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      message.isRead
+                          ? Icons.done_all_rounded
+                          : Icons.done_rounded,
+                      size: 14,
+                      color: message.isRead
+                          ? const Color(0xFF1976D2)
+                          : AppColors.mid,
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
 

@@ -10,6 +10,7 @@ class MessageModel {
   final String text;           // used for text messages and captions
   final DateTime timestamp;
   final bool isFromMe;
+  final bool isRead;
   final MessageType type;
 
   // ── Image message fields ──────────────────────────────────────────────────
@@ -32,6 +33,7 @@ class MessageModel {
     required this.text,
     required this.timestamp,
     required this.isFromMe,
+    this.isRead = false,
     this.type = MessageType.text,
     this.imagePath,
     this.locationLat,

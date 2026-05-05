@@ -74,7 +74,7 @@ class ChatProvider extends ChangeNotifier {
           .from('direct_messages')
           .select()
           .or('from_id.eq.$_myId,to_id.eq.$_myId')
-          .order('created_at');
+          .order('created_at', ascending: true);
 
       final newConvs = <String, ConversationModel>{};
 
@@ -109,6 +109,7 @@ class ChatProvider extends ChangeNotifier {
           text:      row['content'] as String,
           timestamp: DateTime.parse(row['created_at'] as String).toLocal(),
           isFromMe:  isFromMe,
+          isRead:    row['is_read'] as bool? ?? false,
           type:      MessageType.text,
         ));
 
