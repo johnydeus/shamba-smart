@@ -829,10 +829,10 @@ class _DirectoryTabState extends State<_DirectoryTab> {
     try {
       final myId = context.read<AuthProvider>().currentUser?.id ?? "";
       final rows = await Supabase.instance.client
-          .from("farmers")
-          .select("id, name, region, role, color_hex, extra_info")
+          .from("profiles")
+          .select("id, first_name, last_name, region, role")
           .neq("id", myId)
-          .order("created_at", ascending: false);
+          .order("joined_at", ascending: false);
       setState(() { _users = (rows as List).cast<Map<String, dynamic>>(); });
     } catch (e) {
       setState(() { _error = "Hitilafu ya mtandao. Angalia intaneti."; });
@@ -939,13 +939,17 @@ class _DirectoryTabState extends State<_DirectoryTab> {
       itemBuilder: (context, i) {
         final u = users[i];
         final role     = UserRoleX.fromKey(u["role"] as String? ?? "mkulima");
-        final colorHex = u["color_hex"] as String? ?? role.colorHex;
+        final colorHex = role.colorHex;
         final color    = AppColors.roleColor(role);
-        final extra    = u["extra_info"] as String? ?? "";
+        final firstName = u["first_name"] as String? ?? "";
+        final lastName  = u["last_name"] as String? ?? "";
+        final displayName = "$firstName $lastName".trim().isEmpty
+            ? "Mtumiaji"
+            : "$firstName $lastName".trim();
         return _UserCard(
-          id: u["id"] as String, displayName: u["name"] as String? ?? "Mtumiaji",
+          id: u["id"] as String, displayName: displayName,
           role: role, region: u["region"] as String? ?? "",
-          extra: extra, colorHex: colorHex, color: color,
+          extra: "", colorHex: colorHex, color: color,
         );
       },
     );
