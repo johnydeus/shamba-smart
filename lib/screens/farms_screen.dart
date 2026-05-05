@@ -8,6 +8,9 @@ import '../providers/farm_provider.dart';
 import '../theme/app_colors.dart';
 import 'add_farm_screen.dart';
 import 'farm_detail_screen.dart';
+import 'scan_screen.dart';
+import 'soil_screen.dart';
+import 'irrigation_screen.dart';
 
 class FarmsScreen extends StatelessWidget {
   const FarmsScreen({super.key});
@@ -175,123 +178,236 @@ class _FarmCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Card(
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Farm icon
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: AppColors.leaf.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.landscape,
-                      color: AppColors.leaf, size: 28),
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          children: [
+            // ── Coloured header ──────────────────────────────────────────────
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1E3A1E), Color(0xFF2E6B35)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                const SizedBox(width: 14),
-
-                // Farm info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        farm.name,
-                        style: GoogleFonts.playfairDisplay(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.straighten,
-                              size: 13, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(farm.acresDisplay,
-                              style: const TextStyle(
-                                  color: Colors.grey, fontSize: 12)),
-                          const SizedBox(width: 10),
-                          const Icon(Icons.location_on,
-                              size: 13, color: Colors.grey),
-                          const SizedBox(width: 2),
-                          Text(farm.region,
-                              style: const TextStyle(
-                                  color: Colors.grey, fontSize: 12)),
-                        ],
-                      ),
-                      if (farm.crops.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 4,
-                          children: farm.crops
-                              .take(3)
-                              .map((c) => _CropChip(crop: c))
-                              .toList()
-                            ..addAll(farm.crops.length > 3
-                                ? [_CropChip(crop: '+${farm.crops.length - 3}')]
-                                : []),
+              ),
+              child: Row(
+                children: [
+                  const Text('🌾', style: TextStyle(fontSize: 28)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(farm.name,
+                            style: GoogleFonts.playfairDisplay(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            )),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on,
+                                size: 12, color: Colors.white60),
+                            const SizedBox(width: 3),
+                            Text(farm.region,
+                                style: GoogleFonts.dmSans(
+                                    color: Colors.white70, fontSize: 12)),
+                            const SizedBox(width: 10),
+                            const Icon(Icons.straighten,
+                                size: 12, color: Colors.white60),
+                            const SizedBox(width: 3),
+                            Text(farm.acresDisplay,
+                                style: GoogleFonts.dmSans(
+                                    color: Colors.white70, fontSize: 12)),
+                          ],
                         ),
                       ],
-                      if (!farm.hasLocation)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 4),
-                          child: Row(
-                            children: [
-                              Icon(Icons.gps_not_fixed,
-                                  size: 12, color: Colors.orange),
-                              SizedBox(width: 4),
-                              Text('GPS haijawekwa',
-                                  style: TextStyle(
-                                      fontSize: 11, color: Colors.orange)),
-                            ],
-                          ),
-                        ),
+                    ),
+                  ),
+                  // Delete button
+                  GestureDetector(
+                    onTap: onDelete,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.delete_outline,
+                          size: 16, color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Body ─────────────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Badges row
+                  Row(
+                    children: [
+                      _Badge(
+                        icon: farm.hasLocation
+                            ? Icons.gps_fixed
+                            : Icons.gps_not_fixed,
+                        label: farm.hasLocation ? 'GPS Imewekwa' : 'Weka GPS',
+                        color: farm.hasLocation
+                            ? AppColors.leaf
+                            : Colors.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      _Badge(
+                        icon: Icons.grass,
+                        label: farm.crops.isEmpty
+                            ? 'Mazao Hayajawekwa'
+                            : '${farm.crops.length} Zao${farm.crops.length > 1 ? " (${farm.crops.take(2).join(", ")})" : " (${farm.crops.first})"}',
+                        color: farm.crops.isEmpty
+                            ? Colors.grey
+                            : AppColors.harvest,
+                      ),
                     ],
                   ),
-                ),
 
-                // Actions
-                Column(
-                  children: [
-                    const Icon(Icons.arrow_forward_ios,
-                        size: 16, color: Colors.grey),
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: onDelete,
-                      child: const Icon(Icons.delete_outline,
-                          size: 18, color: Colors.redAccent),
-                    ),
-                  ],
-                ),
-              ],
+                  const SizedBox(height: 12),
+
+                  // Quick action buttons
+                  Row(
+                    children: [
+                      _MiniAction(
+                        emoji: '🔬',
+                        label: 'Chunguza',
+                        onTap: () => Navigator.push(context,
+                            MaterialPageRoute(
+                                builder: (_) => const ScanScreen())),
+                      ),
+                      const SizedBox(width: 8),
+                      _MiniAction(
+                        emoji: '🧪',
+                        label: 'Udongo',
+                        onTap: () => Navigator.push(context,
+                            MaterialPageRoute(
+                                builder: (_) => SoilScreen(
+                                  farmLat: farm.gpsLat,
+                                  farmLng: farm.gpsLng,
+                                  farmName: farm.name,
+                                ))),
+                      ),
+                      const SizedBox(width: 8),
+                      _MiniAction(
+                        emoji: '💧',
+                        label: 'Umwagiliaji',
+                        onTap: () => Navigator.push(context,
+                            MaterialPageRoute(
+                                builder: (_) => const IrrigationScreen())),
+                      ),
+                      const Spacer(),
+                      // Open detail arrow
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: AppColors.leaf,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Fungua',
+                                style: GoogleFonts.dmSans(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_forward_ios,
+                                size: 11, color: Colors.white),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _Badge({required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 11, color: color),
+            const SizedBox(width: 4),
+            Text(label,
+                style: GoogleFonts.dmSans(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      );
+}
+
+class _MiniAction extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final VoidCallback onTap;
+  const _MiniAction(
+      {required this.emoji, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.mist,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.mid.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 13)),
+              const SizedBox(width: 4),
+              Text(label,
+                  style: GoogleFonts.dmSans(
+                      fontSize: 11,
+                      color: AppColors.soil,
+                      fontWeight: FontWeight.w600)),
+            ],
           ),
         ),
       );
 }
 
-class _CropChip extends StatelessWidget {
-  final String crop;
-  const _CropChip({required this.crop});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: AppColors.leaf.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          crop,
-          style: const TextStyle(
-              fontSize: 10, color: AppColors.leaf, fontWeight: FontWeight.w600),
-        ),
-      );
-}
