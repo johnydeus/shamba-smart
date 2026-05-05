@@ -354,32 +354,43 @@ class _CommunityTab extends StatelessWidget {
 
         // Post list
         Expanded(
-          child: filtered.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+          child: RefreshIndicator(
+            onRefresh: () => context.read<CommunityProvider>().loadPosts(),
+            color: AppColors.leaf,
+            child: filtered.isEmpty
+                ? ListView(
                     children: [
-                      const Text('📭', style: TextStyle(fontSize: 48)),
-                      const SizedBox(height: 12),
-                      Text('Hakuna machapisho bado.',
-                          style: GoogleFonts.dmSans(color: AppColors.mid)),
-                      const SizedBox(height: 8),
-                      if (user != null)
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.add),
-                          label: const Text('Chapisho la Kwanza'),
-                          onPressed: () =>
-                              _showPostSheet(context, user),
+                      SizedBox(
+                        height: 300,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text('📭', style: TextStyle(fontSize: 48)),
+                              const SizedBox(height: 12),
+                              Text('Hakuna machapisho bado.',
+                                  style: GoogleFonts.dmSans(color: AppColors.mid)),
+                              const SizedBox(height: 8),
+                              if (user != null)
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Chapisho la Kwanza'),
+                                  onPressed: () =>
+                                      _showPostSheet(context, user),
+                                ),
+                            ],
+                          ),
                         ),
+                      ),
                     ],
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
+                    itemCount: filtered.length,
+                    separatorBuilder: (context, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, i) => _PostCard(post: filtered[i]),
                   ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
-                  itemCount: filtered.length,
-                  separatorBuilder: (context, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, i) => _PostCard(post: filtered[i]),
-                ),
+          ),
         ),
       ],
     );
