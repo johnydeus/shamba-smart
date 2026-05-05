@@ -3,7 +3,13 @@
     "allow": [
       "Bash(flutter pub *)",
       "Bash(flutter analyze *)",
-      "Bash(flutter devices *)"
+      "Bash(flutter devices *)",
+      "Bash(supabase --version)",
+      "Bash(npx supabase *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(flutter build *)",
+      "PowerShell(Stop-Process -Name \"java\" -Force -ErrorAction SilentlyContinue)"
     ]
   }
 }
