@@ -917,28 +917,23 @@ class _BentoGrid extends StatelessWidget {
                   size: 16, weight: FontWeight.w700, color: _kGreenDark)),
           const SizedBox(height: 14),
 
-          // Row 1: Weather (tall) + Soil (shorter)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 5,
-                child: _WeatherBentoCard(),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 4,
-                child: Column(
-                  children: [
-                    _SoilHealthBentoCard(
-                        onTap: () => go(const SoilScreen())),
-                    const SizedBox(height: 12),
-                    _CommunityBentoCard(
-                        onTap: () => go(const ForumScreen())),
-                  ],
+          // Row 1: Weather (tall) + Soil Health (full column)
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: _WeatherBentoCard(),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 4,
+                  child: _SoilHealthBentoCard(
+                      onTap: () => go(const SoilScreen())),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 12),
@@ -1224,74 +1219,6 @@ class _GaugePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter old) => false;
-}
-
-// ── Community Card ────────────────────────────────────────────────────────────
-
-class _CommunityBentoCard extends StatelessWidget {
-  final VoidCallback onTap;
-  const _CommunityBentoCard({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              _kGreen.withValues(alpha: 0.9),
-              _kGreenMid,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.people_rounded,
-                  color: Colors.white, size: 16),
-            ),
-            const SizedBox(height: 8),
-            Text('Jamii',
-                style: _jakarta(
-                    size: 13,
-                    weight: FontWeight.w700,
-                    color: Colors.white)),
-            const SizedBox(height: 4),
-            Text('6 machapisho mapya',
-                style: _jakarta(size: 10, color: _kMint)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                for (final emoji in ['🌿', '💰', '🦠'])
-                  Container(
-                    margin: const EdgeInsets.only(right: 4),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(emoji,
-                        style: const TextStyle(fontSize: 11)),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ── Market Prices Card ────────────────────────────────────────────────────────
