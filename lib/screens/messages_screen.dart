@@ -13,6 +13,7 @@ import '../providers/community_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/common_widgets.dart';
 import 'chat_screen.dart';
+import 'expert_profile_screen.dart';
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
 
@@ -846,7 +847,7 @@ class _DirectoryTabState extends State<_DirectoryTab> {
       try {
         final rows = await Supabase.instance.client
             .from("profiles")
-            .select("id, first_name, last_name, email, region, role")
+            .select("id, first_name, last_name, email, region, role, specializations, is_available, consultation_count, bio, organization, district")
             .neq("id", myId)
             .order("joined_at", ascending: false);
         for (final r in (rows as List).cast<Map<String, dynamic>>()) {
@@ -856,10 +857,18 @@ class _DirectoryTabState extends State<_DirectoryTab> {
           combined[id] = {
             'id': id,
             'name': name.isEmpty ? (r['email'] as String? ?? 'Mtumiaji') : name,
+            'first_name': r['first_name'] ?? '',
+            'last_name': r['last_name'] ?? '',
             'region': r['region'] ?? '',
             'role': roleKey,
             'color_hex': UserRoleX.fromKey(roleKey).colorHex,
             'extra_info': '',
+            'specializations': r['specializations'] ?? [],
+            'is_available': r['is_available'] ?? true,
+            'consultation_count': r['consultation_count'] ?? 0,
+            'bio': r['bio'] ?? '',
+            'organization': r['organization'] ?? '',
+            'district': r['district'] ?? '',
           };
         }
       } catch (_) {}
@@ -975,8 +984,24 @@ class _DirectoryTabState extends State<_DirectoryTab> {
         final firstName = u["first_name"] as String? ?? "";
         final lastName  = u["last_name"] as String? ?? "";
         final displayName = "$firstName $lastName".trim().isEmpty
-            ? "Mtumiaji"
+            ? (u["name"] as String? ?? "Mtumiaji")
             : "$firstName $lastName".trim();
+        final specs = (u["specializations"] as List?)?.cast<String>() ?? [];
+        final isAvailable = u["is_available"] as bool? ?? true;
+        final consultCount = u["consultation_count"] as int? ?? 0;
+
+        // Afisa → ExpertProfileScreen; wengine → ChatScreen moja kwa moja
+        if (role == UserRole.afisa) {
+          return _ExpertCard(
+            userData: u,
+            displayName: displayName,
+            region: u["region"] as String? ?? "",
+            specializations: specs,
+            isAvailable: isAvailable,
+            consultCount: consultCount,
+            color: color,
+          );
+        }
         return _UserCard(
           id: u["id"] as String, displayName: displayName,
           role: role, region: u["region"] as String? ?? "",
@@ -1091,6 +1116,164 @@ class _UserCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Expert card (Afisa with specializations) ──────────────────────────────────
+
+class _ExpertCard extends StatelessWidget {
+  final Map<String, dynamic> userData;
+  final String displayName;
+  final String region;
+  final List<String> specializations;
+  final bool isAvailable;
+  final int consultCount;
+  final Color color;
+
+  const _ExpertCard({
+    required this.userData, required this.displayName, required this.region,
+    required this.specializations, required this.isAvailable,
+    required this.consultCount, required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      elevation: 2,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => Navigator.push(context, MaterialPageRoute(
+            builder: (_) => ExpertProfileScreen(userData: userData))),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Avatar with availability dot
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: color.withValues(alpha: 0.13),
+                        child: Text(
+                          displayName.isNotEmpty ? displayName[0].toUpperCase() : 'A',
+                          style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                      ),
+                      Container(
+                        width: 12, height: 12,
+                        decoration: BoxDecoration(
+                          color: isAvailable ? Colors.green : Colors.grey,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(displayName,
+                            style: GoogleFonts.dmSans(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14, color: AppColors.soil)),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00695C).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text('Afisa Kilimo',
+                                  style: GoogleFonts.dmSans(
+                                      fontSize: 10, color: const Color(0xFF00695C),
+                                      fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.location_on, size: 11, color: Colors.grey),
+                            const SizedBox(width: 2),
+                            Text(region, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isAvailable ? '🟢 Anapatikana sasa' : '⚪ Nje ya mtandao',
+                          style: GoogleFonts.dmSans(
+                              fontSize: 11,
+                              color: isAvailable ? Colors.green.shade700 : Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Stats + button
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('$consultCount', style: GoogleFonts.dmSans(
+                          fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.soil)),
+                      Text('walioshauriwa', style: GoogleFonts.dmSans(
+                          fontSize: 9, color: AppColors.mid)),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00695C),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('Wasiliana',
+                            style: GoogleFonts.dmSans(
+                                color: Colors.white, fontSize: 11,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              // Specializations
+              if (specializations.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6, runSpacing: 4,
+                  children: specializations.take(4).map((s) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00695C).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(specLabel(s),
+                        style: GoogleFonts.dmSans(
+                            fontSize: 10, color: const Color(0xFF00695C),
+                            fontWeight: FontWeight.w600)),
+                  )).toList()
+                    ..addAll(specializations.length > 4
+                        ? [Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text('+${specializations.length - 4} zaidi',
+                                style: GoogleFonts.dmSans(
+                                    fontSize: 10, color: Colors.grey)))]
+                        : []),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
