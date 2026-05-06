@@ -57,13 +57,22 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
           .toSet()
           .toList();
 
-      // Load farmer profiles for all those IDs
+      // Load farmer profiles — only for valid UUID farmer_ids
+      // (old farms stored timestamp IDs like "1777153976695" — skip those)
+      final uuidPattern = RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+          caseSensitive: false);
+      final validUuids = farmerIds
+          .where((id) => id != null && uuidPattern.hasMatch(id))
+          .cast<String>()
+          .toList();
+
       Map<String, Map<String, dynamic>> profileMap = {};
-      if (farmerIds.isNotEmpty) {
+      if (validUuids.isNotEmpty) {
         final profileRows = await _db
             .from('profiles')
             .select('id, first_name, last_name, email, role, region')
-            .inFilter('id', farmerIds);
+            .inFilter('id', validUuids);
         for (final p in profileRows as List) {
           profileMap[p['id'] as String] = Map<String, dynamic>.from(p);
         }
