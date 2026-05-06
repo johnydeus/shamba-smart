@@ -62,7 +62,7 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
       if (farmerIds.isNotEmpty) {
         final profileRows = await _db
             .from('profiles')
-            .select('id, first_name, last_name, email, role, region, phone')
+            .select('id, first_name, last_name, email, role, region')
             .inFilter('id', farmerIds);
         for (final p in profileRows as List) {
           profileMap[p['id'] as String] = Map<String, dynamic>.from(p);
