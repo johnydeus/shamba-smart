@@ -173,6 +173,197 @@ Rules:
 ''';
   }
 
+  // Explain a Plant.id disease/pest diagnosis in Swahili with Tanzania context
+  static Future<Map<String, dynamic>> explainDiagnosisInSwahili({
+    required String cropName,
+    required String scanType,
+    required String diseaseName,
+    required double confidence,
+    required String description,
+    required String chemicalTreatment,
+    required String biologicalTreatment,
+    required String prevention,
+  }) async {
+    const jsonTemplate = '''
+{
+  "disease_name_en": "English name",
+  "disease_name_sw": "Jina kwa Kiswahili",
+  "confidence": 0.0,
+  "severity": "low or medium or high or critical",
+  "affected_crop": "cropName",
+  "description_sw": "Maelezo kwa Kiswahili",
+  "immediate_action_sw": "Hatua ya haraka kwa Kiswahili",
+  "pesticide_1_name": "Jina la dawa iliyosajiliwa Tanzania",
+  "pesticide_1_dose": "Kipimo kwa dumu la lita 15",
+  "pesticide_1_type": "fungicide or bactericide or insecticide or organic",
+  "pesticide_2_name": "Dawa ya pili au Hakuna",
+  "pesticide_2_dose": "Kipimo au Hakuna",
+  "pesticide_2_type": "fungicide or bactericide or insecticide or organic",
+  "days_until_critical": 0,
+  "is_healthy": false
+}''';
+
+    final typeLabel = scanType == 'wadudu' ? 'mdudu/wadudu' : 'ugonjwa';
+    final prompt = '''
+You are an agricultural advisor for smallholder farmers in Tanzania.
+Plant.id (a specialized agricultural vision AI) has identified the following $typeLabel on a $cropName crop:
+
+Identified: $diseaseName
+Confidence: ${(confidence * 100).toStringAsFixed(0)}%
+Description: $description
+Chemical treatment options: $chemicalTreatment
+Biological/organic treatment: $biologicalTreatment
+Prevention: $prevention
+
+Use this information to generate advice for a Tanzanian farmer. Respond ONLY with a valid JSON object:
+
+$jsonTemplate
+
+Rules:
+- confidence: use ${confidence.toStringAsFixed(2)}
+- affected_crop: "$cropName"
+- disease_name_sw: translate/localize the disease name to Swahili
+- description_sw: explain in simple Swahili what this disease/pest is and what damage it causes
+- immediate_action_sw: what the farmer must do TODAY, in simple Swahili
+- Only recommend pesticides/fungicides registered in Tanzania (TPRI list)
+- Use the provided treatment info as a guide but adapt to products available in Tanzania
+- severity: estimate how urgent this is (low/medium/high/critical)
+- days_until_critical: how many days before irreversible crop loss if untreated (0 = unknown)
+- is_healthy: false
+''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': _apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'max_tokens': 1024,
+          'messages': [
+            {'role': 'user', 'content': prompt},
+          ],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['content'][0]['text'] as String;
+        final cleanJson =
+            content.replaceAll('```json', '').replaceAll('```', '').trim();
+        return jsonDecode(cleanJson) as Map<String, dynamic>;
+      }
+      return {
+        'error': true,
+        'message': 'Hitilafu ya mtandao. Jaribu tena.',
+        'is_healthy': false,
+      };
+    } catch (e) {
+      return {
+        'error': true,
+        'message': 'Hitilafu: ${e.toString()}',
+        'is_healthy': false,
+      };
+    }
+  }
+
+  // Explain a Plant.id weed identification in Swahili with Tanzania context
+  static Future<Map<String, dynamic>> explainWeedInSwahili({
+    required String cropName,
+    required String weedScientificName,
+    required List<String> weedCommonNames,
+    required double confidence,
+    required String description,
+  }) async {
+    const jsonTemplate = '''
+{
+  "disease_name_en": "Scientific name of weed",
+  "disease_name_sw": "Jina la gugu kwa Kiswahili",
+  "confidence": 0.0,
+  "severity": "low or medium or high or critical",
+  "affected_crop": "cropName",
+  "description_sw": "Maelezo ya gugu na madhara yake kwa Kiswahili",
+  "immediate_action_sw": "Jinsi ya kuondoa/kudhibiti gugu hili SASA kwa Kiswahili",
+  "pesticide_1_name": "Herbicide iliyosajiliwa Tanzania (TPRI)",
+  "pesticide_1_dose": "Kipimo kwa dumu la lita 15",
+  "pesticide_1_type": "herbicide",
+  "pesticide_2_name": "Mbinu ya pili ya kikaboni au Hakuna",
+  "pesticide_2_dose": "Maelezo ya matumizi au Hakuna",
+  "pesticide_2_type": "organic or herbicide",
+  "days_until_critical": 0,
+  "is_healthy": false
+}''';
+
+    final commonNamesStr =
+        weedCommonNames.isNotEmpty ? weedCommonNames.join(', ') : 'unknown';
+    final prompt = '''
+You are a weed scientist and agricultural advisor for smallholder farmers in Tanzania.
+Plant.id (a specialized plant identification AI) has identified a weed in a $cropName field:
+
+Scientific name: $weedScientificName
+Common names: $commonNamesStr
+Confidence: ${(confidence * 100).toStringAsFixed(0)}%
+Description: $description
+
+Use this information to advise a Tanzanian farmer. Respond ONLY with a valid JSON object:
+
+$jsonTemplate
+
+Rules:
+- confidence: use ${confidence.toStringAsFixed(2)}
+- affected_crop: "$cropName"
+- disease_name_sw: the weed's Swahili or local name (e.g. "Striga / Mgalagala"), or transliteration
+- description_sw: explain in simple Swahili what this weed is, how it competes with $cropName, and the harm it causes
+- immediate_action_sw: practical steps to remove or control this weed TODAY
+- pesticide_1_name: the correct herbicide registered in Tanzania (TPRI) for this weed type
+- pesticide_1_type must be "herbicide"
+- pesticide_2_name: organic/manual alternative or second herbicide option
+- severity: how much will this weed harm the $cropName crop if left untreated
+- days_until_critical: estimated days until yield loss becomes significant (0 = unknown)
+- is_healthy: false
+''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': _apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'max_tokens': 1024,
+          'messages': [
+            {'role': 'user', 'content': prompt},
+          ],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['content'][0]['text'] as String;
+        final cleanJson =
+            content.replaceAll('```json', '').replaceAll('```', '').trim();
+        return jsonDecode(cleanJson) as Map<String, dynamic>;
+      }
+      return {
+        'error': true,
+        'message': 'Hitilafu ya mtandao. Jaribu tena.',
+        'is_healthy': false,
+      };
+    } catch (e) {
+      return {
+        'error': true,
+        'message': 'Hitilafu: ${e.toString()}',
+        'is_healthy': false,
+      };
+    }
+  }
+
   // Diagnose by text symptoms (no photo needed — for offline/text-only situations)
   static Future<Map<String, dynamic>> diagnoseBySymptoms({
     required String cropName,

@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import '../services/claude_service.dart';
+import '../services/plant_id_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_colors.dart';
 import 'results_screen.dart';
@@ -103,10 +103,10 @@ class _ScanScreenState extends State<ScanScreen> {
 
     setState(() {
       _analysing = true;
-      _statusMessage = 'Inatuma picha kwa Claude AI...';
+      _statusMessage = 'Inatuma picha kwa Plant.id AI...';
     });
 
-    final result = await ClaudeService.analyseLeafPhoto(
+    final result = await PlantIdService.analysePhoto(
       imageFile: _selectedImage!,
       cropName: _selectedCrop,
       scanType: _selectedScanType,
