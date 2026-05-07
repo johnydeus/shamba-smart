@@ -68,7 +68,7 @@ class PlantIdService {
         return _parseCropHealthAndExplain(data, cropName, scanType);
       }
 
-      return _apiError(response.statusCode);
+      return _apiError(response.statusCode, response.body);
     } catch (e) {
       return _networkError(e);
     }
@@ -141,7 +141,7 @@ class PlantIdService {
         return _parseWeedAndExplain(data, cropName);
       }
 
-      return _apiError(response.statusCode);
+      return _apiError(response.statusCode, response.body);
     } catch (e) {
       return _networkError(e);
     }
@@ -205,12 +205,22 @@ class PlantIdService {
     return 'data:$mime;base64,${base64Encode(bytes)}';
   }
 
-  static Map<String, dynamic> _apiError(int statusCode) => {
-        'error': true,
-        'message':
-            'Kindwise ilirudisha hitilafu ($statusCode). Jaribu tena baadaye.',
-        'is_healthy': false,
-      };
+  static Map<String, dynamic> _apiError(int statusCode, [String? body]) {
+    String detail = '';
+    if (body != null && body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(body) as Map<String, dynamic>;
+        detail = ' — ${decoded['description'] ?? decoded['error'] ?? ''}';
+      } catch (_) {
+        if (body.length < 200) detail = ' — $body';
+      }
+    }
+    return {
+      'error': true,
+      'message': 'Hitilafu $statusCode$detail. Jaribu tena.',
+      'is_healthy': false,
+    };
+  }
 
   static Map<String, dynamic> _networkError(Object e) => {
         'error': true,

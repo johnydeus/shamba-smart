@@ -85,7 +85,9 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _takePhoto() async {
     final photo = await _picker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 80,
+      imageQuality: 70,
+      maxWidth: 1024,
+      maxHeight: 1024,
     );
     if (photo != null) setState(() => _selectedImage = File(photo.path));
   }
@@ -93,7 +95,9 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _pickFromGallery() async {
     final photo = await _picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 80,
+      imageQuality: 70,
+      maxWidth: 1024,
+      maxHeight: 1024,
     );
     if (photo != null) setState(() => _selectedImage = File(photo.path));
   }
