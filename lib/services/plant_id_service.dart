@@ -2,13 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../config/api_keys.dart';
-import 'claude_service.dart';
 
 class PlantIdService {
-  // crop.health — disease + pest detection (ugonjwa + wadudu)
   static const String _cropHealthUrl =
       'https://crop.kindwise.com/api/v1/identification';
-  // plant.id — plant/weed species identification (magugu)
   static const String _plantIdUrl =
       'https://api.plant.id/v3/identification';
 
@@ -21,27 +18,24 @@ class PlantIdService {
       if (!ApiKeys.hasPlantId) {
         return {
           'error': true,
-          'message':
-              'Kugundua magugu kunahitaji plant.id API key. Weka PLANT_ID_KEY kwenye .env',
+          'message': 'PLANT_ID_KEY haijasanidiwa kwenye .env',
           'is_healthy': false,
         };
       }
       return _identifyWeed(imageFile, cropName);
     }
 
-    // ugonjwa + wadudu — both use crop.health
     if (!ApiKeys.hasCropHealth) {
       return {
         'error': true,
-        'message':
-            'CROP_HEALTH_KEY haijasanidiwa. Weka key kwenye .env',
+        'message': 'CROP_HEALTH_KEY haijasanidiwa kwenye .env',
         'is_healthy': false,
       };
     }
     return _detectCropHealth(imageFile, cropName, scanType);
   }
 
-  // ── Disease + Pest detection via crop.health API ──────────────────────────
+  // ── Disease + Pest via crop.health ────────────────────────────────────────
 
   static Future<Map<String, dynamic>> _detectCropHealth(
     File imageFile,
@@ -49,7 +43,6 @@ class PlantIdService {
     String scanType,
   ) async {
     final base64Image = await _toBase64(imageFile);
-
     try {
       final response = await http.post(
         Uri.parse(_cropHealthUrl),
@@ -57,72 +50,80 @@ class PlantIdService {
           'Api-Key': ApiKeys.cropHealth,
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'images': [base64Image],
-          'similar_images': false,
-        }),
+        body: jsonEncode({'images': [base64Image]}),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return _parseCropHealthAndExplain(data, cropName, scanType);
+        return _parseCropHealth(
+          jsonDecode(response.body) as Map<String, dynamic>,
+          cropName,
+          scanType,
+        );
       }
-
       return _apiError(response.statusCode, response.body);
     } catch (e) {
       return _networkError(e);
     }
   }
 
-  static Future<Map<String, dynamic>> _parseCropHealthAndExplain(
+  static Map<String, dynamic> _parseCropHealth(
     Map<String, dynamic> data,
     String cropName,
     String scanType,
-  ) async {
+  ) {
     final result = (data['result'] as Map<String, dynamic>?) ?? {};
 
     final isHealthyMap = result['is_healthy'] as Map<String, dynamic>?;
     final isHealthy = isHealthyMap?['binary'] == true;
-    final healthyProb =
-        (isHealthyMap?['probability'] as num?)?.toDouble() ?? 0.0;
+    final healthyProb = (isHealthyMap?['probability'] as num?)?.toDouble() ?? 0.0;
 
-    if (isHealthy) {
-      return {'is_healthy': true, 'confidence': healthyProb};
-    }
+    if (isHealthy) return {'is_healthy': true, 'confidence': healthyProb};
 
-    final disease = (result['disease'] as Map<String, dynamic>?) ?? {};
-    final suggestions = (disease['suggestions'] as List<dynamic>?) ?? [];
-
-    if (suggestions.isEmpty) {
-      return {'is_healthy': true, 'confidence': 0.5};
-    }
+    final suggestions =
+        ((result['disease'] as Map?)??{})['suggestions'] as List? ?? [];
+    if (suggestions.isEmpty) return {'is_healthy': true, 'confidence': 0.5};
 
     final top = suggestions[0] as Map<String, dynamic>;
     final diseaseName = (top['name'] as String?) ?? '';
     final probability = (top['probability'] as num?)?.toDouble() ?? 0.0;
     final details = (top['details'] as Map<String, dynamic>?) ?? {};
     final treatment = (details['treatment'] as Map<String, dynamic>?) ?? {};
+    final description = (details['description'] as String?) ?? '';
+    final chemical = (treatment['chemical'] as String?) ?? '';
+    final biological = (treatment['biological'] as String?) ?? '';
+    final prevention = (treatment['prevention'] as String?) ?? '';
 
-    return ClaudeService.explainDiagnosisInSwahili(
-      cropName: cropName,
-      scanType: scanType,
-      diseaseName: diseaseName,
-      confidence: probability,
-      description: (details['description'] as String?) ?? '',
-      chemicalTreatment: (treatment['chemical'] as String?) ?? '',
-      biologicalTreatment: (treatment['biological'] as String?) ?? '',
-      prevention: (treatment['prevention'] as String?) ?? '',
-    );
+    final typeLabel = scanType == 'wadudu' ? 'mdudu' : 'ugonjwa';
+
+    return {
+      'disease_name_en': diseaseName,
+      'disease_name_sw': diseaseName,
+      'confidence': probability,
+      'severity': _severity(probability),
+      'affected_crop': cropName,
+      'description_sw': description.isNotEmpty
+          ? description
+          : '$typeLabel uliogundulika kwenye $cropName.',
+      'immediate_action_sw': _buildAction(chemical, biological, typeLabel),
+      'pesticide_1_name': _firstSentence(chemical),
+      'pesticide_1_dose': 'Fuata kipimo kilichoandikwa kwenye dawa',
+      'pesticide_1_type': scanType == 'wadudu' ? 'insecticide' : 'fungicide',
+      'pesticide_2_name': _firstSentence(biological),
+      'pesticide_2_dose': '',
+      'pesticide_2_type': 'organic',
+      'prevention_sw': prevention,
+      'days_until_critical': 0,
+      'is_healthy': false,
+    };
   }
 
-  // ── Weed identification via plant.id API ──────────────────────────────────
+  // ── Weeds via plant.id ────────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> _identifyWeed(
     File imageFile,
     String cropName,
   ) async {
     final base64Image = await _toBase64(imageFile);
-
     try {
       final response = await http.post(
         Uri.parse(_plantIdUrl),
@@ -130,48 +131,43 @@ class PlantIdService {
           'Api-Key': ApiKeys.plantId,
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'images': [base64Image],
-          'similar_images': false,
-        }),
+        body: jsonEncode({'images': [base64Image]}),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return _parseWeedAndExplain(data, cropName);
+        return _parseWeed(
+          jsonDecode(response.body) as Map<String, dynamic>,
+          cropName,
+        );
       }
-
       return _apiError(response.statusCode, response.body);
     } catch (e) {
       return _networkError(e);
     }
   }
 
-  static Future<Map<String, dynamic>> _parseWeedAndExplain(
+  static Map<String, dynamic> _parseWeed(
     Map<String, dynamic> data,
     String cropName,
-  ) async {
+  ) {
     final result = (data['result'] as Map<String, dynamic>?) ?? {};
 
-    final isPlantMap = result['is_plant'] as Map<String, dynamic>?;
-    if (isPlantMap?['binary'] != true) {
+    final isPlant =
+        (result['is_plant'] as Map<String, dynamic>?)?['binary'] == true;
+    if (!isPlant) {
       return {
         'error': true,
-        'message':
-            'Picha hii haikuonekana kuwa mmea. Piga picha ya gugu wazi zaidi.',
+        'message': 'Picha hii haikuonekana kuwa mmea. Piga tena karibu zaidi.',
         'is_healthy': false,
       };
     }
 
-    final classification =
-        (result['classification'] as Map<String, dynamic>?) ?? {};
     final suggestions =
-        (classification['suggestions'] as List<dynamic>?) ?? [];
-
+        ((result['classification'] as Map?)??{})['suggestions'] as List? ?? [];
     if (suggestions.isEmpty) {
       return {
         'error': true,
-        'message': 'Mmea haukutambuliwa. Piga picha tena karibu zaidi.',
+        'message': 'Mmea haukutambuliwa. Piga picha tena.',
         'is_healthy': false,
       };
     }
@@ -181,22 +177,63 @@ class PlantIdService {
     final probability = (top['probability'] as num?)?.toDouble() ?? 0.0;
     final details = (top['details'] as Map<String, dynamic>?) ?? {};
     final commonNames =
-        ((details['common_names'] as List<dynamic>?) ?? []).cast<String>();
+        ((details['common_names'] as List?) ?? []).cast<String>();
     final descMap = details['description'];
     final description = descMap is Map
         ? ((descMap['value'] as String?) ?? '')
         : (descMap as String?) ?? '';
 
-    return ClaudeService.explainWeedInSwahili(
-      cropName: cropName,
-      weedScientificName: plantName,
-      weedCommonNames: commonNames,
-      confidence: probability,
-      description: description,
-    );
+    final displayName =
+        commonNames.isNotEmpty ? '${commonNames.first} ($plantName)' : plantName;
+
+    return {
+      'disease_name_en': plantName,
+      'disease_name_sw': displayName,
+      'confidence': probability,
+      'severity': _severity(probability),
+      'affected_crop': cropName,
+      'description_sw': description.isNotEmpty
+          ? description
+          : 'Gugu hili linaweza kuathiri mavuno ya $cropName yako.',
+      'immediate_action_sw':
+          'Ng\'oa gugu hili mapema kabla halijatoa mbegu. '
+          'Tumia herbicide inayofaa kwa $cropName — wasiliana na duka la kilimo karibu nawe.',
+      'pesticide_1_name': 'Herbicide inayofaa kwa $cropName',
+      'pesticide_1_dose': 'Fuata kipimo kilichoandikwa kwenye dawa',
+      'pesticide_1_type': 'herbicide',
+      'pesticide_2_name': 'Kupalilia kwa mkono au jembe',
+      'pesticide_2_dose': 'Kabla halijatoa mbegu',
+      'pesticide_2_type': 'organic',
+      'days_until_critical': 0,
+      'is_healthy': false,
+    };
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  static String _severity(double prob) {
+    if (prob >= 0.80) return 'high';
+    if (prob >= 0.55) return 'medium';
+    return 'low';
+  }
+
+  static String _buildAction(
+      String chemical, String biological, String typeLabel) {
+    final parts = <String>[];
+    if (chemical.isNotEmpty) parts.add('Kemikali: $chemical');
+    if (biological.isNotEmpty) parts.add('Asili: $biological');
+    if (parts.isEmpty) {
+      return 'Wasiliana na mtaalamu wa kilimo kuhusu $typeLabel huu.';
+    }
+    return parts.join('\n\n');
+  }
+
+  static String _firstSentence(String text) {
+    if (text.isEmpty) return 'Hakuna';
+    final dot = text.indexOf('.');
+    final end = dot > 0 && dot < 120 ? dot : text.length.clamp(0, 120);
+    return text.substring(0, end).trim();
+  }
 
   static Future<String> _toBase64(File imageFile) async {
     final ext = imageFile.path.split('.').last.toLowerCase();
@@ -217,7 +254,7 @@ class PlantIdService {
     }
     return {
       'error': true,
-      'message': 'Hitilafu $statusCode$detail. Jaribu tena.',
+      'message': 'Hitilafu $statusCode$detail.',
       'is_healthy': false,
     };
   }
