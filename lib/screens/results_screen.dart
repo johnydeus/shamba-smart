@@ -121,8 +121,12 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 ]),
               ),
 
+            // ── Plant identification result ──────────────────────────────────
+            if (!hasError && d['is_plant_id'] == true) ..._buildPlantIdBody(d),
+
             // ── Disease / Pest / Weed results ───────────────────────────────
-            if (!hasError && !isHealthy) ..._buildDiseaseBody(d),
+            if (!hasError && !isHealthy && d['is_plant_id'] != true)
+              ..._buildDiseaseBody(d),
 
             const SizedBox(height: 24),
 
@@ -162,6 +166,163 @@ class _ResultsScreenState extends State<ResultsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  List<Widget> _buildPlantIdBody(Map<String, dynamic> d) {
+    final scientificName = (d['plant_scientific_name'] as String?) ?? '';
+    final commonNames = ((d['plant_common_names'] as List?) ?? []).cast<String>();
+    final family = (d['plant_family'] as String?) ?? '';
+    final genus = (d['plant_genus'] as String?) ?? '';
+    final confidence = (d['confidence'] as num?)?.toDouble() ?? 0.0;
+    final description = (d['description_sw'] as String?) ?? '';
+    final displayName = commonNames.isNotEmpty ? commonNames.first : scientificName;
+
+    return [
+      // Header
+      Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.park, color: Color(0xFF00695C), size: 20),
+                const SizedBox(width: 8),
+                Text('Mmea Uliotambuliwa',
+                    style: GoogleFonts.dmSans(
+                        color: const Color(0xFF00695C),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13)),
+              ]),
+              const SizedBox(height: 10),
+              Text(displayName,
+                  style: GoogleFonts.playfairDisplay(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF1A1A1A))),
+              if (scientificName.isNotEmpty && scientificName != displayName)
+                Text(scientificName,
+                    style: GoogleFonts.dmSans(
+                        fontSize: 13,
+                        color: Colors.grey[500],
+                        fontStyle: FontStyle.italic)),
+              if (family.isNotEmpty || genus.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, children: [
+                  if (genus.isNotEmpty)
+                    _chip('Jenasi: $genus', const Color(0xFF00695C)),
+                  if (family.isNotEmpty)
+                    _chip('Familia: $family', const Color(0xFF00695C)),
+                ]),
+              ],
+              if (commonNames.length > 1) ...[
+                const SizedBox(height: 8),
+                Text('Majina mengine: ${commonNames.skip(1).take(3).join(', ')}',
+                    style: GoogleFonts.dmSans(
+                        fontSize: 12, color: Colors.grey[600])),
+              ],
+            ],
+          ),
+        ),
+      ),
+
+      const SizedBox(height: 12),
+
+      // Confidence
+      Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.analytics_outlined,
+                    color: Color(0xFF00695C), size: 16),
+                const SizedBox(width: 6),
+                Text('Uhakika wa Utambuzi',
+                    style: GoogleFonts.dmSans(
+                        color: const Color(0xFF00695C),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13)),
+              ]),
+              const SizedBox(height: 10),
+              Row(children: [
+                Text('${(confidence * 100).toStringAsFixed(0)}%',
+                    style: GoogleFonts.dmSans(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF00695C))),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LinearProgressIndicator(
+                        value: confidence,
+                        color: const Color(0xFF00695C),
+                        backgroundColor: const Color(0xFFE0F2F1),
+                        minHeight: 8,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(_confidenceLabel(confidence),
+                          style: GoogleFonts.dmSans(
+                              fontSize: 11, color: Colors.grey[600])),
+                    ],
+                  ),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      ),
+
+      // Description
+      if (description.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        _sectionCard(
+          icon: Icons.info_outline,
+          title: 'Kuhusu Mmea Huu',
+          color: const Color(0xFF00695C),
+          child: Text(description,
+              style: GoogleFonts.dmSans(fontSize: 14, height: 1.5)),
+        ),
+      ],
+
+      // Next step hint
+      const SizedBox(height: 16),
+      _card(
+        color: const Color(0xFF00695C),
+        child: Row(children: [
+          const Icon(Icons.lightbulb_outline, color: Colors.white70, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Ukitaka kujua kama mmea huu una ugonjwa au wadudu, rudi na uchague "Ugonjwa" au "Wadudu" kwenye aina ya uchunguzi.',
+              style: GoogleFonts.dmSans(
+                  color: Colors.white, fontSize: 13, height: 1.4),
+            ),
+          ),
+        ]),
+      ),
+    ];
+  }
+
+  Widget _chip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(label,
+          style: GoogleFonts.dmSans(
+              fontSize: 11, color: color, fontWeight: FontWeight.w600)),
     );
   }
 

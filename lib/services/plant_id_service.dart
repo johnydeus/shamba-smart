@@ -14,13 +14,16 @@ class PlantIdService {
     required String cropName,
     required String scanType,
   }) async {
-    if (scanType == 'magugu') {
+    if (scanType == 'magugu' || scanType == 'tambua_mmea') {
       if (!ApiKeys.hasPlantId) {
         return {
           'error': true,
           'message': 'PLANT_ID_KEY haijasanidiwa kwenye .env',
           'is_healthy': false,
         };
+      }
+      if (scanType == 'tambua_mmea') {
+        return _identifyPlant(imageFile);
       }
       return _identifyWeed(imageFile, cropName);
     }
@@ -130,6 +133,84 @@ class PlantIdService {
       'pesticide_2_type': 'organic',
       'days_until_critical': 0,
       'is_healthy': false,
+    };
+  }
+
+  // ── Plant identification (tambua_mmea) via plant.id ──────────────────────
+
+  static Future<Map<String, dynamic>> _identifyPlant(File imageFile) async {
+    final base64Image = await _toBase64(imageFile);
+    try {
+      final response = await http.post(
+        Uri.parse(_plantIdUrl),
+        headers: {
+          'Api-Key': ApiKeys.plantId,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'images': [base64Image],
+          'details': ['common_names', 'description', 'taxonomy', 'url'],
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return _parsePlantIdentification(
+            jsonDecode(response.body) as Map<String, dynamic>);
+      }
+      return _apiError(response.statusCode, response.body);
+    } catch (e) {
+      return _networkError(e);
+    }
+  }
+
+  static Map<String, dynamic> _parsePlantIdentification(
+      Map<String, dynamic> data) {
+    final result = (data['result'] as Map<String, dynamic>?) ?? {};
+
+    final isPlant =
+        (result['is_plant'] as Map<String, dynamic>?)?['binary'] == true;
+    if (!isPlant) {
+      return {
+        'error': true,
+        'message': 'Picha hii haikuonekana kuwa mmea. Piga picha tena.',
+        'is_healthy': false,
+      };
+    }
+
+    final suggestions =
+        ((result['classification'] as Map?)??{})['suggestions'] as List? ?? [];
+    if (suggestions.isEmpty) {
+      return {
+        'error': true,
+        'message': 'Mmea haukutambuliwa. Jaribu picha iliyo wazi zaidi.',
+        'is_healthy': false,
+      };
+    }
+
+    final top = suggestions[0] as Map<String, dynamic>;
+    final scientificName = (top['name'] as String?) ?? '';
+    final probability = (top['probability'] as num?)?.toDouble() ?? 0.0;
+    final details = (top['details'] as Map<String, dynamic>?) ?? {};
+    final commonNames =
+        ((details['common_names'] as List?) ?? []).cast<String>();
+    final taxonomy = (details['taxonomy'] as Map<String, dynamic>?) ?? {};
+    final descMap = details['description'];
+    final description = descMap is Map
+        ? ((descMap['value'] as String?) ?? '')
+        : (descMap as String?) ?? '';
+    final family = (taxonomy['family'] as String?) ?? '';
+    final genus = (taxonomy['genus'] as String?) ?? '';
+
+    return {
+      'scan_type': 'tambua_mmea',
+      'plant_scientific_name': scientificName,
+      'plant_common_names': commonNames,
+      'plant_family': family,
+      'plant_genus': genus,
+      'confidence': probability,
+      'description_sw': description,
+      'is_healthy': true,
+      'is_plant_id': true,
     };
   }
 

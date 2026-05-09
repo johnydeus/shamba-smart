@@ -27,37 +27,47 @@ const List<String> kCrops = [
   'Katani', 'Tumbaku', 'Karafuu',
 ];
 
-// The 3 scan categories the farmer can choose from
+// The 4 scan categories the farmer can choose from
 const _scanTypes = [
   {
     'key': 'ugonjwa',
     'label': 'Ugonjwa',
     'emoji': '🦠',
-    'subtitle': 'Magonjwa ya jani/mmea',
+    'subtitle': 'Magonjwa ya jani',
     'color': 0xFF6A1B9A,
     'tip': 'Piga picha karibu na jani lililougua ili AI ione dalili vizuri.',
     'buttonLabel': 'Chunguza Ugonjwa',
     'appBarTitle': 'Gundua Ugonjwa',
   },
   {
+    'key': 'wadudu',
+    'label': 'Wadudu',
+    'emoji': '🐛',
+    'subtitle': 'Wadudu na uharibifu',
+    'color': 0xFFE65100,
+    'tip': 'Piga picha ya mdudu au uharibifu aliofanya kwenye mmea/jani.',
+    'buttonLabel': 'Tambua Mdudu',
+    'appBarTitle': 'Gundua Wadudu',
+  },
+  {
     'key': 'magugu',
     'label': 'Magugu',
     'emoji': '🌿',
-    'subtitle': 'Tambua magugu shambani',
+    'subtitle': 'Tambua magugu',
     'color': 0xFF2E7D32,
     'tip': 'Piga picha ya mmea wote wa gugu — pamoja na majani na shina.',
     'buttonLabel': 'Tambua Gugu',
     'appBarTitle': 'Tambua Magugu',
   },
   {
-    'key': 'wadudu',
-    'label': 'Wadudu',
-    'emoji': '🐛',
-    'subtitle': 'Wadudu na uharibifu wao',
-    'color': 0xFFE65100,
-    'tip': 'Piga picha ya mdudu au uharibifu aliofanya kwenye mmea/jani.',
-    'buttonLabel': 'Tambua Mdudu',
-    'appBarTitle': 'Gundua Wadudu',
+    'key': 'tambua_mmea',
+    'label': 'Mmea',
+    'emoji': '🌳',
+    'subtitle': 'Tambua aina ya mmea',
+    'color': 0xFF00695C,
+    'tip': 'Piga picha ya mmea mzima, jani, au tunda ili kujua ni aina gani.',
+    'buttonLabel': 'Tambua Mmea',
+    'appBarTitle': 'Tambua Mmea',
   },
 ];
 
@@ -265,20 +275,21 @@ class _ScanScreenState extends State<ScanScreen> {
           ),
         ],
       ),
-      child: Row(
-        children: _scanTypes.map((type) {
-          final isSelected = _selectedScanType == type['key'];
-          final color = Color(type['color'] as int);
-          return Expanded(
-            child: GestureDetector(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _scanTypes.map((type) {
+            final isSelected = _selectedScanType == type['key'];
+            final color = Color(type['color'] as int);
+            return GestureDetector(
               onTap: () => setState(() {
                 _selectedScanType = type['key'] as String;
-                _selectedImage = null; // clear image on type change
+                _selectedImage = null;
               }),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                width: 88,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
                 decoration: BoxDecoration(
                   color: isSelected ? color : Colors.transparent,
                   borderRadius: BorderRadius.circular(13),
@@ -286,15 +297,13 @@ class _ScanScreenState extends State<ScanScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      type['emoji'] as String,
-                      style: const TextStyle(fontSize: 22),
-                    ),
-                    const SizedBox(height: 4),
+                    Text(type['emoji'] as String,
+                        style: const TextStyle(fontSize: 20)),
+                    const SizedBox(height: 3),
                     Text(
                       type['label'] as String,
                       style: GoogleFonts.dmSans(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: isSelected ? Colors.white : AppColors.mid,
                       ),
@@ -303,9 +312,7 @@ class _ScanScreenState extends State<ScanScreen> {
                       type['subtitle'] as String,
                       style: GoogleFonts.dmSans(
                         fontSize: 9,
-                        color: isSelected
-                            ? Colors.white70
-                            : Colors.grey,
+                        color: isSelected ? Colors.white70 : Colors.grey,
                       ),
                       textAlign: TextAlign.center,
                       maxLines: 1,
@@ -314,9 +321,9 @@ class _ScanScreenState extends State<ScanScreen> {
                   ],
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
