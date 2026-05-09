@@ -32,6 +32,7 @@ class ChatScreen extends StatefulWidget {
   final String contactName;
   final UserRole contactRole;
   final String contactColorHex;
+  final String? initialMessage;
 
   const ChatScreen({
     super.key,
@@ -39,6 +40,7 @@ class ChatScreen extends StatefulWidget {
     required this.contactName,
     required this.contactRole,
     required this.contactColorHex,
+    this.initialMessage,
   });
 
   @override
@@ -66,6 +68,9 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       chat.markRead(widget.contactId);
       setState(() => _loadingInit = false);
+      if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
+        _textCtrl.text = widget.initialMessage!;
+      }
       _scrollToBottom();
     });
 

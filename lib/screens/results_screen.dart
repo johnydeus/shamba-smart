@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/user_model.dart';
 import '../theme/app_colors.dart';
+import 'chat_screen.dart';
 import 'home_screen.dart';
 import 'scan_screen.dart';
 
@@ -478,6 +481,49 @@ class _ResultsScreenState extends State<ResultsScreen> {
             ),
           ]),
         ),
+
+      // ── Consult buttons ─────────────────────────────────────────────────
+      const SizedBox(height: 20),
+      Row(children: [
+        const Expanded(child: Divider()),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text('Omba Msaada',
+              style: GoogleFonts.dmSans(
+                  color: Colors.grey[500], fontSize: 12)),
+        ),
+        const Expanded(child: Divider()),
+      ]),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(
+          child: _consultBtn(
+            icon: Icons.agriculture,
+            label: 'Afisa Kilimo',
+            subtitle: 'Omba ushauri',
+            color: const Color(0xFF00695C),
+            onTap: () => _showContactSheet(
+              context: context,
+              diagnosis: d,
+              role: UserRole.afisa,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _consultBtn(
+            icon: Icons.storefront,
+            label: 'Duka la Dawa',
+            subtitle: 'Tafuta dawa',
+            color: const Color(0xFF1565C0),
+            onTap: () => _showContactSheet(
+              context: context,
+              diagnosis: d,
+              role: UserRole.duka,
+            ),
+          ),
+        ),
+      ]),
     ];
   }
 
@@ -556,6 +602,314 @@ class _ResultsScreenState extends State<ResultsScreen> {
         borderRadius: BorderRadius.circular(14),
       ),
       child: child,
+    );
+  }
+
+  // ── Consult button widget ─────────────────────────────────────────────────
+
+  Widget _consultBtn({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: color.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(height: 8),
+              Text(label,
+                  style: GoogleFonts.dmSans(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: color)),
+              Text(subtitle,
+                  style: GoogleFonts.dmSans(
+                      fontSize: 11, color: Colors.grey[600])),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Contact bottom sheet (Afisa or Duka) ─────────────────────────────────
+
+  void _showContactSheet({
+    required BuildContext context,
+    required Map<String, dynamic> diagnosis,
+    required UserRole role,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ContactSheet(
+        diagnosis: diagnosis,
+        role: role,
+        imagePath: widget.imagePath,
+      ),
+    );
+  }
+}
+
+// ── Contact Sheet ─────────────────────────────────────────────────────────────
+
+class _ContactSheet extends StatefulWidget {
+  final Map<String, dynamic> diagnosis;
+  final UserRole role;
+  final String imagePath;
+
+  const _ContactSheet({
+    required this.diagnosis,
+    required this.role,
+    required this.imagePath,
+  });
+
+  @override
+  State<_ContactSheet> createState() => _ContactSheetState();
+}
+
+class _ContactSheetState extends State<_ContactSheet> {
+  List<Map<String, dynamic>> _contacts = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('profiles')
+          .select('id, first_name, last_name, region, role, shop_name, organization, district')
+          .eq('role', widget.role.key)
+          .order('first_name')
+          .limit(50);
+      setState(() {
+        _contacts = List<Map<String, dynamic>>.from(rows);
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Hitilafu ya kupakia orodha.';
+        _loading = false;
+      });
+    }
+  }
+
+  String _formatMessage() {
+    final d = widget.diagnosis;
+    final disease = d['disease_name_sw'] ?? d['disease_name_en'] ?? 'Haijulikani';
+    final crop = d['affected_crop'] ?? '';
+    final conf = ((d['confidence'] as num? ?? 0) * 100).round();
+    final severity = _severityLabel(d['severity'] ?? '');
+    final desc = (d['description_sw'] as String? ?? '').isNotEmpty
+        ? '\nMaelezo: ${d['description_sw']}'
+        : '';
+    final cause = (d['cause_sw'] as String? ?? '').isNotEmpty
+        ? '\nSababu: ${d['cause_sw']}'
+        : '';
+    final action = (d['immediate_action_sw'] as String? ?? '').isNotEmpty
+        ? '\nHatua ya haraka: ${d['immediate_action_sw']}'
+        : '';
+    final req = widget.role == UserRole.duka
+        ? 'Naomba ujulishe kama una dawa inayofaa na bei yake, au mbadala unaoweza kupendekeza.'
+        : 'Naomba ushauri wa kitaalamu kuhusu matibabu sahihi na jinsi ya kuzuia tatizo hili.';
+
+    return '🌾 OMBI LA USHAURI — MATOKEO YA UCHUNGUZI\n'
+        '─────────────────────────────\n'
+        'Zao: $crop\n'
+        'Tatizo: $disease\n'
+        'Uhakika: $conf% | Ukali: $severity'
+        '$desc$cause$action\n'
+        '─────────────────────────────\n'
+        '$req';
+  }
+
+  String _severityLabel(String s) {
+    switch (s.toLowerCase()) {
+      case 'low': return 'Chini';
+      case 'medium': return 'Wastani';
+      case 'high': return 'Juu';
+      case 'critical': return 'Hatari Sana';
+      default: return s;
+    }
+  }
+
+  void _openChat(Map<String, dynamic> contact) {
+    final role = UserRoleX.fromKey(contact['role'] as String? ?? 'mkulima');
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          contactId: contact['id'] as String,
+          contactName: _contactName(contact),
+          contactRole: role,
+          contactColorHex: role.colorHex.replaceFirst('#', ''),
+          initialMessage: _formatMessage(),
+        ),
+      ),
+    );
+  }
+
+  String _contactName(Map<String, dynamic> c) {
+    final first = (c['first_name'] as String? ?? '').trim();
+    final last = (c['last_name'] as String? ?? '').trim();
+    final shop = c['shop_name'] as String?;
+    if (shop != null && shop.isNotEmpty) return shop;
+    return '$first $last'.trim();
+  }
+
+  String _contactSub(Map<String, dynamic> c) {
+    final parts = <String>[];
+    final org = c['organization'] as String?;
+    final district = c['district'] as String?;
+    final region = c['region'] as String?;
+    if (org != null && org.isNotEmpty) parts.add(org);
+    if (district != null && district.isNotEmpty) parts.add(district);
+    if (region != null && region.isNotEmpty) parts.add(region);
+    return parts.join(' • ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAfisa = widget.role == UserRole.afisa;
+    final color = isAfisa ? const Color(0xFF00695C) : const Color(0xFF1565C0);
+    final title = isAfisa ? 'Chagua Afisa Kilimo' : 'Chagua Duka la Dawa';
+    final icon = isAfisa ? Icons.agriculture : Icons.storefront;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (_, ctrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 4),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+              child: Row(children: [
+                Icon(icon, color: color, size: 22),
+                const SizedBox(width: 10),
+                Text(title,
+                    style: GoogleFonts.playfairDisplay(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: color)),
+              ]),
+            ),
+            const Divider(height: 1),
+            // Body
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? Center(
+                          child: Text(_error!,
+                              style: GoogleFonts.dmSans(color: Colors.red)))
+                      : _contacts.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  isAfisa
+                                      ? 'Hakuna afisa kilimo waliojisajili bado katika mfumo huu.'
+                                      : 'Hakuna maduka ya dawa yaliyojisajili bado katika mfumo huu.',
+                                  style: GoogleFonts.dmSans(
+                                      color: Colors.grey[600], fontSize: 14),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              controller: ctrl,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              itemCount: _contacts.length,
+                              separatorBuilder: (context2, i2) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (_, i) {
+                                final c = _contacts[i];
+                                final name = _contactName(c);
+                                final sub = _contactSub(c);
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor:
+                                        color.withValues(alpha: 0.15),
+                                    child: Text(
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                          color: color,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  title: Text(name,
+                                      style: GoogleFonts.dmSans(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14)),
+                                  subtitle: sub.isNotEmpty
+                                      ? Text(sub,
+                                          style: GoogleFonts.dmSans(
+                                              fontSize: 12,
+                                              color: Colors.grey[600]))
+                                      : null,
+                                  trailing: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text('Wasiliana',
+                                        style: GoogleFonts.dmSans(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold)),
+                                  ),
+                                  onTap: () => _openChat(c),
+                                );
+                              },
+                            ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
