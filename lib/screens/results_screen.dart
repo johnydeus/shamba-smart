@@ -27,31 +27,11 @@ class ResultsScreen extends StatefulWidget {
 class _ResultsScreenState extends State<ResultsScreen> {
   bool _treatmentExpanded = false;
 
-  Color _severityColor(String s) {
-    switch (s.toLowerCase()) {
-      case 'high':
-      case 'critical':
-        return const Color(0xFFB71C1C);
-      case 'medium':
-        return const Color(0xFFFF6F00);
-      default:
-        return const Color(0xFF2E8B57);
-    }
-  }
-
-  String _severityLabel(String s) {
-    switch (s.toLowerCase()) {
-      case 'low':
-        return 'Chini';
-      case 'medium':
-        return 'Wastani';
-      case 'high':
-        return 'Juu';
-      case 'critical':
-        return 'Hatari Sana';
-      default:
-        return s;
-    }
+  String _confidenceLabel(double conf) {
+    if (conf >= 0.90) return 'AI ina uhakika mkubwa sana';
+    if (conf >= 0.75) return 'AI ina uhakika wa kutosha';
+    if (conf >= 0.55) return 'AI ina uhakika wa wastani';
+    return 'AI hana uhakika wa kutosha';
   }
 
   String _scanTypeLabel(String? t) {
@@ -190,7 +170,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final diseaseEn = (d['disease_name_en'] as String?) ?? '';
     final scanType = (d['scan_type'] as String?) ?? 'ugonjwa';
     final confidence = (d['confidence'] as num?)?.toDouble() ?? 0.0;
-    final severity = (d['severity'] as String?) ?? 'low';
     final cropName = (d['affected_crop'] as String?) ?? widget.cropName;
     final description = (d['description_sw'] as String?) ?? '';
     final cause = (d['cause_sw'] as String?) ?? '';
@@ -263,67 +242,81 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
       const SizedBox(height: 12),
 
-      // ── 2. Confidence + Severity ────────────────────────────────────────
-      Row(children: [
-        Expanded(
-          child: Card(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(children: [
-                Text('Uhakika',
+      // ── 2. Confidence card ──────────────────────────────────────────────
+      Card(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.analytics_outlined,
+                    color: Color(0xFF1A5C2E), size: 16),
+                const SizedBox(width: 6),
+                Text('Uhakika wa Utambuzi',
                     style: GoogleFonts.dmSans(
-                        color: Colors.grey[600], fontSize: 12)),
-                const SizedBox(height: 8),
+                        color: const Color(0xFF1A5C2E),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13)),
+              ]),
+              const SizedBox(height: 10),
+              Row(children: [
                 Text('${(confidence * 100).toStringAsFixed(0)}%',
                     style: GoogleFonts.dmSans(
-                        fontSize: 24,
+                        fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: const Color(0xFF1A5C2E))),
-                const SizedBox(height: 6),
-                LinearProgressIndicator(
-                  value: confidence,
-                  color: const Color(0xFF1A5C2E),
-                  backgroundColor: const Color(0xFFE8F5E9),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LinearProgressIndicator(
+                        value: confidence,
+                        color: const Color(0xFF1A5C2E),
+                        backgroundColor: const Color(0xFFE8F5E9),
+                        minHeight: 8,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _confidenceLabel(confidence),
+                        style: GoogleFonts.dmSans(
+                            fontSize: 11,
+                            color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
                 ),
               ]),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Card(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(children: [
-                Text('Ukali',
-                    style: GoogleFonts.dmSans(
-                        color: Colors.grey[600], fontSize: 12)),
+              if (confidence < 0.70) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: _severityColor(severity)
-                        .withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    _severityLabel(severity),
-                    style: GoogleFonts.dmSans(
-                        color: _severityColor(severity),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15),
-                  ),
+                  child: Row(children: [
+                    const Icon(Icons.info_outline,
+                        color: Colors.orange, size: 14),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Uhakika ni mdogo — thibitisha na afisa kilimo.',
+                        style: GoogleFonts.dmSans(
+                            fontSize: 11, color: Colors.orange[800]),
+                      ),
+                    ),
+                  ]),
                 ),
-              ]),
-            ),
+              ],
+            ],
           ),
         ),
-      ]),
+      ),
 
       const SizedBox(height: 12),
 

@@ -244,11 +244,10 @@ class PlantIdService {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  static String _severity(double prob) {
-    if (prob >= 0.80) return 'high';
-    if (prob >= 0.55) return 'medium';
-    return 'low';
-  }
+  // Kindwise crop.health does not return a severity score per disease.
+  // We intentionally leave severity empty so ResultsScreen does not show
+  // a misleading "Ukali" value derived from detection confidence.
+  static String _severity(double prob) => '';
 
   static String _buildAction(
       String chemical, String biological, String scanType) {
