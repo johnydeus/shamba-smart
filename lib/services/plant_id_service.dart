@@ -50,16 +50,7 @@ class PlantIdService {
           'Api-Key': ApiKeys.cropHealth,
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'images': [base64Image],
-          'details': [
-            'description',
-            'treatment',
-            'cause',
-            'common_names',
-            'classification',
-          ],
-        }),
+        body: jsonEncode({'images': [base64Image]}),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
