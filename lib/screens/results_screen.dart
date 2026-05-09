@@ -70,8 +70,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
           style: GoogleFonts.playfairDisplay(
               color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFF1A5C2E),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

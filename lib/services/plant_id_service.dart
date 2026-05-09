@@ -149,7 +149,7 @@ class PlantIdService {
         },
         body: jsonEncode({
           'images': [base64Image],
-          'details': ['common_names', 'description', 'taxonomy', 'url'],
+          'details': 'common_names,description,taxonomy',
         }),
       );
 
@@ -230,12 +230,7 @@ class PlantIdService {
         },
         body: jsonEncode({
           'images': [base64Image],
-          'details': [
-            'common_names',
-            'description',
-            'taxonomy',
-            'treatment',
-          ],
+          'details': 'common_names,description,taxonomy',
         }),
       );
 

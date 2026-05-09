@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/plant_id_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_colors.dart';
+import 'history_screen.dart';
 import 'results_screen.dart';
 
 // All Tanzania crops — Ministry of Agriculture, TAHA, TOSCI, TanzaniaInvest
@@ -137,7 +138,7 @@ class _ScanScreenState extends State<ScanScreen> {
     setState(() => _analysing = false);
     if (!mounted) return;
 
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ResultsScreen(
@@ -160,6 +161,16 @@ class _ScanScreenState extends State<ScanScreen> {
               color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: _typeColor,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.white),
+            tooltip: 'Historia ya Uchunguzi',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HistoryScreen()),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
