@@ -50,7 +50,16 @@ class PlantIdService {
           'Api-Key': ApiKeys.cropHealth,
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'images': [base64Image]}),
+        body: jsonEncode({
+          'images': [base64Image],
+          'details': [
+            'description',
+            'treatment',
+            'cause',
+            'common_names',
+            'classification',
+          ],
+        }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -97,6 +106,17 @@ class PlantIdService {
     final commonNames =
         ((details['common_names'] as List?) ?? []).cast<String>();
 
+    // Auto-detect if it's a pest based on classification
+    final classification =
+        ((details['classification'] as List?) ?? []).cast<String>();
+    final isPest = classification
+        .any((c) => c.toLowerCase().contains('insect') ||
+            c.toLowerCase().contains('pest') ||
+            c.toLowerCase().contains('arthropod') ||
+            c.toLowerCase().contains('mite'));
+    final effectiveScanType =
+        isPest ? 'wadudu' : scanType;
+
     return {
       'disease_name_en': diseaseName,
       'disease_name_sw': diseaseName,
@@ -104,16 +124,16 @@ class PlantIdService {
       'confidence': probability,
       'severity': _severity(probability),
       'affected_crop': cropName,
-      'scan_type': scanType,
+      'scan_type': effectiveScanType,
       'description_sw': description.isNotEmpty ? description : '',
       'cause_sw': cause.isNotEmpty ? cause : '',
-      'immediate_action_sw': _buildAction(chemical, biological, scanType),
+      'immediate_action_sw': _buildAction(chemical, biological, effectiveScanType),
       'chemical_treatment': chemical,
       'biological_treatment': biological,
       'prevention_treatment': prevention,
       'pesticide_1_name': _firstSentence(chemical),
       'pesticide_1_dose': 'Fuata kipimo kilichoandikwa kwenye dawa',
-      'pesticide_1_type': scanType == 'wadudu' ? 'insecticide' : 'fungicide',
+      'pesticide_1_type': effectiveScanType == 'wadudu' ? 'insecticide' : 'fungicide',
       'pesticide_2_name': biological.isNotEmpty ? _firstSentence(biological) : 'Hakuna',
       'pesticide_2_dose': biological.isNotEmpty ? '' : '',
       'pesticide_2_type': 'organic',
@@ -136,7 +156,15 @@ class PlantIdService {
           'Api-Key': ApiKeys.plantId,
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'images': [base64Image]}),
+        body: jsonEncode({
+          'images': [base64Image],
+          'details': [
+            'common_names',
+            'description',
+            'taxonomy',
+            'treatment',
+          ],
+        }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
