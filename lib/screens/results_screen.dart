@@ -5,7 +5,7 @@ import '../theme/app_colors.dart';
 import 'home_screen.dart';
 import 'scan_screen.dart';
 
-class ResultsScreen extends StatelessWidget {
+class ResultsScreen extends StatefulWidget {
   final Map<String, dynamic> diagnosis;
   final String imagePath;
   final String cropName;
@@ -17,25 +17,27 @@ class ResultsScreen extends StatelessWidget {
     required this.cropName,
   });
 
-  // Map severity level to a colour
-  Color _severityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'low':
-        return const Color(0xFF2E8B57);
-      case 'medium':
-        return const Color(0xFFFF6F00);
+  @override
+  State<ResultsScreen> createState() => _ResultsScreenState();
+}
+
+class _ResultsScreenState extends State<ResultsScreen> {
+  bool _treatmentExpanded = false;
+
+  Color _severityColor(String s) {
+    switch (s.toLowerCase()) {
       case 'high':
-        return const Color(0xFFE65100);
       case 'critical':
         return const Color(0xFFB71C1C);
+      case 'medium':
+        return const Color(0xFFFF6F00);
       default:
-        return Colors.grey;
+        return const Color(0xFF2E8B57);
     }
   }
 
-  // Map severity level to Swahili label
-  String _severityLabel(String severity) {
-    switch (severity.toLowerCase()) {
+  String _severityLabel(String s) {
+    switch (s.toLowerCase()) {
       case 'low':
         return 'Chini';
       case 'medium':
@@ -45,389 +47,133 @@ class ResultsScreen extends StatelessWidget {
       case 'critical':
         return 'Hatari Sana';
       default:
-        return severity;
+        return s;
+    }
+  }
+
+  String _scanTypeLabel(String? t) {
+    switch (t) {
+      case 'wadudu':
+        return 'Wadudu / Pest';
+      case 'magugu':
+        return 'Gugu / Weed';
+      default:
+        return 'Ugonjwa / Disease';
+    }
+  }
+
+  IconData _scanTypeIcon(String? t) {
+    switch (t) {
+      case 'wadudu':
+        return Icons.pest_control;
+      case 'magugu':
+        return Icons.grass;
+      default:
+        return Icons.biotech;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Check if Claude returned an error or if the plant is healthy
-    final hasError = diagnosis['error'] == true;
-    final isHealthy = diagnosis['is_healthy'] == true;
-
-    final diseaseSw =
-        diagnosis['disease_name_sw'] ?? 'Ugonjwa haujulikani';
-    final diseaseEn = diagnosis['disease_name_en'] ?? '';
-    final confidence = (diagnosis['confidence'] ?? 0.0) as double;
-    final severity = diagnosis['severity'] ?? 'low';
-    final descriptionSw =
-        diagnosis['description_sw'] ?? '';
-    final actionSw = diagnosis['immediate_action_sw'] ?? '';
-    final pest1Name = diagnosis['pesticide_1_name'] ?? '';
-    final pest1Dose = diagnosis['pesticide_1_dose'] ?? '';
-    final pest2Name = diagnosis['pesticide_2_name'] ?? '';
-    final pest2Dose = diagnosis['pesticide_2_dose'] ?? '';
-    final daysCritical = diagnosis['days_until_critical'] ?? 0;
-    final preventionSw = diagnosis['prevention_sw'] as String? ?? '';
-    final threatType = diagnosis['threat_type'] as String? ?? '';
+    final d = widget.diagnosis;
+    final hasError = d['error'] == true;
+    final isHealthy = d['is_healthy'] == true;
 
     return Scaffold(
       backgroundColor: AppColors.mist,
       appBar: AppBar(
-        title: Text('Matokeo ya Uchunguzi',
-            style: GoogleFonts.playfairDisplay(
-                color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(
+          'Matokeo ya Uchunguzi',
+          style: GoogleFonts.playfairDisplay(
+              color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         automaticallyImplyLeading: false,
+        backgroundColor: const Color(0xFF1A5C2E),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Show the leaf photo
-            if (imagePath.isNotEmpty)
+            // ── Photo ──────────────────────────────────────────────────────
+            if (widget.imagePath.isNotEmpty)
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: Image.file(
-                  File(imagePath),
-                  height: 200,
+                  File(widget.imagePath),
+                  height: 220,
                   fit: BoxFit.cover,
                 ),
               ),
 
             const SizedBox(height: 16),
 
-            // Error case
+            // ── Error ───────────────────────────────────────────────────────
             if (hasError)
-              _InfoCard(
+              _card(
                 color: const Color(0xFFB71C1C),
                 child: Text(
-                  diagnosis['message'] ?? 'Hitilafu isiyojulikana.',
-                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  d['message'] ?? 'Hitilafu isiyojulikana.',
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 15),
                   textAlign: TextAlign.center,
                 ),
               ),
 
-            // Healthy plant
+            // ── Healthy ─────────────────────────────────────────────────────
             if (!hasError && isHealthy)
-              _InfoCard(
+              _card(
                 color: const Color(0xFF2E8B57),
-                child: const Column(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.white, size: 48),
-                    SizedBox(height: 8),
-                    Text(
-                      'Mmea Wako Unaonekana Mzima! 🌿',
-                      style: TextStyle(
+                child: const Column(children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 48),
+                  SizedBox(height: 8),
+                  Text(
+                    'Mmea Wako Unaonekana Mzima!',
+                    style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+                        fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ]),
               ),
 
-            // Disease found
-            if (!hasError && !isHealthy) ...[
-              // Disease name card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Ugonjwa Uliopatikana:',
-                        style: TextStyle(
-                            color: Color(0xFF9E9E9E), fontSize: 13),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        diseaseSw,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A1A1A),
-                        ),
-                      ),
-                      if (diseaseEn.isNotEmpty)
-                        Text(
-                          diseaseEn,
-                          style: const TextStyle(
-                              color: Color(0xFF9E9E9E), fontSize: 14),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Confidence and severity row
-              Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Uhakika',
-                              style: TextStyle(
-                                  color: Color(0xFF9E9E9E), fontSize: 13),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${(confidence * 100).toStringAsFixed(0)}%',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1A5C2E),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            LinearProgressIndicator(
-                              value: confidence,
-                              color: const Color(0xFF1A5C2E),
-                              backgroundColor: const Color(0xFFE8F5E9),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Ukali',
-                              style: TextStyle(
-                                  color: Color(0xFF9E9E9E), fontSize: 13),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: _severityColor(severity)
-                                    .withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                _severityLabel(severity),
-                                style: TextStyle(
-                                  color: _severityColor(severity),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            if (daysCritical > 0) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                '$daysCritical siku',
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF9E9E9E)),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // Description
-              if (descriptionSw.isNotEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Maelezo:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A5C2E),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(descriptionSw,
-                            style: const TextStyle(fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                ),
-
-              const SizedBox(height: 12),
-
-              // Immediate action
-              if (actionSw.isNotEmpty)
-                _InfoCard(
-                  color: const Color(0xFFFF6F00),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.warning_amber,
-                              color: Colors.white, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Fanya Sasa Hivi:',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        actionSw,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-
-              const SizedBox(height: 12),
-
-              // Pesticide recommendations
-              if (pest1Name.isNotEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Dawa Zinazopendekezwa:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Color(0xFF1A5C2E),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _PesticideRow(
-                          number: '1',
-                          name: pest1Name,
-                          dose: pest1Dose,
-                        ),
-                        if (pest2Name.isNotEmpty) ...[
-                          const Divider(),
-                          _PesticideRow(
-                            number: '2',
-                            name: pest2Name,
-                            dose: pest2Dose,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Prevention (text diagnosis only)
-              if (preventionSw.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.shield,
-                                color: Color(0xFF2E7D32), size: 18),
-                            SizedBox(width: 6),
-                            Text(
-                              'Kinga na Uzuiaji:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2E7D32),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(preventionSw,
-                            style: const TextStyle(fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-
-              // Threat type badge (text diagnosis)
-              if (threatType.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A5C2E).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Aina: $threatType',
-                      style: const TextStyle(
-                          color: Color(0xFF1A5C2E),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-              ],
-            ],
+            // ── Disease / Pest / Weed results ───────────────────────────────
+            if (!hasError && !isHealthy) ..._buildDiseaseBody(d),
 
             const SizedBox(height: 24),
 
-            // Action buttons at the bottom
+            // ── Action buttons ──────────────────────────────────────────────
             ElevatedButton.icon(
               icon: const Icon(Icons.camera_alt),
               label: const Text('Piga Picha Nyingine'),
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ScanScreen()),
-                );
-              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A5C2E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const ScanScreen()),
+              ),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               icon: const Icon(Icons.home),
               label: const Text('Rudi Nyumbani'),
-              onPressed: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HomeScreen()),
-                  (route) => false,
-                );
-              },
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF1A5C2E),
                 side: const BorderSide(color: Color(0xFF1A5C2E)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
                 padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                (r) => false,
               ),
             ),
           ],
@@ -435,70 +181,381 @@ class ResultsScreen extends StatelessWidget {
       ),
     );
   }
-}
 
-// Reusable coloured information card
-class _InfoCard extends StatelessWidget {
-  final Color color;
-  final Widget child;
+  List<Widget> _buildDiseaseBody(Map<String, dynamic> d) {
+    final diseaseSw = (d['disease_name_sw'] as String?) ?? '';
+    final diseaseEn = (d['disease_name_en'] as String?) ?? '';
+    final scanType = (d['scan_type'] as String?) ?? 'ugonjwa';
+    final confidence = (d['confidence'] as num?)?.toDouble() ?? 0.0;
+    final severity = (d['severity'] as String?) ?? 'low';
+    final cropName = (d['affected_crop'] as String?) ?? widget.cropName;
+    final description = (d['description_sw'] as String?) ?? '';
+    final cause = (d['cause_sw'] as String?) ?? '';
+    final actionSw = (d['immediate_action_sw'] as String?) ?? '';
+    final chemical = (d['chemical_treatment'] as String?) ?? '';
+    final biological = (d['biological_treatment'] as String?) ?? '';
+    final prevention = (d['prevention_treatment'] as String?) ?? '';
 
-  const _InfoCard({required this.color, required this.child});
+    final hasTreatment =
+        chemical.isNotEmpty || biological.isNotEmpty || prevention.isNotEmpty;
 
-  @override
-  Widget build(BuildContext context) {
+    return [
+      // ── 1. Identification card ──────────────────────────────────────────
+      Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Crop
+              Row(children: [
+                const Icon(Icons.eco, color: Color(0xFF2E7D32), size: 18),
+                const SizedBox(width: 6),
+                Text('Zao:',
+                    style: GoogleFonts.dmSans(
+                        color: Colors.grey[600], fontSize: 13)),
+                const SizedBox(width: 6),
+                Text(cropName,
+                    style: GoogleFonts.dmSans(
+                        fontWeight: FontWeight.bold, fontSize: 14)),
+              ]),
+              const SizedBox(height: 8),
+              // Scan type
+              Row(children: [
+                Icon(_scanTypeIcon(scanType),
+                    color: const Color(0xFF1A5C2E), size: 18),
+                const SizedBox(width: 6),
+                Text('Aina ya tatizo:',
+                    style: GoogleFonts.dmSans(
+                        color: Colors.grey[600], fontSize: 13)),
+                const SizedBox(width: 6),
+                Text(_scanTypeLabel(scanType),
+                    style: GoogleFonts.dmSans(
+                        fontWeight: FontWeight.bold, fontSize: 13)),
+              ]),
+              const Divider(height: 20),
+              // Disease name
+              Text('Tatizo Lililogunduliwa:',
+                  style: GoogleFonts.dmSans(
+                      color: Colors.grey[600], fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(
+                diseaseSw.isNotEmpty ? diseaseSw : 'Haijulikani',
+                style: GoogleFonts.playfairDisplay(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1A1A1A)),
+              ),
+              if (diseaseEn.isNotEmpty && diseaseEn != diseaseSw)
+                Text(diseaseEn,
+                    style: GoogleFonts.dmSans(
+                        color: Colors.grey[500], fontSize: 13,
+                        fontStyle: FontStyle.italic)),
+            ],
+          ),
+        ),
+      ),
+
+      const SizedBox(height: 12),
+
+      // ── 2. Confidence + Severity ────────────────────────────────────────
+      Row(children: [
+        Expanded(
+          child: Card(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(children: [
+                Text('Uhakika',
+                    style: GoogleFonts.dmSans(
+                        color: Colors.grey[600], fontSize: 12)),
+                const SizedBox(height: 8),
+                Text('${(confidence * 100).toStringAsFixed(0)}%',
+                    style: GoogleFonts.dmSans(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1A5C2E))),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value: confidence,
+                  color: const Color(0xFF1A5C2E),
+                  backgroundColor: const Color(0xFFE8F5E9),
+                ),
+              ]),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Card(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(children: [
+                Text('Ukali',
+                    style: GoogleFonts.dmSans(
+                        color: Colors.grey[600], fontSize: 12)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _severityColor(severity)
+                        .withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _severityLabel(severity),
+                    style: GoogleFonts.dmSans(
+                        color: _severityColor(severity),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ]),
+
+      const SizedBox(height: 12),
+
+      // ── 3. Description ──────────────────────────────────────────────────
+      if (description.isNotEmpty)
+        _sectionCard(
+          icon: Icons.info_outline,
+          title: 'Maelezo',
+          color: const Color(0xFF1A5C2E),
+          child: Text(description,
+              style: GoogleFonts.dmSans(fontSize: 14, height: 1.5)),
+        ),
+
+      // ── 4. Cause ────────────────────────────────────────────────────────
+      if (cause.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        _sectionCard(
+          icon: Icons.help_outline,
+          title: 'Sababu ya Tatizo',
+          color: const Color(0xFF6A1B9A),
+          child: Text(cause,
+              style: GoogleFonts.dmSans(fontSize: 14, height: 1.5)),
+        ),
+      ],
+
+      const SizedBox(height: 12),
+
+      // ── 5. Immediate action ─────────────────────────────────────────────
+      if (actionSw.isNotEmpty)
+        _card(
+          color: const Color(0xFFFF6F00),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.warning_amber,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text('Fanya Sasa Hivi:',
+                    style: GoogleFonts.dmSans(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15)),
+              ]),
+              const SizedBox(height: 8),
+              Text(actionSw,
+                  style: GoogleFonts.dmSans(
+                      color: Colors.white, fontSize: 14, height: 1.4)),
+            ],
+          ),
+        ),
+
+      const SizedBox(height: 12),
+
+      // ── 6. Treatment expandable ─────────────────────────────────────────
+      if (hasTreatment)
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () =>
+                setState(() => _treatmentExpanded = !_treatmentExpanded),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header button
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A5C2E)
+                              .withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.medication,
+                            color: Color(0xFF1A5C2E), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Mapendekezo ya Dawa',
+                          style: GoogleFonts.dmSans(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: const Color(0xFF1A5C2E)),
+                        ),
+                      ),
+                      Icon(
+                        _treatmentExpanded
+                            ? Icons.expand_less
+                            : Icons.expand_more,
+                        color: const Color(0xFF1A5C2E),
+                      ),
+                    ],
+                  ),
+
+                  // Expanded content
+                  if (_treatmentExpanded) ...[
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+
+                    if (chemical.isNotEmpty) ...[
+                      _treatmentSection(
+                        icon: Icons.science,
+                        title: 'Dawa ya Kemikali',
+                        text: chemical,
+                        color: const Color(0xFFB71C1C),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    if (biological.isNotEmpty) ...[
+                      _treatmentSection(
+                        icon: Icons.eco,
+                        title: 'Dawa ya Asili / Kibiolojia',
+                        text: biological,
+                        color: const Color(0xFF2E7D32),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    if (prevention.isNotEmpty)
+                      _treatmentSection(
+                        icon: Icons.shield,
+                        title: 'Kinga na Uzuiaji',
+                        text: prevention,
+                        color: const Color(0xFF1565C0),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        )
+      else
+        // No treatment data — show advice
+        _card(
+          color: const Color(0xFF37474F),
+          child: Row(children: [
+            const Icon(Icons.tips_and_updates,
+                color: Colors.white70, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Wasiliana na mtaalamu wa kilimo au duka la pembejeo karibu nawe kwa ushauri zaidi wa dawa.',
+                style: GoogleFonts.dmSans(
+                    color: Colors.white, fontSize: 13, height: 1.4),
+              ),
+            ),
+          ]),
+        ),
+    ];
+  }
+
+  Widget _sectionCard({
+    required IconData icon,
+    required String title,
+    required Color color,
+    required Widget child,
+  }) {
+    return Card(
+      elevation: 1,
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 8),
+              Text(title,
+                  style: GoogleFonts.dmSans(
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      fontSize: 14)),
+            ]),
+            const SizedBox(height: 10),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _treatmentSection({
+    required IconData icon,
+    required String title,
+    required String text,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 6),
+            Text(title,
+                style: GoogleFonts.dmSans(
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                    fontSize: 13)),
+          ]),
+          const SizedBox(height: 6),
+          Text(text,
+              style: GoogleFonts.dmSans(
+                  fontSize: 13, height: 1.5, color: AppColors.soil)),
+        ],
+      ),
+    );
+  }
+
+  Widget _card({required Color color, required Widget child}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: child,
-    );
-  }
-}
-
-// One row showing a pesticide name and its dose
-class _PesticideRow extends StatelessWidget {
-  final String number;
-  final String name;
-  final String dose;
-
-  const _PesticideRow({
-    required this.number,
-    required this.name,
-    required this.dose,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 14,
-          backgroundColor: const Color(0xFF1A5C2E),
-          child: Text(
-            number,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.bold),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(name,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text(dose,
-                  style: const TextStyle(
-                      color: Color(0xFF9E9E9E), fontSize: 13)),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

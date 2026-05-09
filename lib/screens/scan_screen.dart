@@ -103,7 +103,7 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   Future<void> _analysePhoto() async {
-    if (_selectedImage == null) return;
+    if (_selectedImage == null || _analysing) return;
 
     setState(() {
       _analysing = true;

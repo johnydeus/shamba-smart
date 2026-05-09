@@ -93,25 +93,30 @@ class PlantIdService {
     final biological = (treatment['biological'] as String?) ?? '';
     final prevention = (treatment['prevention'] as String?) ?? '';
 
-    final typeLabel = scanType == 'wadudu' ? 'mdudu' : 'ugonjwa';
+    final cause = (details['cause'] as String?) ?? '';
+    final commonNames =
+        ((details['common_names'] as List?) ?? []).cast<String>();
 
     return {
       'disease_name_en': diseaseName,
       'disease_name_sw': diseaseName,
+      'common_names': commonNames,
       'confidence': probability,
       'severity': _severity(probability),
       'affected_crop': cropName,
-      'description_sw': description.isNotEmpty
-          ? description
-          : '$typeLabel uliogundulika kwenye $cropName.',
-      'immediate_action_sw': _buildAction(chemical, biological, typeLabel),
+      'scan_type': scanType,
+      'description_sw': description.isNotEmpty ? description : '',
+      'cause_sw': cause.isNotEmpty ? cause : '',
+      'immediate_action_sw': _buildAction(chemical, biological, scanType),
+      'chemical_treatment': chemical,
+      'biological_treatment': biological,
+      'prevention_treatment': prevention,
       'pesticide_1_name': _firstSentence(chemical),
       'pesticide_1_dose': 'Fuata kipimo kilichoandikwa kwenye dawa',
       'pesticide_1_type': scanType == 'wadudu' ? 'insecticide' : 'fungicide',
-      'pesticide_2_name': _firstSentence(biological),
-      'pesticide_2_dose': '',
+      'pesticide_2_name': biological.isNotEmpty ? _firstSentence(biological) : 'Hakuna',
+      'pesticide_2_dose': biological.isNotEmpty ? '' : '',
       'pesticide_2_type': 'organic',
-      'prevention_sw': prevention,
       'days_until_critical': 0,
       'is_healthy': false,
     };
@@ -218,14 +223,11 @@ class PlantIdService {
   }
 
   static String _buildAction(
-      String chemical, String biological, String typeLabel) {
-    final parts = <String>[];
-    if (chemical.isNotEmpty) parts.add('Kemikali: $chemical');
-    if (biological.isNotEmpty) parts.add('Asili: $biological');
-    if (parts.isEmpty) {
-      return 'Wasiliana na mtaalamu wa kilimo kuhusu $typeLabel huu.';
-    }
-    return parts.join('\n\n');
+      String chemical, String biological, String scanType) {
+    if (chemical.isNotEmpty) return _firstSentence(chemical);
+    if (biological.isNotEmpty) return _firstSentence(biological);
+    final label = scanType == 'wadudu' ? 'mdudu' : 'ugonjwa';
+    return 'Wasiliana na mtaalamu wa kilimo kuhusu $label huu.';
   }
 
   static String _firstSentence(String text) {
