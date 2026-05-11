@@ -68,7 +68,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
         title: Text(
           'Matokeo ya Uchunguzi',
           style: GoogleFonts.playfairDisplay(
-              color: Colors.white, fontWeight: FontWeight.bold),
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: const Color(0xFF1A5C2E),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -97,8 +99,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 color: const Color(0xFFB71C1C),
                 child: Text(
                   d['message'] ?? 'Hitilafu isiyojulikana.',
-                  style: const TextStyle(
-                      color: Colors.white, fontSize: 15),
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -107,18 +108,21 @@ class _ResultsScreenState extends State<ResultsScreen> {
             if (!hasError && isHealthy)
               _card(
                 color: const Color(0xFF2E8B57),
-                child: const Column(children: [
-                  Icon(Icons.check_circle, color: Colors.white, size: 48),
-                  SizedBox(height: 8),
-                  Text(
-                    'Mmea Wako Unaonekana Mzima!',
-                    style: TextStyle(
+                child: const Column(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white, size: 48),
+                    SizedBox(height: 8),
+                    Text(
+                      'Mmea Wako Unaonekana Mzima!',
+                      style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
-                        fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                ]),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
 
             // ── Plant identification result ──────────────────────────────────
@@ -139,7 +143,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: () => Navigator.pushReplacement(
                 context,
@@ -155,7 +160,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 side: const BorderSide(color: Color(0xFF1A5C2E)),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: () => Navigator.pushAndRemoveUntil(
                 context,
@@ -171,12 +177,15 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
   List<Widget> _buildPlantIdBody(Map<String, dynamic> d) {
     final scientificName = (d['plant_scientific_name'] as String?) ?? '';
-    final commonNames = ((d['plant_common_names'] as List?) ?? []).cast<String>();
+    final commonNames = ((d['plant_common_names'] as List?) ?? [])
+        .cast<String>();
     final family = (d['plant_family'] as String?) ?? '';
     final genus = (d['plant_genus'] as String?) ?? '';
     final confidence = (d['confidence'] as num?)?.toDouble() ?? 0.0;
     final description = (d['description_sw'] as String?) ?? '';
-    final displayName = commonNames.isNotEmpty ? commonNames.first : scientificName;
+    final displayName = commonNames.isNotEmpty
+        ? commonNames.first
+        : scientificName;
 
     return [
       // Header
@@ -188,41 +197,59 @@ class _ResultsScreenState extends State<ResultsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                const Icon(Icons.park, color: Color(0xFF00695C), size: 20),
-                const SizedBox(width: 8),
-                Text('Mmea Uliotambuliwa',
+              Row(
+                children: [
+                  const Icon(Icons.park, color: Color(0xFF00695C), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Mmea Uliotambuliwa',
                     style: GoogleFonts.dmSans(
-                        color: const Color(0xFF00695C),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13)),
-              ]),
-              const SizedBox(height: 10),
-              Text(displayName,
-                  style: GoogleFonts.playfairDisplay(
-                      fontSize: 22,
+                      color: const Color(0xFF00695C),
                       fontWeight: FontWeight.bold,
-                      color: const Color(0xFF1A1A1A))),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                displayName,
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1A1A1A),
+                ),
+              ),
               if (scientificName.isNotEmpty && scientificName != displayName)
-                Text(scientificName,
-                    style: GoogleFonts.dmSans(
-                        fontSize: 13,
-                        color: Colors.grey[500],
-                        fontStyle: FontStyle.italic)),
+                Text(
+                  scientificName,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13,
+                    color: Colors.grey[500],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
               if (family.isNotEmpty || genus.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Wrap(spacing: 8, children: [
-                  if (genus.isNotEmpty)
-                    _chip('Jenasi: $genus', const Color(0xFF00695C)),
-                  if (family.isNotEmpty)
-                    _chip('Familia: $family', const Color(0xFF00695C)),
-                ]),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (genus.isNotEmpty)
+                      _chip('Jenasi: $genus', const Color(0xFF00695C)),
+                    if (family.isNotEmpty)
+                      _chip('Familia: $family', const Color(0xFF00695C)),
+                  ],
+                ),
               ],
               if (commonNames.length > 1) ...[
                 const SizedBox(height: 8),
-                Text('Majina mengine: ${commonNames.skip(1).take(3).join(', ')}',
-                    style: GoogleFonts.dmSans(
-                        fontSize: 12, color: Colors.grey[600])),
+                Text(
+                  'Majina mengine: ${commonNames.skip(1).take(3).join(', ')}',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
               ],
             ],
           ),
@@ -239,43 +266,60 @@ class _ResultsScreenState extends State<ResultsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                const Icon(Icons.analytics_outlined,
-                    color: Color(0xFF00695C), size: 16),
-                const SizedBox(width: 6),
-                Text('Uhakika wa Utambuzi',
-                    style: GoogleFonts.dmSans(
-                        color: const Color(0xFF00695C),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13)),
-              ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Text('${(confidence * 100).toStringAsFixed(0)}%',
-                    style: GoogleFonts.dmSans(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF00695C))),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      LinearProgressIndicator(
-                        value: confidence,
-                        color: const Color(0xFF00695C),
-                        backgroundColor: const Color(0xFFE0F2F1),
-                        minHeight: 8,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(_confidenceLabel(confidence),
-                          style: GoogleFonts.dmSans(
-                              fontSize: 11, color: Colors.grey[600])),
-                    ],
+              Row(
+                children: [
+                  const Icon(
+                    Icons.analytics_outlined,
+                    color: Color(0xFF00695C),
+                    size: 16,
                   ),
-                ),
-              ]),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Uhakika wa Utambuzi',
+                    style: GoogleFonts.dmSans(
+                      color: const Color(0xFF00695C),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Text(
+                    '${(confidence * 100).toStringAsFixed(0)}%',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF00695C),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LinearProgressIndicator(
+                          value: confidence,
+                          color: const Color(0xFF00695C),
+                          backgroundColor: const Color(0xFFE0F2F1),
+                          minHeight: 8,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _confidenceLabel(confidence),
+                          style: GoogleFonts.dmSans(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -288,8 +332,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
           icon: Icons.info_outline,
           title: 'Kuhusu Mmea Huu',
           color: const Color(0xFF00695C),
-          child: Text(description,
-              style: GoogleFonts.dmSans(fontSize: 14, height: 1.5)),
+          child: Text(
+            description,
+            style: GoogleFonts.dmSans(fontSize: 14, height: 1.5),
+          ),
         ),
       ],
 
@@ -297,17 +343,26 @@ class _ResultsScreenState extends State<ResultsScreen> {
       const SizedBox(height: 16),
       _card(
         color: const Color(0xFF00695C),
-        child: Row(children: [
-          const Icon(Icons.lightbulb_outline, color: Colors.white70, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Ukitaka kujua kama mmea huu una ugonjwa au wadudu, rudi na uchague "Ugonjwa" au "Wadudu" kwenye aina ya uchunguzi.',
-              style: GoogleFonts.dmSans(
-                  color: Colors.white, fontSize: 13, height: 1.4),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.lightbulb_outline,
+              color: Colors.white70,
+              size: 20,
             ),
-          ),
-        ]),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Ukitaka kujua kama mmea huu una ugonjwa au wadudu, rudi na uchague "Ugonjwa" au "Wadudu" kwenye aina ya uchunguzi.',
+                style: GoogleFonts.dmSans(
+                  color: Colors.white,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     ];
   }
@@ -320,9 +375,14 @@ class _ResultsScreenState extends State<ResultsScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Text(label,
-          style: GoogleFonts.dmSans(
-              fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+      child: Text(
+        label,
+        style: GoogleFonts.dmSans(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -353,49 +413,81 @@ class _ResultsScreenState extends State<ResultsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Crop
-              Row(children: [
-                const Icon(Icons.eco, color: Color(0xFF2E7D32), size: 18),
-                const SizedBox(width: 6),
-                Text('Zao:',
+              Row(
+                children: [
+                  const Icon(Icons.eco, color: Color(0xFF2E7D32), size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Zao:',
                     style: GoogleFonts.dmSans(
-                        color: Colors.grey[600], fontSize: 13)),
-                const SizedBox(width: 6),
-                Text(cropName,
+                      color: Colors.grey[600],
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    cropName,
                     style: GoogleFonts.dmSans(
-                        fontWeight: FontWeight.bold, fontSize: 14)),
-              ]),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               // Scan type
-              Row(children: [
-                Icon(_scanTypeIcon(scanType),
-                    color: const Color(0xFF1A5C2E), size: 18),
-                const SizedBox(width: 6),
-                Text('Aina ya tatizo:',
+              Row(
+                children: [
+                  Icon(
+                    _scanTypeIcon(scanType),
+                    color: const Color(0xFF1A5C2E),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Aina ya tatizo:',
                     style: GoogleFonts.dmSans(
-                        color: Colors.grey[600], fontSize: 13)),
-                const SizedBox(width: 6),
-                Text(_scanTypeLabel(scanType),
+                      color: Colors.grey[600],
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _scanTypeLabel(scanType),
                     style: GoogleFonts.dmSans(
-                        fontWeight: FontWeight.bold, fontSize: 13)),
-              ]),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
               const Divider(height: 20),
               // Disease name
-              Text('Tatizo Lililogunduliwa:',
-                  style: GoogleFonts.dmSans(
-                      color: Colors.grey[600], fontSize: 12)),
+              Text(
+                'Tatizo Lililogunduliwa:',
+                style: GoogleFonts.dmSans(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                ),
+              ),
               const SizedBox(height: 4),
               Text(
                 diseaseSw.isNotEmpty ? diseaseSw : 'Haijulikani',
                 style: GoogleFonts.playfairDisplay(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1A1A1A)),
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1A1A1A),
+                ),
               ),
               if (diseaseEn.isNotEmpty && diseaseEn != diseaseSw)
-                Text(diseaseEn,
-                    style: GoogleFonts.dmSans(
-                        color: Colors.grey[500], fontSize: 13,
-                        fontStyle: FontStyle.italic)),
+                Text(
+                  diseaseEn,
+                  style: GoogleFonts.dmSans(
+                    color: Colors.grey[500],
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
             ],
           ),
         ),
@@ -405,53 +497,66 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
       // ── 2. Confidence card ──────────────────────────────────────────────
       Card(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                const Icon(Icons.analytics_outlined,
-                    color: Color(0xFF1A5C2E), size: 16),
-                const SizedBox(width: 6),
-                Text('Uhakika wa Utambuzi',
-                    style: GoogleFonts.dmSans(
-                        color: const Color(0xFF1A5C2E),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13)),
-              ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Text('${(confidence * 100).toStringAsFixed(0)}%',
-                    style: GoogleFonts.dmSans(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1A5C2E))),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      LinearProgressIndicator(
-                        value: confidence,
-                        color: const Color(0xFF1A5C2E),
-                        backgroundColor: const Color(0xFFE8F5E9),
-                        minHeight: 8,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _confidenceLabel(confidence),
-                        style: GoogleFonts.dmSans(
-                            fontSize: 11,
-                            color: Colors.grey[600]),
-                      ),
-                    ],
+              Row(
+                children: [
+                  const Icon(
+                    Icons.analytics_outlined,
+                    color: Color(0xFF1A5C2E),
+                    size: 16,
                   ),
-                ),
-              ]),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Uhakika wa Utambuzi',
+                    style: GoogleFonts.dmSans(
+                      color: const Color(0xFF1A5C2E),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Text(
+                    '${(confidence * 100).toStringAsFixed(0)}%',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF1A5C2E),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LinearProgressIndicator(
+                          value: confidence,
+                          color: const Color(0xFF1A5C2E),
+                          backgroundColor: const Color(0xFFE8F5E9),
+                          minHeight: 8,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _confidenceLabel(confidence),
+                          style: GoogleFonts.dmSans(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               if (confidence < 0.70) ...[
                 const SizedBox(height: 8),
                 Container(
@@ -460,18 +565,25 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Row(children: [
-                    const Icon(Icons.info_outline,
-                        color: Colors.orange, size: 14),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Uhakika ni mdogo — thibitisha na afisa kilimo.',
-                        style: GoogleFonts.dmSans(
-                            fontSize: 11, color: Colors.orange[800]),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Colors.orange,
+                        size: 14,
                       ),
-                    ),
-                  ]),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Uhakika ni mdogo — thibitisha na afisa kilimo.',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 11,
+                            color: Colors.orange[800],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ],
@@ -487,8 +599,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
           icon: Icons.info_outline,
           title: 'Maelezo',
           color: const Color(0xFF1A5C2E),
-          child: Text(description,
-              style: GoogleFonts.dmSans(fontSize: 14, height: 1.5)),
+          child: Text(
+            description,
+            style: GoogleFonts.dmSans(fontSize: 14, height: 1.5),
+          ),
         ),
 
       // ── 4. Cause ────────────────────────────────────────────────────────
@@ -498,8 +612,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
           icon: Icons.help_outline,
           title: 'Sababu ya Tatizo',
           color: const Color(0xFF6A1B9A),
-          child: Text(cause,
-              style: GoogleFonts.dmSans(fontSize: 14, height: 1.5)),
+          child: Text(
+            cause,
+            style: GoogleFonts.dmSans(fontSize: 14, height: 1.5),
+          ),
         ),
       ],
 
@@ -512,20 +628,33 @@ class _ResultsScreenState extends State<ResultsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                const Icon(Icons.warning_amber,
-                    color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Text('Fanya Sasa Hivi:',
+              Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Fanya Sasa Hivi:',
                     style: GoogleFonts.dmSans(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15)),
-              ]),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
-              Text(actionSw,
-                  style: GoogleFonts.dmSans(
-                      color: Colors.white, fontSize: 14, height: 1.4)),
+              Text(
+                actionSw,
+                style: GoogleFonts.dmSans(
+                  color: Colors.white,
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+              ),
             ],
           ),
         ),
@@ -537,7 +666,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
         Card(
           elevation: 2,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14)),
+            borderRadius: BorderRadius.circular(14),
+          ),
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
             onTap: () =>
@@ -553,21 +683,24 @@ class _ResultsScreenState extends State<ResultsScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1A5C2E)
-                              .withValues(alpha: 0.1),
+                          color: const Color(0xFF1A5C2E).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.medication,
-                            color: Color(0xFF1A5C2E), size: 22),
+                        child: const Icon(
+                          Icons.medication,
+                          color: Color(0xFF1A5C2E),
+                          size: 22,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Mapendekezo ya Dawa',
                           style: GoogleFonts.dmSans(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: const Color(0xFF1A5C2E)),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: const Color(0xFF1A5C2E),
+                          ),
                         ),
                       ),
                       Icon(
@@ -622,62 +755,75 @@ class _ResultsScreenState extends State<ResultsScreen> {
         // No treatment data — show advice
         _card(
           color: const Color(0xFF37474F),
-          child: Row(children: [
-            const Icon(Icons.tips_and_updates,
-                color: Colors.white70, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Wasiliana na mtaalamu wa kilimo au duka la pembejeo karibu nawe kwa ushauri zaidi wa dawa.',
-                style: GoogleFonts.dmSans(
-                    color: Colors.white, fontSize: 13, height: 1.4),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.tips_and_updates,
+                color: Colors.white70,
+                size: 20,
               ),
-            ),
-          ]),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Wasiliana na mtaalamu wa kilimo au duka la pembejeo karibu nawe kwa ushauri zaidi wa dawa.',
+                  style: GoogleFonts.dmSans(
+                    color: Colors.white,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
 
       // ── Consult buttons ─────────────────────────────────────────────────
       const SizedBox(height: 20),
-      Row(children: [
-        const Expanded(child: Divider()),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text('Omba Msaada',
-              style: GoogleFonts.dmSans(
-                  color: Colors.grey[500], fontSize: 12)),
-        ),
-        const Expanded(child: Divider()),
-      ]),
+      Row(
+        children: [
+          const Expanded(child: Divider()),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              'Omba Msaada',
+              style: GoogleFonts.dmSans(color: Colors.grey[500], fontSize: 12),
+            ),
+          ),
+          const Expanded(child: Divider()),
+        ],
+      ),
       const SizedBox(height: 12),
-      Row(children: [
-        Expanded(
-          child: _consultBtn(
-            icon: Icons.agriculture,
-            label: 'Afisa Kilimo',
-            subtitle: 'Omba ushauri',
-            color: const Color(0xFF00695C),
-            onTap: () => _showContactSheet(
-              context: context,
-              diagnosis: d,
-              role: UserRole.afisa,
+      Row(
+        children: [
+          Expanded(
+            child: _consultBtn(
+              icon: Icons.agriculture,
+              label: 'Afisa Kilimo',
+              subtitle: 'Omba ushauri',
+              color: const Color(0xFF00695C),
+              onTap: () => _showContactSheet(
+                context: context,
+                diagnosis: d,
+                role: UserRole.afisa,
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _consultBtn(
-            icon: Icons.storefront,
-            label: 'Duka la Dawa',
-            subtitle: 'Tafuta dawa',
-            color: const Color(0xFF1565C0),
-            onTap: () => _showContactSheet(
-              context: context,
-              diagnosis: d,
-              role: UserRole.duka,
+          const SizedBox(width: 10),
+          Expanded(
+            child: _consultBtn(
+              icon: Icons.storefront,
+              label: 'Duka la Dawa',
+              subtitle: 'Tafuta dawa',
+              color: const Color(0xFF1565C0),
+              onTap: () => _showContactSheet(
+                context: context,
+                diagnosis: d,
+                role: UserRole.duka,
+              ),
             ),
           ),
-        ),
-      ]),
+        ],
+      ),
     ];
   }
 
@@ -689,22 +835,26 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }) {
     return Card(
       elevation: 1,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 8),
-              Text(title,
+            Row(
+              children: [
+                Icon(icon, color: color, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  title,
                   style: GoogleFonts.dmSans(
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                      fontSize: 14)),
-            ]),
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 10),
             child,
           ],
@@ -729,19 +879,29 @@ class _ResultsScreenState extends State<ResultsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Icon(icon, color: color, size: 16),
-            const SizedBox(width: 6),
-            Text(title,
+          Row(
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 6),
+              Text(
+                title,
                 style: GoogleFonts.dmSans(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                    fontSize: 13)),
-          ]),
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
-          Text(text,
-              style: GoogleFonts.dmSans(
-                  fontSize: 13, height: 1.5, color: AppColors.soil)),
+          Text(
+            text,
+            style: GoogleFonts.dmSans(
+              fontSize: 13,
+              height: 1.5,
+              color: AppColors.soil,
+            ),
+          ),
         ],
       ),
     );
@@ -787,14 +947,21 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 child: Icon(icon, color: color, size: 24),
               ),
               const SizedBox(height: 8),
-              Text(label,
-                  style: GoogleFonts.dmSans(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: color)),
-              Text(subtitle,
-                  style: GoogleFonts.dmSans(
-                      fontSize: 11, color: Colors.grey[600])),
+              Text(
+                label,
+                style: GoogleFonts.dmSans(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: color,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: GoogleFonts.dmSans(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                ),
+              ),
             ],
           ),
         ),
@@ -852,10 +1019,13 @@ class _ContactSheetState extends State<_ContactSheet> {
 
   Future<void> _load() async {
     try {
+      final roleKey = widget.role.key;
       final rows = await Supabase.instance.client
           .from('profiles')
-          .select('id, first_name, last_name, region, role, shop_name, organization, district')
-          .eq('role', widget.role.key)
+          .select(
+            'id, first_name, last_name, region, role, shop_name, organization, district, all_roles',
+          )
+          .or('role.eq.$roleKey,all_roles.cs.{$roleKey}')
           .order('first_name')
           .limit(50);
       setState(() {
@@ -872,7 +1042,8 @@ class _ContactSheetState extends State<_ContactSheet> {
 
   String _formatMessage() {
     final d = widget.diagnosis;
-    final disease = d['disease_name_sw'] ?? d['disease_name_en'] ?? 'Haijulikani';
+    final disease =
+        d['disease_name_sw'] ?? d['disease_name_en'] ?? 'Haijulikani';
     final crop = d['affected_crop'] ?? '';
     final conf = ((d['confidence'] as num? ?? 0) * 100).round();
     final severity = _severityLabel(d['severity'] ?? '');
@@ -901,11 +1072,16 @@ class _ContactSheetState extends State<_ContactSheet> {
 
   String _severityLabel(String s) {
     switch (s.toLowerCase()) {
-      case 'low': return 'Chini';
-      case 'medium': return 'Wastani';
-      case 'high': return 'Juu';
-      case 'critical': return 'Hatari Sana';
-      default: return s;
+      case 'low':
+        return 'Chini';
+      case 'medium':
+        return 'Wastani';
+      case 'high':
+        return 'Juu';
+      case 'critical':
+        return 'Hatari Sana';
+      default:
+        return s;
     }
   }
 
@@ -976,15 +1152,20 @@ class _ContactSheetState extends State<_ContactSheet> {
             // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-              child: Row(children: [
-                Icon(icon, color: color, size: 22),
-                const SizedBox(width: 10),
-                Text(title,
+              child: Row(
+                children: [
+                  Icon(icon, color: color, size: 22),
+                  const SizedBox(width: 10),
+                  Text(
+                    title,
                     style: GoogleFonts.playfairDisplay(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: color)),
-              ]),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const Divider(height: 1),
             // Body
@@ -992,74 +1173,90 @@ class _ContactSheetState extends State<_ContactSheet> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(
-                          child: Text(_error!,
-                              style: GoogleFonts.dmSans(color: Colors.red)))
-                      : _contacts.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: Text(
-                                  isAfisa
-                                      ? 'Hakuna afisa kilimo waliojisajili bado katika mfumo huu.'
-                                      : 'Hakuna maduka ya dawa yaliyojisajili bado katika mfumo huu.',
-                                  style: GoogleFonts.dmSans(
-                                      color: Colors.grey[600], fontSize: 14),
-                                  textAlign: TextAlign.center,
-                                ),
+                  ? Center(
+                      child: Text(
+                        _error!,
+                        style: GoogleFonts.dmSans(color: Colors.red),
+                      ),
+                    )
+                  : _contacts.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          isAfisa
+                              ? 'Hakuna afisa kilimo waliojisajili bado katika mfumo huu.'
+                              : 'Hakuna maduka ya dawa yaliyojisajili bado katika mfumo huu.',
+                          style: GoogleFonts.dmSans(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: ctrl,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      itemCount: _contacts.length,
+                      separatorBuilder: (context2, i2) =>
+                          const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final c = _contacts[i];
+                        final name = _contactName(c);
+                        final sub = _contactSub(c);
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: color.withValues(alpha: 0.15),
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : '?',
+                              style: TextStyle(
+                                color: color,
+                                fontWeight: FontWeight.bold,
                               ),
-                            )
-                          : ListView.separated(
-                              controller: ctrl,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              itemCount: _contacts.length,
-                              separatorBuilder: (context2, i2) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (_, i) {
-                                final c = _contacts[i];
-                                final name = _contactName(c);
-                                final sub = _contactSub(c);
-                                return ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor:
-                                        color.withValues(alpha: 0.15),
-                                    child: Text(
-                                      name.isNotEmpty
-                                          ? name[0].toUpperCase()
-                                          : '?',
-                                      style: TextStyle(
-                                          color: color,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                  title: Text(name,
-                                      style: GoogleFonts.dmSans(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14)),
-                                  subtitle: sub.isNotEmpty
-                                      ? Text(sub,
-                                          style: GoogleFonts.dmSans(
-                                              fontSize: 12,
-                                              color: Colors.grey[600]))
-                                      : null,
-                                  trailing: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: color,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text('Wasiliana',
-                                        style: GoogleFonts.dmSans(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold)),
-                                  ),
-                                  onTap: () => _openChat(c),
-                                );
-                              },
                             ),
+                          ),
+                          title: Text(
+                            name,
+                            style: GoogleFonts.dmSans(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: sub.isNotEmpty
+                              ? Text(
+                                  sub,
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                )
+                              : null,
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'Wasiliana',
+                              style: GoogleFonts.dmSans(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          onTap: () => _openChat(c),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../models/farm_model.dart';
+import '../models/farm_task_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/farm_provider.dart';
+import '../providers/farm_task_provider.dart';
 import '../services/claude_service.dart';
 import '../services/weather_service.dart';
 import '../theme/app_colors.dart';
@@ -59,17 +62,32 @@ class _FarmDetailScreenState extends State<FarmDetailScreen>
   }
 
   Future<void> _generateSchedule() async {
-    setState(() { _scheduleLoading = true; _scheduleText = null; });
+    setState(() {
+      _scheduleLoading = true;
+      _scheduleText = null;
+    });
     final crops = widget.farm.crops.isEmpty
         ? 'mazao mchanganyiko'
         : widget.farm.crops.join(', ');
     final region = widget.farm.region;
-    final acres  = widget.farm.acresDisplay;
-    final soil   = widget.farm.soilType ?? 'haijulikani';
-    final now    = DateTime.now();
-    final months = ['Januari','Februari','Machi','Aprili','Mei','Juni',
-                    'Julai','Agosti','Septemba','Oktoba','Novemba','Desemba'];
-    final month  = months[now.month - 1];
+    final acres = widget.farm.acresDisplay;
+    final soil = widget.farm.soilType ?? 'haijulikani';
+    final now = DateTime.now();
+    final months = [
+      'Januari',
+      'Februari',
+      'Machi',
+      'Aprili',
+      'Mei',
+      'Juni',
+      'Julai',
+      'Agosti',
+      'Septemba',
+      'Oktoba',
+      'Novemba',
+      'Desemba',
+    ];
+    final month = months[now.month - 1];
 
     final prompt =
         'Mkulima kutoka $region ana shamba la $acres analima: $crops. '
@@ -89,12 +107,20 @@ class _FarmDetailScreenState extends State<FarmDetailScreen>
       cropContext: crops,
       regionContext: region,
     );
-    if (mounted) setState(() { _scheduleText = result; _scheduleLoading = false; });
+    if (mounted)
+      setState(() {
+        _scheduleText = result;
+        _scheduleLoading = false;
+      });
   }
 
   @override
   Widget build(BuildContext context) {
-    final farm = widget.farm;
+    final farms = context.watch<FarmProvider>().farms;
+    final farm = farms.firstWhere(
+      (f) => f.id == widget.farm.id,
+      orElse: () => widget.farm,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFFDF6EE),
@@ -110,9 +136,15 @@ class _FarmDetailScreenState extends State<FarmDetailScreen>
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Hariri',
                 onPressed: () {
-                  final uid = context.read<AuthProvider>().currentUser?.id ?? '';
-                  Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => AddFarmScreen(farmerId: uid, editFarm: farm)));
+                  final uid =
+                      context.read<AuthProvider>().currentUser?.id ?? '';
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          AddFarmScreen(farmerId: uid, editFarm: farm),
+                    ),
+                  );
                 },
               ),
             ],
@@ -126,11 +158,22 @@ class _FarmDetailScreenState extends State<FarmDetailScreen>
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white60,
               labelStyle: GoogleFonts.dmSans(
-                  fontWeight: FontWeight.bold, fontSize: 13),
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
               tabs: const [
-                Tab(icon: Icon(Icons.dashboard_outlined, size: 18), text: 'Muhtasari'),
-                Tab(icon: Icon(Icons.calendar_month_outlined, size: 18), text: 'Ratiba'),
-                Tab(icon: Icon(Icons.health_and_safety_outlined, size: 18), text: 'Afya'),
+                Tab(
+                  icon: Icon(Icons.dashboard_outlined, size: 18),
+                  text: 'Muhtasari',
+                ),
+                Tab(
+                  icon: Icon(Icons.calendar_month_outlined, size: 18),
+                  text: 'Ratiba',
+                ),
+                Tab(
+                  icon: Icon(Icons.health_and_safety_outlined, size: 18),
+                  text: 'Afya',
+                ),
               ],
             ),
           ),
@@ -138,7 +181,11 @@ class _FarmDetailScreenState extends State<FarmDetailScreen>
         body: TabBarView(
           controller: _tabs,
           children: [
-            _OverviewTab(farm: farm, forecast: _forecast, weatherLoading: _weatherLoading),
+            _OverviewTab(
+              farm: farm,
+              forecast: _forecast,
+              weatherLoading: _weatherLoading,
+            ),
             _ScheduleTab(
               farm: farm,
               scheduleText: _scheduleText,
@@ -175,13 +222,16 @@ class _FarmHeader extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 64, height: 64,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.white30),
                 ),
-                child: const Center(child: Text('🌾', style: TextStyle(fontSize: 32))),
+                child: const Center(
+                  child: Text('🌾', style: TextStyle(fontSize: 32)),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -189,59 +239,98 @@ class _FarmHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(farm.name,
-                        style: GoogleFonts.playfairDisplay(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        )),
+                    Text(
+                      farm.name,
+                      style: GoogleFonts.playfairDisplay(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.location_on, color: Colors.white60, size: 13),
+                        const Icon(
+                          Icons.location_on,
+                          color: Colors.white60,
+                          size: 13,
+                        ),
                         const SizedBox(width: 3),
-                        Text(farm.region,
-                            style: GoogleFonts.dmSans(
-                                color: Colors.white70, fontSize: 13)),
+                        Text(
+                          farm.region,
+                          style: GoogleFonts.dmSans(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
                         const SizedBox(width: 12),
-                        const Icon(Icons.straighten, color: Colors.white60, size: 13),
+                        const Icon(
+                          Icons.straighten,
+                          color: Colors.white60,
+                          size: 13,
+                        ),
                         const SizedBox(width: 3),
-                        Text(farm.acresDisplay,
-                            style: GoogleFonts.dmSans(
-                                color: Colors.white70, fontSize: 13)),
+                        Text(
+                          farm.acresDisplay,
+                          style: GoogleFonts.dmSans(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     if (farm.crops.isNotEmpty)
                       Wrap(
                         spacing: 6,
-                        children: farm.crops.take(3).map((c) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.harvest.withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: AppColors.harvest.withValues(alpha: 0.5)),
-                          ),
-                          child: Text(c,
-                              style: GoogleFonts.dmSans(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600)),
-                        )).toList(),
+                        children: farm.crops
+                            .take(3)
+                            .map(
+                              (c) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.harvest.withValues(
+                                    alpha: 0.25,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: AppColors.harvest.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  c,
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
                       )
                     else
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white12,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Text('Mazao hayajawekwa',
-                            style: GoogleFonts.dmSans(
-                                color: Colors.white60, fontSize: 11)),
+                        child: Text(
+                          'Mazao hayajawekwa',
+                          style: GoogleFonts.dmSans(
+                            color: Colors.white60,
+                            fontSize: 11,
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -271,22 +360,33 @@ class _OverviewTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tasks = context.watch<FarmTaskProvider>().tasksForFarm(farm.id);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         // ── Quick stats ──────────────────────────────────────────────────────
         Row(
           children: [
-            _StatCard(emoji: '📐', label: 'Ukubwa', value: farm.acresDisplay,
-                color: AppColors.leaf),
+            _StatCard(
+              emoji: '📐',
+              label: 'Ukubwa',
+              value: farm.acresDisplay,
+              color: AppColors.leaf,
+            ),
             const SizedBox(width: 10),
-            _StatCard(emoji: '🌱', label: 'Mazao',
-                value: farm.crops.isEmpty ? '—' : '${farm.crops.length} aina',
-                color: AppColors.harvest),
+            _StatCard(
+              emoji: '🌱',
+              label: 'Mazao',
+              value: farm.crops.isEmpty ? '—' : '${farm.crops.length} aina',
+              color: AppColors.harvest,
+            ),
             const SizedBox(width: 10),
-            _StatCard(emoji: '📍', label: 'GPS',
-                value: farm.hasLocation ? 'Imewekwa' : 'Haijawekwa',
-                color: farm.hasLocation ? AppColors.leaf : Colors.orange),
+            _StatCard(
+              emoji: '📍',
+              label: 'GPS',
+              value: farm.hasLocation ? 'Imewekwa' : 'Haijawekwa',
+              color: farm.hasLocation ? AppColors.leaf : Colors.orange,
+            ),
           ],
         ),
 
@@ -297,24 +397,41 @@ class _OverviewTab extends StatelessWidget {
         const SizedBox(height: 10),
         Row(
           children: [
-            _QuickAction(emoji: '🔬', label: 'Chunguza\nUgonjwa',
-                color: const Color(0xFF1A5C2E),
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const ScanScreen()))),
+            _QuickAction(
+              emoji: '🔬',
+              label: 'Chunguza\nUgonjwa',
+              color: const Color(0xFF1A5C2E),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ScanScreen()),
+              ),
+            ),
             const SizedBox(width: 10),
-            _QuickAction(emoji: '🧪', label: 'Data ya\nUdongo',
-                color: const Color(0xFF7A5C3A),
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => SoilScreen(
-                      farmLat: farm.gpsLat,
-                      farmLng: farm.gpsLng,
-                      farmName: farm.name,
-                    )))),
+            _QuickAction(
+              emoji: '🧪',
+              label: 'Data ya\nUdongo',
+              color: const Color(0xFF7A5C3A),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SoilScreen(
+                    farmLat: farm.gpsLat,
+                    farmLng: farm.gpsLng,
+                    farmName: farm.name,
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(width: 10),
-            _QuickAction(emoji: '💧', label: 'Mpango\nUmwagiliaji',
-                color: const Color(0xFF0277BD),
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const IrrigationScreen()))),
+            _QuickAction(
+              emoji: '💧',
+              label: 'Mpango\nUmwagiliaji',
+              color: const Color(0xFF0277BD),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const IrrigationScreen()),
+              ),
+            ),
           ],
         ),
 
@@ -324,13 +441,21 @@ class _OverviewTab extends StatelessWidget {
         if (farm.hasLocation) ...[
           _SectionTitle('Eneo la Shamba'),
           const SizedBox(height: 10),
-          _InfoCard(children: [
-            _InfoRow(Icons.gps_fixed, 'Latitudo',
-                farm.gpsLat!.toStringAsFixed(6)),
-            const Divider(height: 16),
-            _InfoRow(Icons.gps_fixed, 'Longitudo',
-                farm.gpsLng!.toStringAsFixed(6)),
-          ]),
+          _InfoCard(
+            children: [
+              _InfoRow(
+                Icons.gps_fixed,
+                'Latitudo',
+                farm.gpsLat!.toStringAsFixed(6),
+              ),
+              const Divider(height: 16),
+              _InfoRow(
+                Icons.gps_fixed,
+                'Longitudo',
+                farm.gpsLng!.toStringAsFixed(6),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
         ],
 
@@ -345,19 +470,33 @@ class _OverviewTab extends StatelessWidget {
         if (farm.crops.isNotEmpty) ...[
           _SectionTitle('Mazao ya Shamba'),
           const SizedBox(height: 10),
-          _InfoCard(children: [
-            Wrap(
-              spacing: 8, runSpacing: 8,
-              children: farm.crops.map((c) => Chip(
-                label: Text(c, style: GoogleFonts.dmSans(
-                    fontSize: 12, color: AppColors.leaf,
-                    fontWeight: FontWeight.w600)),
-                backgroundColor: AppColors.leaf.withValues(alpha: 0.1),
-                side: BorderSide(color: AppColors.leaf.withValues(alpha: 0.3)),
-                visualDensity: VisualDensity.compact,
-              )).toList(),
-            ),
-          ]),
+          _InfoCard(
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: farm.crops
+                    .map(
+                      (c) => Chip(
+                        label: Text(
+                          c,
+                          style: GoogleFonts.dmSans(
+                            fontSize: 12,
+                            color: AppColors.leaf,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        backgroundColor: AppColors.leaf.withValues(alpha: 0.1),
+                        side: BorderSide(
+                          color: AppColors.leaf.withValues(alpha: 0.3),
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
         ],
 
@@ -365,10 +504,14 @@ class _OverviewTab extends StatelessWidget {
         if (farm.notes != null && farm.notes!.isNotEmpty) ...[
           _SectionTitle('Maelezo'),
           const SizedBox(height: 10),
-          _InfoCard(children: [
-            Text(farm.notes!,
-                style: GoogleFonts.dmSans(fontSize: 13, height: 1.5)),
-          ]),
+          _InfoCard(
+            children: [
+              Text(
+                farm.notes!,
+                style: GoogleFonts.dmSans(fontSize: 13, height: 1.5),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
         ],
 
@@ -397,6 +540,7 @@ class _ScheduleTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tasks = context.watch<FarmTaskProvider>().tasksForFarm(farm.id);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -417,17 +561,22 @@ class _ScheduleTab extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Ratiba ya Kilimo',
-                        style: GoogleFonts.playfairDisplay(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold)),
+                    Text(
+                      'Ratiba ya Kilimo',
+                      style: GoogleFonts.playfairDisplay(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     Text(
                       farm.crops.isEmpty
                           ? 'Bonyeza upate ratiba ya kilimo'
                           : 'Kwa: ${farm.crops.take(2).join(", ")}${farm.crops.length > 2 ? "..." : ""}',
                       style: GoogleFonts.dmSans(
-                          color: Colors.white70, fontSize: 12),
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -438,18 +587,30 @@ class _ScheduleTab extends StatelessWidget {
 
         const SizedBox(height: 16),
 
-        // Generate button or results
-        if (!loading && scheduleText == null) ...[
+        _FarmTaskList(farm: farm),
+
+        const SizedBox(height: 16),
+
+        if (farm.plantingDate == null) ...[
           ElevatedButton.icon(
-            onPressed: onGenerate,
-            icon: const Icon(Icons.auto_awesome, size: 18),
-            label: const Text('Tengeneza Ratiba kwa AI'),
+            onPressed: () {
+              final uid = context.read<AuthProvider>().currentUser?.id ?? '';
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AddFarmScreen(farmerId: uid, editFarm: farm),
+                ),
+              );
+            },
+            icon: const Icon(Icons.calendar_month_outlined, size: 18),
+            label: const Text('Weka Tarehe ya Kupanda'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.leaf,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(52),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -460,11 +621,42 @@ class _ScheduleTab extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              'Claude AI ataunda ratiba maalum kwa mazao yako na mkoa wako — '
-              'kuanzia maandalizi ya shamba hadi kuvuna.',
+              'Baada ya kuweka tarehe ya kupanda, Shamba Smart itatengeneza '
+              'kazi za palizi, mbolea, ukaguzi, umwagiliaji na kuvuna.',
               style: GoogleFonts.dmSans(
-                  fontSize: 12, color: AppColors.leaf, height: 1.5),
+                fontSize: 12,
+                color: AppColors.leaf,
+                height: 1.5,
+              ),
               textAlign: TextAlign.center,
+            ),
+          ),
+        ] else if (tasks.isNotEmpty && scheduleText == null && !loading) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.mint,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_outline,
+                  color: AppColors.leaf,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Ratiba imetengenezwa kwa tarehe ya kupanda: ${farm.plantingDateDisplay}. Maliza kazi kwa kubonyeza alama ya tiki.',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 12,
+                      color: AppColors.leaf,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ] else if (loading) ...[
@@ -472,8 +664,10 @@ class _ScheduleTab extends StatelessWidget {
           const Center(child: CircularProgressIndicator(color: AppColors.leaf)),
           const SizedBox(height: 16),
           Center(
-            child: Text('AI inaandaa ratiba yako...',
-                style: GoogleFonts.dmSans(color: AppColors.mid, fontSize: 13)),
+            child: Text(
+              'AI inaandaa ratiba yako...',
+              style: GoogleFonts.dmSans(color: AppColors.mid, fontSize: 13),
+            ),
           ),
         ] else if (scheduleText != null) ...[
           Container(
@@ -482,8 +676,10 @@ class _ScheduleTab extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                ),
               ],
             ),
             child: Column(
@@ -493,17 +689,25 @@ class _ScheduleTab extends StatelessWidget {
                   children: [
                     const Text('🤖', style: TextStyle(fontSize: 16)),
                     const SizedBox(width: 8),
-                    Text('Ratiba ya Claude AI',
-                        style: GoogleFonts.dmSans(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.soil,
-                            fontSize: 14)),
+                    Text(
+                      'Ratiba ya Claude AI',
+                      style: GoogleFonts.dmSans(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.soil,
+                        fontSize: 14,
+                      ),
+                    ),
                   ],
                 ),
                 const Divider(height: 20),
-                Text(scheduleText!,
-                    style: GoogleFonts.dmSans(
-                        fontSize: 13.5, height: 1.7, color: AppColors.ink)),
+                Text(
+                  scheduleText!,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13.5,
+                    height: 1.7,
+                    color: AppColors.ink,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
                   onPressed: onGenerate,
@@ -513,7 +717,8 @@ class _ScheduleTab extends StatelessWidget {
                     foregroundColor: AppColors.leaf,
                     side: const BorderSide(color: AppColors.leaf),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ],
@@ -531,6 +736,134 @@ class _ScheduleTab extends StatelessWidget {
 // TAB 3 — AFYA YA SHAMBA (Health)
 // ══════════════════════════════════════════════════════════════════════════════
 
+class _FarmTaskList extends StatelessWidget {
+  final FarmModel farm;
+  const _FarmTaskList({required this.farm});
+
+  @override
+  Widget build(BuildContext context) {
+    final tasks = context.watch<FarmTaskProvider>().tasksForFarm(farm.id);
+    if (tasks.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.mint,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.leaf.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.calendar_month_outlined,
+              color: AppColors.leaf,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Weka tarehe ya kupanda ili kupata kazi za kalenda.',
+                style: GoogleFonts.dmSans(
+                  fontSize: 12.5,
+                  color: AppColors.leaf,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                final uid = context.read<AuthProvider>().currentUser?.id ?? '';
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        AddFarmScreen(farmerId: uid, editFarm: farm),
+                  ),
+                );
+              },
+              child: const Text('Weka'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle('Kazi za Kalenda'),
+        const SizedBox(height: 10),
+        ...tasks.take(8).map((task) => _FarmTaskRow(task: task)),
+        if (tasks.length > 8)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              '+ kazi ${tasks.length - 8} zaidi zipo kwenye ratiba hii',
+              style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.mid),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _FarmTaskRow extends StatelessWidget {
+  final FarmTaskModel task;
+  const _FarmTaskRow({required this.task});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = task.isDone
+        ? Colors.grey
+        : task.isOverdue
+        ? Colors.red.shade700
+        : AppColors.leaf;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Text(task.type.emoji, style: const TextStyle(fontSize: 21)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.title,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.soil,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${task.dueDateDisplay} • ${task.status.label}',
+                  style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.mid),
+                ),
+              ],
+            ),
+          ),
+          if (!task.isDone)
+            IconButton(
+              onPressed: () =>
+                  context.read<FarmTaskProvider>().markDone(task.id),
+              icon: const Icon(Icons.check_circle_outline, size: 21),
+              color: color,
+              tooltip: 'Weka imefanyika',
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HealthTab extends StatelessWidget {
   final FarmModel farm;
   const _HealthTab({required this.farm});
@@ -544,11 +877,14 @@ class _HealthTab extends StatelessWidget {
         _HealthCard(
           emoji: '🔬',
           title: 'Chunguza Ugonjwa wa Zao',
-          subtitle: 'Piga picha ya jani — AI itachunguza ugonjwa, wadudu, au magugu',
+          subtitle:
+              'Piga picha ya jani — AI itachunguza ugonjwa, wadudu, au magugu',
           buttonLabel: 'Fungua Kamera ya Uchunguzi',
           buttonColor: const Color(0xFF1A5C2E),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const ScanScreen())),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ScanScreen()),
+          ),
         ),
 
         const SizedBox(height: 14),
@@ -562,12 +898,16 @@ class _HealthTab extends StatelessWidget {
               : 'Weka GPS kwanza ili kupata data sahihi ya udongo',
           buttonLabel: 'Pata Data ya Udongo',
           buttonColor: const Color(0xFF7A5C3A),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => SoilScreen(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SoilScreen(
                 farmLat: farm.gpsLat,
                 farmLng: farm.gpsLng,
                 farmName: farm.name,
-              ))),
+              ),
+            ),
+          ),
         ),
 
         const SizedBox(height: 14),
@@ -576,11 +916,14 @@ class _HealthTab extends StatelessWidget {
         _HealthCard(
           emoji: '💧',
           title: 'Mpango wa Umwagiliaji',
-          subtitle: 'Pata ratiba kamili ya umwagiliaji kulingana na zao na hali ya hewa',
+          subtitle:
+              'Pata ratiba kamili ya umwagiliaji kulingana na zao na hali ya hewa',
           buttonLabel: 'Tengeneza Mpango wa Umwagiliaji',
           buttonColor: const Color(0xFF0277BD),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const IrrigationScreen())),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const IrrigationScreen()),
+          ),
         ),
 
         const SizedBox(height: 14),
@@ -589,11 +932,14 @@ class _HealthTab extends StatelessWidget {
         _HealthCard(
           emoji: '📡',
           title: 'Sensa za IoT — Uangalizi wa Wakati Halisi',
-          subtitle: 'Angalia data za unyevu, joto, NPK, pH kutoka kwa sensa zilizounganishwa shambani (kipengele cha hiari)',
+          subtitle:
+              'Angalia data za unyevu, joto, NPK, pH kutoka kwa sensa zilizounganishwa shambani (kipengele cha hiari)',
           buttonLabel: 'Fungua IoT Dashboard',
           buttonColor: const Color(0xFF1A237E),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => IoTDashboardScreen(farm: farm))),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => IoTDashboardScreen(farm: farm)),
+          ),
         ),
 
         const SizedBox(height: 14),
@@ -613,11 +959,14 @@ class _HealthTab extends StatelessWidget {
                 children: [
                   const Text('💡', style: TextStyle(fontSize: 18)),
                   const SizedBox(width: 8),
-                  Text('Vidokezo vya Afya ya Shamba',
-                      style: GoogleFonts.dmSans(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.soil,
-                          fontSize: 14)),
+                  Text(
+                    'Vidokezo vya Afya ya Shamba',
+                    style: GoogleFonts.dmSans(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.soil,
+                      fontSize: 14,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -627,12 +976,19 @@ class _HealthTab extends StatelessWidget {
                 '🐛 Chunguza wadudu mapema asubuhi au jioni',
                 '🧪 Pima udongo kila msimu wa kilimo',
                 '📷 Piga picha ukiona dalili yoyote ya ugonjwa',
-              ].map((tip) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(tip,
+              ].map(
+                (tip) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    tip,
                     style: GoogleFonts.dmSans(
-                        fontSize: 13, height: 1.4, color: AppColors.ink)),
-              )),
+                      fontSize: 13,
+                      height: 1.4,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -665,20 +1021,34 @@ class _WeatherCard extends StatelessWidget {
       return const Card(
         child: Padding(
           padding: EdgeInsets.all(20),
-          child: Center(child: CircularProgressIndicator(
-              color: AppColors.leaf, strokeWidth: 2)),
+          child: Center(
+            child: CircularProgressIndicator(
+              color: AppColors.leaf,
+              strokeWidth: 2,
+            ),
+          ),
         ),
       );
     }
     if (forecast.isEmpty) {
-      return _InfoCard(children: [
-        Row(children: [
-          const Icon(Icons.cloud_off_outlined, color: AppColors.mid, size: 16),
-          const SizedBox(width: 8),
-          Text('Weka GPS kupata hali ya hewa ya shamba lako',
-              style: GoogleFonts.dmSans(color: AppColors.mid, fontSize: 13)),
-        ]),
-      ]);
+      return _InfoCard(
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.cloud_off_outlined,
+                color: AppColors.mid,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Weka GPS kupata hali ya hewa ya shamba lako',
+                style: GoogleFonts.dmSans(color: AppColors.mid, fontSize: 13),
+              ),
+            ],
+          ),
+        ],
+      );
     }
 
     return Card(
@@ -700,22 +1070,34 @@ class _WeatherCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Column(
                   children: [
-                    Text(label,
-                        style: GoogleFonts.dmSans(
-                            fontSize: 11, color: AppColors.mid)),
+                    Text(
+                      label,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 11,
+                        color: AppColors.mid,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(_weatherEmoji(rain),
-                        style: const TextStyle(fontSize: 22)),
+                    Text(
+                      _weatherEmoji(rain),
+                      style: const TextStyle(fontSize: 22),
+                    ),
                     const SizedBox(height: 4),
-                    Text(maxTemp != null
-                        ? '${maxTemp.toStringAsFixed(0)}°'
-                        : '--',
-                        style: GoogleFonts.dmSans(
-                            fontSize: 13, fontWeight: FontWeight.bold)),
+                    Text(
+                      maxTemp != null ? '${maxTemp.toStringAsFixed(0)}°' : '--',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     if (rain != null && rain > 0)
-                      Text('${rain.toStringAsFixed(0)}mm',
-                          style: GoogleFonts.dmSans(
-                              fontSize: 10, color: Colors.blue.shade400)),
+                      Text(
+                        '${rain.toStringAsFixed(0)}mm',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 10,
+                          color: Colors.blue.shade400,
+                        ),
+                      ),
                   ],
                 ),
               );
@@ -732,38 +1114,46 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _StatCard({required this.emoji, required this.label,
-      required this.value, required this.color});
+  const _StatCard({
+    required this.emoji,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.2)),
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 22)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.dmSans(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: color,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          child: Column(
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 22)),
-              const SizedBox(height: 4),
-              Text(value,
-                  style: GoogleFonts.dmSans(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      color: color),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-              Text(label,
-                  style: GoogleFonts.dmSans(
-                      fontSize: 10, color: AppColors.mid),
-                  textAlign: TextAlign.center),
-            ],
+          Text(
+            label,
+            style: GoogleFonts.dmSans(fontSize: 10, color: AppColors.mid),
+            textAlign: TextAlign.center,
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 class _QuickAction extends StatelessWidget {
@@ -771,37 +1161,44 @@ class _QuickAction extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  const _QuickAction({required this.emoji, required this.label,
-      required this.color, required this.onTap});
+  const _QuickAction({
+    required this.emoji,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: InkWell(
-          onTap: onTap,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: color.withValues(alpha: 0.2)),
-            ),
-            child: Column(
-              children: [
-                Text(emoji, style: const TextStyle(fontSize: 28)),
-                const SizedBox(height: 8),
-                Text(label,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.dmSans(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: color,
-                        height: 1.3)),
-              ],
-            ),
-          ),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
-      );
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 28)),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.dmSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: color,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _HealthCard extends StatelessWidget {
@@ -811,75 +1208,93 @@ class _HealthCard extends StatelessWidget {
   final String buttonLabel;
   final Color buttonColor;
   final VoidCallback onTap;
-  const _HealthCard({required this.emoji, required this.title,
-      required this.subtitle, required this.buttonLabel,
-      required this.buttonColor, required this.onTap});
+  const _HealthCard({
+    required this.emoji,
+    required this.title,
+    required this.subtitle,
+    required this.buttonLabel,
+    required this.buttonColor,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => Card(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Text(emoji, style: const TextStyle(fontSize: 28)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title,
-                            style: GoogleFonts.dmSans(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: AppColors.soil)),
-                        const SizedBox(height: 3),
-                        Text(subtitle,
-                            style: GoogleFonts.dmSans(
-                                fontSize: 12,
-                                color: AppColors.mid,
-                                height: 1.4)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: onTap,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: buttonColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: Text(buttonLabel,
+              Text(emoji, style: const TextStyle(fontSize: 28)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
                       style: GoogleFonts.dmSans(
-                          fontWeight: FontWeight.w600, fontSize: 13)),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppColors.soil,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12,
+                        color: AppColors.mid,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-      );
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onTap,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: buttonColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: Text(
+                buttonLabel,
+                style: GoogleFonts.dmSans(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _SectionTitle extends StatelessWidget {
   final String text;
   const _SectionTitle(this.text);
   @override
-  Widget build(BuildContext context) => Text(text,
-      style: GoogleFonts.dmSans(
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-          color: AppColors.soil));
+  Widget build(BuildContext context) => Text(
+    text,
+    style: GoogleFonts.dmSans(
+      fontWeight: FontWeight.bold,
+      fontSize: 14,
+      color: AppColors.soil,
+    ),
+  );
 }
 
 class _InfoCard extends StatelessWidget {
@@ -887,15 +1302,15 @@ class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.children});
   @override
   Widget build(BuildContext context) => Card(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14)),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children),
-        ),
-      );
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    ),
+  );
 }
 
 class _InfoRow extends StatelessWidget {
@@ -905,17 +1320,21 @@ class _InfoRow extends StatelessWidget {
   const _InfoRow(this.icon, this.label, this.value);
   @override
   Widget build(BuildContext context) => Row(
-        children: [
-          Icon(icon, size: 14, color: AppColors.mid),
-          const SizedBox(width: 6),
-          Text('$label: ',
-              style: GoogleFonts.dmSans(
-                  fontSize: 12, color: AppColors.mid)),
-          Text(value,
-              style: GoogleFonts.dmSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ink)),
-        ],
-      );
+    children: [
+      Icon(icon, size: 14, color: AppColors.mid),
+      const SizedBox(width: 6),
+      Text(
+        '$label: ',
+        style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.mid),
+      ),
+      Text(
+        value,
+        style: GoogleFonts.dmSans(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: AppColors.ink,
+        ),
+      ),
+    ],
+  );
 }
