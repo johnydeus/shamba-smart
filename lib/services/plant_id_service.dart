@@ -6,8 +6,7 @@ import '../config/api_keys.dart';
 class PlantIdService {
   static const String _cropHealthUrl =
       'https://crop.kindwise.com/api/v1/identification';
-  static const String _plantIdUrl =
-      'https://api.plant.id/v3/identification';
+  static const String _plantIdUrl = 'https://plant.id/api/v3/identification';
 
   static Future<Map<String, dynamic>> analysePhoto({
     required File imageFile,
@@ -53,7 +52,9 @@ class PlantIdService {
           'Api-Key': ApiKeys.cropHealth,
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'images': [base64Image]}),
+        body: jsonEncode({
+          'images': [base64Image],
+        }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -78,12 +79,13 @@ class PlantIdService {
 
     final isHealthyMap = result['is_healthy'] as Map<String, dynamic>?;
     final isHealthy = isHealthyMap?['binary'] == true;
-    final healthyProb = (isHealthyMap?['probability'] as num?)?.toDouble() ?? 0.0;
+    final healthyProb =
+        (isHealthyMap?['probability'] as num?)?.toDouble() ?? 0.0;
 
     if (isHealthy) return {'is_healthy': true, 'confidence': healthyProb};
 
     final suggestions =
-        ((result['disease'] as Map?)??{})['suggestions'] as List? ?? [];
+        ((result['disease'] as Map?) ?? {})['suggestions'] as List? ?? [];
     if (suggestions.isEmpty) return {'is_healthy': true, 'confidence': 0.5};
 
     final top = suggestions[0] as Map<String, dynamic>;
@@ -91,25 +93,41 @@ class PlantIdService {
     final probability = (top['probability'] as num?)?.toDouble() ?? 0.0;
     final details = (top['details'] as Map<String, dynamic>?) ?? {};
     final treatment = (details['treatment'] as Map<String, dynamic>?) ?? {};
-    final description = (details['description'] as String?) ?? '';
-    final chemical = (treatment['chemical'] as String?) ?? '';
-    final biological = (treatment['biological'] as String?) ?? '';
-    final prevention = (treatment['prevention'] as String?) ?? '';
 
-    final cause = (details['cause'] as String?) ?? '';
-    final commonNames =
-        ((details['common_names'] as List?) ?? []).cast<String>();
+    // description can be a String or {"value": "..."} object
+    final rawDesc = details['description'];
+    final description = rawDesc is Map
+        ? ((rawDesc['value'] as String?) ?? '')
+        : (rawDesc as String?) ?? '';
+
+    // treatment fields can also be string or {"value": "..."} objects
+    String strVal(dynamic v) =>
+        v is Map ? ((v['value'] as String?) ?? '') : (v as String?) ?? '';
+
+    final chemical = strVal(treatment['chemical']);
+    final biological = strVal(treatment['biological']);
+    final prevention = strVal(treatment['prevention']);
+
+    // cause can be string or object
+    final rawCause = details['cause'];
+    final cause = rawCause is Map
+        ? ((rawCause['value'] as String?) ?? '')
+        : (rawCause as String?) ?? '';
+
+    final commonNames = ((details['common_names'] as List?) ?? [])
+        .cast<String>();
 
     // Auto-detect if it's a pest based on classification
-    final classification =
-        ((details['classification'] as List?) ?? []).cast<String>();
-    final isPest = classification
-        .any((c) => c.toLowerCase().contains('insect') ||
-            c.toLowerCase().contains('pest') ||
-            c.toLowerCase().contains('arthropod') ||
-            c.toLowerCase().contains('mite'));
-    final effectiveScanType =
-        isPest ? 'wadudu' : scanType;
+    final classification = ((details['classification'] as List?) ?? [])
+        .cast<String>();
+    final isPest = classification.any(
+      (c) =>
+          c.toLowerCase().contains('insect') ||
+          c.toLowerCase().contains('pest') ||
+          c.toLowerCase().contains('arthropod') ||
+          c.toLowerCase().contains('mite'),
+    );
+    final effectiveScanType = isPest ? 'wadudu' : scanType;
 
     return {
       'disease_name_en': diseaseName,
@@ -121,14 +139,22 @@ class PlantIdService {
       'scan_type': effectiveScanType,
       'description_sw': description.isNotEmpty ? description : '',
       'cause_sw': cause.isNotEmpty ? cause : '',
-      'immediate_action_sw': _buildAction(chemical, biological, effectiveScanType),
+      'immediate_action_sw': _buildAction(
+        chemical,
+        biological,
+        effectiveScanType,
+      ),
       'chemical_treatment': chemical,
       'biological_treatment': biological,
       'prevention_treatment': prevention,
       'pesticide_1_name': _firstSentence(chemical),
       'pesticide_1_dose': 'Fuata kipimo kilichoandikwa kwenye dawa',
-      'pesticide_1_type': effectiveScanType == 'wadudu' ? 'insecticide' : 'fungicide',
-      'pesticide_2_name': biological.isNotEmpty ? _firstSentence(biological) : 'Hakuna',
+      'pesticide_1_type': effectiveScanType == 'wadudu'
+          ? 'insecticide'
+          : 'fungicide',
+      'pesticide_2_name': biological.isNotEmpty
+          ? _firstSentence(biological)
+          : 'Hakuna',
       'pesticide_2_dose': biological.isNotEmpty ? '' : '',
       'pesticide_2_type': 'organic',
       'days_until_critical': 0,
@@ -155,7 +181,8 @@ class PlantIdService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return _parsePlantIdentification(
-            jsonDecode(response.body) as Map<String, dynamic>);
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
       }
       return _apiError(response.statusCode, response.body);
     } catch (e) {
@@ -164,7 +191,8 @@ class PlantIdService {
   }
 
   static Map<String, dynamic> _parsePlantIdentification(
-      Map<String, dynamic> data) {
+    Map<String, dynamic> data,
+  ) {
     final result = (data['result'] as Map<String, dynamic>?) ?? {};
 
     final isPlant =
@@ -178,7 +206,8 @@ class PlantIdService {
     }
 
     final suggestions =
-        ((result['classification'] as Map?)??{})['suggestions'] as List? ?? [];
+        ((result['classification'] as Map?) ?? {})['suggestions'] as List? ??
+        [];
     if (suggestions.isEmpty) {
       return {
         'error': true,
@@ -191,8 +220,8 @@ class PlantIdService {
     final scientificName = (top['name'] as String?) ?? '';
     final probability = (top['probability'] as num?)?.toDouble() ?? 0.0;
     final details = (top['details'] as Map<String, dynamic>?) ?? {};
-    final commonNames =
-        ((details['common_names'] as List?) ?? []).cast<String>();
+    final commonNames = ((details['common_names'] as List?) ?? [])
+        .cast<String>();
     final taxonomy = (details['taxonomy'] as Map<String, dynamic>?) ?? {};
     final descMap = details['description'];
     final description = descMap is Map
@@ -263,7 +292,8 @@ class PlantIdService {
     }
 
     final suggestions =
-        ((result['classification'] as Map?)??{})['suggestions'] as List? ?? [];
+        ((result['classification'] as Map?) ?? {})['suggestions'] as List? ??
+        [];
     if (suggestions.isEmpty) {
       return {
         'error': true,
@@ -276,15 +306,16 @@ class PlantIdService {
     final plantName = (top['name'] as String?) ?? '';
     final probability = (top['probability'] as num?)?.toDouble() ?? 0.0;
     final details = (top['details'] as Map<String, dynamic>?) ?? {};
-    final commonNames =
-        ((details['common_names'] as List?) ?? []).cast<String>();
+    final commonNames = ((details['common_names'] as List?) ?? [])
+        .cast<String>();
     final descMap = details['description'];
     final description = descMap is Map
         ? ((descMap['value'] as String?) ?? '')
         : (descMap as String?) ?? '';
 
-    final displayName =
-        commonNames.isNotEmpty ? '${commonNames.first} ($plantName)' : plantName;
+    final displayName = commonNames.isNotEmpty
+        ? '${commonNames.first} ($plantName)'
+        : plantName;
 
     return {
       'disease_name_en': plantName,
@@ -317,7 +348,10 @@ class PlantIdService {
   static String _severity(double prob) => '';
 
   static String _buildAction(
-      String chemical, String biological, String scanType) {
+    String chemical,
+    String biological,
+    String scanType,
+  ) {
     if (chemical.isNotEmpty) return _firstSentence(chemical);
     if (biological.isNotEmpty) return _firstSentence(biological);
     final label = scanType == 'wadudu' ? 'mdudu' : 'ugonjwa';
@@ -356,8 +390,8 @@ class PlantIdService {
   }
 
   static Map<String, dynamic> _networkError(Object e) => {
-        'error': true,
-        'message': 'Hitilafu ya mtandao: ${e.toString()}',
-        'is_healthy': false,
-      };
+    'error': true,
+    'message': 'Hitilafu ya mtandao: ${e.toString()}',
+    'is_healthy': false,
+  };
 }
