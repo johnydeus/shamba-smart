@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/data_sync_service.dart';
 import '../services/local_data.dart';
 
@@ -575,12 +576,28 @@ class _SeedCard extends StatelessWidget {
                     value: variety['tosci_number'],
                   ),
 
+                // Scientific name
+                if ((variety['crop_scientific'] ?? '').toString().isNotEmpty)
+                  _Row(
+                    icon: Icons.science,
+                    label: 'Jina la kisayansi:',
+                    value: variety['crop_scientific'].toString(),
+                  ),
+
                 // Year released
                 if (variety['year_released'] != null)
                   _Row(
                     icon: Icons.calendar_today,
                     label: 'Mwaka wa kutolewa:',
                     value: variety['year_released'].toString(),
+                  ),
+
+                // Grain yield range (raw text from TOSCI)
+                if ((variety['grain_yield'] ?? '').toString().isNotEmpty)
+                  _Row(
+                    icon: Icons.bar_chart,
+                    label: 'Mavuno ya nafaka:',
+                    value: variety['grain_yield'].toString(),
                   ),
 
                 // Planting spacing
@@ -803,6 +820,36 @@ class _SeedCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ],
+
+                // TOSCI source link
+                if ((variety['detail_url'] ?? '').toString().isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () async {
+                      final url = Uri.tryParse(variety['detail_url'].toString());
+                      if (url != null) await launchUrl(url, mode: LaunchMode.externalApplication);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE3F2FD),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF0277BD).withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.open_in_new, size: 14, color: Color(0xFF0277BD)),
+                          SizedBox(width: 6),
+                          Text(
+                            'Angalia kwenye tovuti ya TOSCI',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF0277BD), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
