@@ -1,11 +1,17 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_colors.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../routes/fade_slide_route.dart';
+import '../theme/app_theme.dart';
+import '../widgets/shamba_button.dart';
+import '../widgets/status_badge.dart';
+import '../widgets/shamba_card.dart';
 import 'home_screen.dart';
 import 'scan_screen.dart';
 
-class ResultsScreen extends StatelessWidget {
+class ResultsScreen extends StatefulWidget {
   final Map<String, dynamic> diagnosis;
   final String imagePath;
   final String cropName;
@@ -17,23 +23,28 @@ class ResultsScreen extends StatelessWidget {
     required this.cropName,
   });
 
-  // Map severity level to a colour
+  @override
+  State<ResultsScreen> createState() => _ResultsScreenState();
+}
+
+class _ResultsScreenState extends State<ResultsScreen> {
+  bool _aiExpanded = false;
+
   Color _severityColor(String severity) {
     switch (severity.toLowerCase()) {
       case 'low':
-        return const Color(0xFF2E8B57);
+        return AppColors.success;
       case 'medium':
-        return const Color(0xFFFF6F00);
+        return AppColors.warning;
       case 'high':
-        return const Color(0xFFE65100);
+        return AppColors.warningLight;
       case 'critical':
-        return const Color(0xFFB71C1C);
+        return AppColors.critical;
       default:
-        return Colors.grey;
+        return AppColors.textTertiary;
     }
   }
 
-  // Map severity level to Swahili label
   String _severityLabel(String severity) {
     switch (severity.toLowerCase()) {
       case 'low':
@@ -49,9 +60,24 @@ class ResultsScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _shareWhatsApp() async {
+    final d = widget.diagnosis;
+    final text = Uri.encodeComponent(
+      '🌿 Shamba Smart — Uchunguzi\n'
+      'Zao: ${widget.cropName}\n'
+      'Ugonjwa: ${d['disease_name_sw'] ?? '—'}\n'
+      'Uhakika: ${(((d['confidence'] ?? 0.0) as double) * 100).toStringAsFixed(0)}%\n'
+      'Hatua: ${d['immediate_action_sw'] ?? '—'}',
+    );
+    final uri = Uri.parse('https://wa.me/?text=$text');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Check if Claude returned an error or if the plant is healthy
+    final diagnosis = widget.diagnosis;
     final hasError = diagnosis['error'] == true;
     final isHealthy = diagnosis['is_healthy'] == true;
 
@@ -60,8 +86,7 @@ class ResultsScreen extends StatelessWidget {
     final diseaseEn = diagnosis['disease_name_en'] ?? '';
     final confidence = (diagnosis['confidence'] ?? 0.0) as double;
     final severity = diagnosis['severity'] ?? 'low';
-    final descriptionSw =
-        diagnosis['description_sw'] ?? '';
+    final descriptionSw = diagnosis['description_sw'] ?? '';
     final actionSw = diagnosis['immediate_action_sw'] ?? '';
     final pest1Name = diagnosis['pesticide_1_name'] ?? '';
     final pest1Dose = diagnosis['pesticide_1_dose'] ?? '';
@@ -70,58 +95,66 @@ class ResultsScreen extends StatelessWidget {
     final daysCritical = diagnosis['days_until_critical'] ?? 0;
     final preventionSw = diagnosis['prevention_sw'] as String? ?? '';
     final threatType = diagnosis['threat_type'] as String? ?? '';
+    final phiDays = diagnosis['phi_days'];
 
     return Scaffold(
-      backgroundColor: AppColors.mist,
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
-        title: Text('Matokeo ya Uchunguzi',
-            style: GoogleFonts.playfairDisplay(
-                color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('Matokeo ya Uchunguzi'),
         automaticallyImplyLeading: false,
+        actions: [
+          if (!hasError && !isHealthy)
+            IconButton(
+              icon: const Icon(Icons.share_outlined),
+              onPressed: _shareWhatsApp,
+              tooltip: 'Shiriki WhatsApp',
+            ),
+        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Show the leaf photo
-            if (imagePath.isNotEmpty)
+            if (widget.imagePath.isNotEmpty)
               ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
                 child: Image.file(
-                  File(imagePath),
+                  File(widget.imagePath),
                   height: 200,
                   fit: BoxFit.cover,
                 ),
-              ),
+              ).animate().fadeIn(duration: 400.ms),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
 
-            // Error case
             if (hasError)
-              _InfoCard(
-                color: const Color(0xFFB71C1C),
+              _AlertBanner(
+                color: AppColors.critical,
                 child: Text(
                   diagnosis['message'] ?? 'Hitilafu isiyojulikana.',
-                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  style: GoogleFonts.poppins(
+                    color: AppColors.white,
+                    fontSize: 15,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ),
 
-            // Healthy plant
             if (!hasError && isHealthy)
-              _InfoCard(
-                color: const Color(0xFF2E8B57),
-                child: const Column(
+              _AlertBanner(
+                color: AppColors.success,
+                child: Column(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.white, size: 48),
-                    SizedBox(height: 8),
+                    const Icon(Icons.check_circle_outline,
+                        color: AppColors.white, size: 48),
+                    const SizedBox(height: 8),
                     Text(
                       'Mmea Wako Unaonekana Mzima! 🌿',
-                      style: TextStyle(
-                        color: Colors.white,
+                      style: GoogleFonts.poppins(
+                        color: AppColors.white,
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -129,168 +162,56 @@ class ResultsScreen extends StatelessWidget {
                 ),
               ),
 
-            // Disease found
             if (!hasError && !isHealthy) ...[
-              // Disease name card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
+              _DiseaseGradientBanner(
+                diseaseSw: diseaseSw,
+                diseaseEn: diseaseEn,
+                confidence: confidence,
+                severity: severity,
+                severityLabel: _severityLabel(severity.toString()),
+                severityColor: _severityColor(severity.toString()),
+              ),
+
+              if (descriptionSw.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                ShambaCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Ugonjwa Uliopatikana:',
-                        style: TextStyle(
-                            color: Color(0xFF9E9E9E), fontSize: 13),
-                      ),
-                      const SizedBox(height: 4),
                       Text(
-                        diseaseSw,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A1A1A),
+                        'Maelezo',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
                         ),
                       ),
-                      if (diseaseEn.isNotEmpty)
-                        Text(
-                          diseaseEn,
-                          style: const TextStyle(
-                              color: Color(0xFF9E9E9E), fontSize: 14),
-                        ),
+                      const SizedBox(height: 8),
+                      Text(
+                        descriptionSw,
+                        style: GoogleFonts.poppins(fontSize: 14),
+                      ),
                     ],
                   ),
                 ),
-              ),
+              ],
 
-              const SizedBox(height: 12),
-
-              // Confidence and severity row
-              Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Uhakika',
-                              style: TextStyle(
-                                  color: Color(0xFF9E9E9E), fontSize: 13),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${(confidence * 100).toStringAsFixed(0)}%',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1A5C2E),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            LinearProgressIndicator(
-                              value: confidence,
-                              color: const Color(0xFF1A5C2E),
-                              backgroundColor: const Color(0xFFE8F5E9),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Ukali',
-                              style: TextStyle(
-                                  color: Color(0xFF9E9E9E), fontSize: 13),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: _severityColor(severity)
-                                    .withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                _severityLabel(severity),
-                                style: TextStyle(
-                                  color: _severityColor(severity),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            if (daysCritical > 0) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                '$daysCritical siku',
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF9E9E9E)),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // Description
-              if (descriptionSw.isNotEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Maelezo:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A5C2E),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(descriptionSw,
-                            style: const TextStyle(fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                ),
-
-              const SizedBox(height: 12),
-
-              // Immediate action
-              if (actionSw.isNotEmpty)
-                _InfoCard(
-                  color: const Color(0xFFFF6F00),
+              if (actionSw.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _AlertBanner(
+                  color: AppColors.warning,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.warning_amber,
-                              color: Colors.white, size: 20),
-                          SizedBox(width: 8),
+                          const Icon(Icons.warning_amber_outlined,
+                              color: AppColors.white, size: 20),
+                          const SizedBox(width: 8),
                           Text(
-                            'Fanya Sasa Hivi:',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
+                            'Fanya Sasa Hivi',
+                            style: GoogleFonts.poppins(
+                              color: AppColors.white,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -298,137 +219,172 @@ class ResultsScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         actionSw,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 14),
+                        style: GoogleFonts.poppins(
+                          color: AppColors.white,
+                          fontSize: 14,
+                        ),
                       ),
+                      if (daysCritical > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Hatari ndani ya siku $daysCritical',
+                            style: GoogleFonts.poppins(
+                              color: AppColors.white.withValues(alpha: 0.9),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
+              ],
 
-              const SizedBox(height: 12),
+              if (pest1Name.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _TreatmentCard(
+                  title: 'Dawa ya Kwanza',
+                  name: pest1Name,
+                  dose: pest1Dose,
+                  borderColor: AppColors.primary,
+                  phiDays: phiDays,
+                  isPrimary: true,
+                ),
+                if (pest2Name.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _TreatmentCard(
+                    title: 'Dawa Mbadala',
+                    name: pest2Name,
+                    dose: pest2Dose,
+                    borderColor: AppColors.info,
+                    isPrimary: false,
+                  ),
+                ],
+              ],
 
-              // Pesticide recommendations
-              if (pest1Name.isNotEmpty)
-                Card(
+              if (preventionSw.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                ShambaCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.shield_outlined,
+                              color: AppColors.success, size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Kinga na Uzuiaji',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.success,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(preventionSw,
+                          style: GoogleFonts.poppins(fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (threatType.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.sm),
+                  child: Center(
+                    child: StatusBadge(
+                      label: 'Aina: $threatType',
+                      type: BadgeType.info,
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: AppSpacing.md),
+              Material(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                child: InkWell(
+                  onTap: () => setState(() => _aiExpanded = !_aiExpanded),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppSpacing.md),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Dawa Zinazopendekezwa:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Color(0xFF1A5C2E),
-                          ),
+                        Row(
+                          children: [
+                            const Icon(Icons.auto_awesome_outlined,
+                                color: AppColors.primary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Maelezo zaidi ya AI',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Icon(_aiExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        _PesticideRow(
-                          number: '1',
-                          name: pest1Name,
-                          dose: pest1Dose,
-                        ),
-                        if (pest2Name.isNotEmpty) ...[
-                          const Divider(),
-                          _PesticideRow(
-                            number: '2',
-                            name: pest2Name,
-                            dose: pest2Dose,
+                        if (_aiExpanded) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            descriptionSw.isNotEmpty
+                                ? descriptionSw
+                                : 'AI imechambua picha yako kulingana na hali ya mazao Tanzania.',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              height: 1.5,
+                            ),
                           ),
                         ],
                       ],
                     ),
                   ),
                 ),
-
-              // Prevention (text diagnosis only)
-              if (preventionSw.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.shield,
-                                color: Color(0xFF2E7D32), size: 18),
-                            SizedBox(width: 6),
-                            Text(
-                              'Kinga na Uzuiaji:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2E7D32),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(preventionSw,
-                            style: const TextStyle(fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-
-              // Threat type badge (text diagnosis)
-              if (threatType.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A5C2E).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Aina: $threatType',
-                      style: const TextStyle(
-                          color: Color(0xFF1A5C2E),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ],
 
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.lg),
 
-            // Action buttons at the bottom
-            ElevatedButton.icon(
-              icon: const Icon(Icons.camera_alt),
-              label: const Text('Piga Picha Nyingine'),
+            ShambaButton(
+              label: 'Piga Picha Nyingine',
+              icon: Icons.camera_alt_outlined,
+              fullWidth: true,
               onPressed: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => const ScanScreen()),
+                  FadeSlideRoute(page: const ScanScreen()),
                 );
               },
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.home),
-              label: const Text('Rudi Nyumbani'),
+            const SizedBox(height: AppSpacing.sm),
+            ShambaButton(
+              label: 'Shiriki WhatsApp',
+              icon: Icons.share_outlined,
+              variant: ButtonVariant.outline,
+              fullWidth: true,
+              onPressed: hasError || isHealthy ? null : _shareWhatsApp,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            ShambaButton(
+              label: 'Rudi Nyumbani',
+              icon: Icons.home_outlined,
+              variant: ButtonVariant.ghost,
+              fullWidth: true,
               onPressed: () {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (_) => const HomeScreen()),
+                  FadeSlideRoute(page: const HomeScreen()),
                   (route) => false,
                 );
               },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF1A5C2E),
-                side: const BorderSide(color: Color(0xFF1A5C2E)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
             ),
           ],
         ),
@@ -437,68 +393,243 @@ class ResultsScreen extends StatelessWidget {
   }
 }
 
-// Reusable coloured information card
-class _InfoCard extends StatelessWidget {
+class _DiseaseGradientBanner extends StatelessWidget {
+  final String diseaseSw;
+  final String diseaseEn;
+  final double confidence;
+  final dynamic severity;
+  final String severityLabel;
+  final Color severityColor;
+
+  const _DiseaseGradientBanner({
+    required this.diseaseSw,
+    required this.diseaseEn,
+    required this.confidence,
+    required this.severity,
+    required this.severityLabel,
+    required this.severityColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isCritical = severity.toString().toLowerCase() == 'critical';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            severityColor.withValues(alpha: 0.9),
+            AppColors.primaryDark,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: AppShadow.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            diseaseSw,
+            style: GoogleFonts.poppins(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: AppColors.white,
+            ),
+          ),
+          if (diseaseEn.isNotEmpty)
+            Text(
+              diseaseEn,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: AppColors.textOnDarkSoft,
+              ),
+            ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Uhakika: ${(confidence * 100).toStringAsFixed(0)}%',
+            style: GoogleFonts.poppins(
+              color: AppColors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: confidence),
+            duration: const Duration(milliseconds: 1200),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                child: LinearProgressIndicator(
+                  value: value,
+                  minHeight: 8,
+                  backgroundColor: Colors.white24,
+                  valueColor: AlwaysStoppedAnimation(
+                    value > 0.7
+                        ? AppColors.primaryLight
+                        : value > 0.4
+                            ? AppColors.warningLight
+                            : AppColors.critical,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: AppSpacing.md),
+          StatusBadge(
+            label: severityLabel,
+            type: StatusBadge.fromSeverity(severity?.toString()),
+            showDot: isCritical,
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.05, end: 0);
+  }
+}
+
+class _AlertBanner extends StatelessWidget {
   final Color color;
   final Widget child;
 
-  const _InfoCard({required this.color, required this.child});
+  const _AlertBanner({required this.color, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: child,
     );
   }
 }
 
-// One row showing a pesticide name and its dose
-class _PesticideRow extends StatelessWidget {
-  final String number;
+class _TreatmentCard extends StatelessWidget {
+  final String title;
   final String name;
   final String dose;
+  final Color borderColor;
+  final dynamic phiDays;
+  final bool isPrimary;
 
-  const _PesticideRow({
-    required this.number,
+  const _TreatmentCard({
+    required this.title,
     required this.name,
     required this.dose,
+    required this.borderColor,
+    this.phiDays,
+    required this.isPrimary,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 14,
-          backgroundColor: const Color(0xFF1A5C2E),
-          child: Text(
-            number,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.bold),
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 5,
+              decoration: BoxDecoration(
+                color: borderColor,
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(AppRadius.lg),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: borderColor,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (isPrimary)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.successBg,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.full),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.verified_outlined,
+                                    size: 12, color: AppColors.success),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'TPRI',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      name,
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    if (dose.isNotEmpty)
+                      Text(
+                        dose,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    if (phiDays != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        '⏰ Subiri siku $phiDays kabla ya mavuno',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(name,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text(dose,
-                  style: const TextStyle(
-                      color: Color(0xFF9E9E9E), fontSize: 13)),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

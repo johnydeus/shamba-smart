@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/data_sync_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/loading_skeleton.dart';
 
 const List<String> kRegions = [
   'Morogoro', 'Kilosa', 'Pwani', 'Arusha',
@@ -94,42 +100,18 @@ class _AgrovetScreenState extends State<AgrovetScreen> {
           // List of agrovets
           Expanded(
             child: _loading
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                            color: Color(0xFF1A5C2E)),
-                        SizedBox(height: 12),
-                        Text('Inatafuta maduka...',
-                            style:
-                                TextStyle(color: Color(0xFF9E9E9E))),
-                      ],
-                    ),
+                ? ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: 5,
+                    itemBuilder: (_, __) => const SkeletonCard(),
                   )
                 : _agrovets.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment:
-                              MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.store_mall_directory,
-                                size: 60,
-                                color: Color(0xFF9E9E9E)),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'Hakuna maduka yaliyopatikana.',
-                              style: TextStyle(
-                                  color: Color(0xFF9E9E9E)),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Jaribu Tena'),
-                              onPressed: _loadAgrovets,
-                            ),
-                          ],
-                        ),
+                    ? EmptyState(
+                        emoji: '🏪',
+                        title: 'Hakuna maduka',
+                        subtitle: 'Hakuna maduka yaliyopatikana katika mkoa huu.',
+                        buttonLabel: 'Jaribu Tena',
+                        onButtonTap: _loadAgrovets,
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(
@@ -137,25 +119,35 @@ class _AgrovetScreenState extends State<AgrovetScreen> {
                         itemCount: _agrovets.length,
                         itemBuilder: (context, index) {
                           final shop = _agrovets[index];
+                          final stock = shop['stock_status']
+                                  ?.toString() ??
+                              'available';
+                          final distance =
+                              shop['distance_km']?.toString();
+                          final phone =
+                              shop['phone']?.toString() ?? '';
+
                           return Card(
                             margin:
                                 const EdgeInsets.only(bottom: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                  AppRadius.lg),
+                            ),
                             child: Padding(
                               padding: const EdgeInsets.all(12),
                               child: Row(
                                 crossAxisAlignment:
                                     CrossAxisAlignment.start,
                                 children: [
-                                  // Store icon
                                   CircleAvatar(
-                                    backgroundColor:
-                                        const Color(0xFF1A5C2E),
-                                    child: const Icon(Icons.store,
-                                        color: Colors.white),
+                                    backgroundColor: AppColors.primary,
+                                    child: const Icon(
+                                      Icons.store_outlined,
+                                      color: AppColors.white,
+                                    ),
                                   ),
                                   const SizedBox(width: 12),
-
-                                  // Shop details
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -167,22 +159,83 @@ class _AgrovetScreenState extends State<AgrovetScreen> {
                                               child: Text(
                                                 shop['shop_name'] ??
                                                     'Duka',
-                                                style: const TextStyle(
+                                                style: GoogleFonts.poppins(
                                                   fontWeight:
-                                                      FontWeight.bold,
+                                                      FontWeight.w700,
                                                   fontSize: 15,
                                                 ),
                                               ),
                                             ),
-                                            if (shop['verified'] ==
-                                                true)
-                                              const Icon(
-                                                  Icons.verified,
-                                                  color: Color(
-                                                      0xFF1A5C2E),
-                                                  size: 16),
+                                            if (shop['verified'] == true)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primarySoft,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.verified_outlined,
+                                                      color: AppColors.primary,
+                                                      size: 14,
+                                                    ),
+                                                    const SizedBox(width: 2),
+                                                    Text(
+                                                      'Imethibitishwa',
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 9,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: AppColors.primary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
                                           ],
                                         ),
+                                        if (distance != null) ...[
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 3,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.infoBg,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                  Icons.place_outlined,
+                                                  size: 12,
+                                                  color: AppColors.info,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '$distance km',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 11,
+                                                    color: AppColors.info,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 6),
+                                        _StockChip(status: stock),
                                         if ((shop['area'] ?? '')
                                             .isNotEmpty)
                                           Text(
@@ -224,28 +277,46 @@ class _AgrovetScreenState extends State<AgrovetScreen> {
                                             ],
                                           ),
                                         ],
-                                        if ((shop['phone'] ?? '')
-                                            .isNotEmpty) ...[
-                                          const SizedBox(height: 6),
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.phone,
-                                                  size: 14,
-                                                  color: Color(
-                                                      0xFF1A5C2E)),
-                                              const SizedBox(
-                                                  width: 4),
-                                              Text(
-                                                shop['phone'],
-                                                style: const TextStyle(
-                                                  color: Color(
-                                                      0xFF1A5C2E),
-                                                  fontWeight:
-                                                      FontWeight.bold,
-                                                  fontSize: 13,
-                                                ),
+                                        if (phone.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          InkWell(
+                                            onTap: () => launchUrl(
+                                              Uri.parse('tel:$phone'),
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 8,
                                               ),
-                                            ],
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primarySoft,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(
+                                                    Icons.phone_outlined,
+                                                    size: 16,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    phone,
+                                                    style: GoogleFonts.poppins(
+                                                      color: AppColors.primary,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
                                           ),
                                         ],
                                       ],
@@ -254,11 +325,54 @@ class _AgrovetScreenState extends State<AgrovetScreen> {
                                 ],
                               ),
                             ),
-                          );
+                          )
+                              .animate(
+                                  delay:
+                                      Duration(milliseconds: index * 60))
+                              .fadeIn(duration: 300.ms)
+                              .slideX(begin: 0.05, end: 0);
                         },
                       ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _StockChip extends StatelessWidget {
+  final String status;
+  const _StockChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, bg, fg) = switch (status.toLowerCase()) {
+      'unavailable' || 'haipatikani' => (
+          'Haipatikani',
+          AppColors.criticalBg,
+          AppColors.critical
+        ),
+      'check' || 'angalia' => (
+          'Angalia Stoo',
+          AppColors.warningBg,
+          AppColors.warning
+        ),
+      _ => ('Inapatikana', AppColors.successBg, AppColors.success),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.poppins(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: fg,
+        ),
       ),
     );
   }

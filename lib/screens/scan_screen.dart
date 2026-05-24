@@ -1,10 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import '../routes/fade_slide_route.dart';
 import '../services/plant_id_service.dart';
 import '../services/supabase_service.dart';
-import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
+import '../widgets/shamba_button.dart';
 import 'results_screen.dart';
 
 // All Tanzania crops — Ministry of Agriculture, TAHA, TOSCI, TanzaniaInvest
@@ -61,6 +65,19 @@ const _scanTypes = [
   },
 ];
 
+const Map<String, String> _cropEmojis = {
+  'Mahindi': '🌽',
+  'Mchele': '🍚',
+  'Nyanya': '🍅',
+  'Maharagwe': '🫘',
+  'Ndizi': '🍌',
+  'Muhogo': '🥔',
+  'Pamba': '☁️',
+  'Kahawa': '☕',
+};
+
+String _cropEmoji(String crop) => _cropEmojis[crop] ?? '🌱';
+
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
 
@@ -68,19 +85,37 @@ class ScanScreen extends StatefulWidget {
   State<ScanScreen> createState() => _ScanScreenState();
 }
 
-class _ScanScreenState extends State<ScanScreen> {
+class _ScanScreenState extends State<ScanScreen>
+    with SingleTickerProviderStateMixin {
   File? _selectedImage;
   String _selectedCrop = kCrops.first;
   String _selectedScanType = 'ugonjwa';
   bool _analysing = false;
+  bool _tipsExpanded = false;
   String _statusMessage = '';
 
   final ImagePicker _picker = ImagePicker();
+  late final AnimationController _bracketCtrl;
 
   Map<String, dynamic> get _currentType =>
       _scanTypes.firstWhere((t) => t['key'] == _selectedScanType);
 
   Color get _typeColor => Color(_currentType['color'] as int);
+
+  @override
+  void initState() {
+    super.initState();
+    _bracketCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _bracketCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _takePhoto() async {
     final photo = await _picker.pickImage(
@@ -104,6 +139,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Future<void> _analysePhoto() async {
     if (_selectedImage == null) return;
+    HapticFeedback.mediumImpact();
 
     setState(() {
       _analysing = true;
@@ -129,8 +165,8 @@ class _ScanScreenState extends State<ScanScreen> {
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-        builder: (_) => ResultsScreen(
+      FadeSlideRoute(
+        page: ResultsScreen(
           diagnosis: result,
           imagePath: _selectedImage!.path,
           cropName: _selectedCrop,
@@ -144,12 +180,29 @@ class _ScanScreenState extends State<ScanScreen> {
     return Scaffold(
       backgroundColor: AppColors.mist,
       appBar: AppBar(
-        title: Text(
-          _currentType['appBarTitle'] as String,
-          style: GoogleFonts.playfairDisplay(
-              color: Colors.white, fontWeight: FontWeight.bold),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_typeColor, AppColors.primary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
         ),
-        backgroundColor: _typeColor,
+        title: Text(_currentType['appBarTitle'] as String),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.flash_on_outlined),
+            tooltip: 'Mwanga',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tumia mwanga wa jua au tochi ya simu'),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -161,41 +214,62 @@ class _ScanScreenState extends State<ScanScreen> {
 
             const SizedBox(height: 16),
 
-            // ── Crop selector ──────────────────────────────────────────────
-            Text('Chagua Zao:',
-                style: GoogleFonts.dmSans(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: AppColors.soil)),
-            const SizedBox(height: 8),
-            // ignore: deprecated_member_use
-            DropdownButtonFormField<String>(
-              initialValue: _selectedCrop,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: _typeColor.withValues(alpha: 0.4))),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: _typeColor.withValues(alpha: 0.4))),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: _typeColor, width: 2)),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            // ── Crop selector chips ────────────────────────────────────────
+            Text(
+              'Chagua Zao:',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: AppColors.textPrimary,
               ),
-              items: kCrops
-                  .map((c) => DropdownMenuItem(
-                      value: c,
-                      child: Text(c, style: GoogleFonts.dmSans(fontSize: 14))))
-                  .toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedCrop = val);
-              },
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 44,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: kCrops.length,
+                itemBuilder: (context, i) {
+                  final crop = kCrops[i];
+                  final selected = crop == _selectedCrop;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_cropEmoji(crop)),
+                          const SizedBox(width: 4),
+                          Text(crop),
+                          if (selected) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.check, size: 14),
+                          ],
+                        ],
+                      ),
+                      selected: selected,
+                      onSelected: (_) =>
+                          setState(() => _selectedCrop = crop),
+                      selectedColor: AppColors.primary,
+                      backgroundColor: AppColors.surfaceVariant,
+                      labelStyle: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: selected
+                            ? AppColors.white
+                            : AppColors.textSecondary,
+                      ),
+                      checkmarkColor: Colors.transparent,
+                      showCheckmark: false,
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppRadius.full),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
 
             const SizedBox(height: 20),
@@ -205,42 +279,23 @@ class _ScanScreenState extends State<ScanScreen> {
 
             const SizedBox(height: 14),
 
-            // ── Camera / Gallery buttons ───────────────────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: _ActionBtn(
-                    icon: Icons.camera_alt_rounded,
-                    label: 'Kamera',
-                    color: _typeColor,
-                    onTap: _takePhoto,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _ActionBtn(
-                    icon: Icons.photo_library_rounded,
-                    label: 'Picha Zilizopo',
-                    color: _typeColor,
-                    onTap: _pickFromGallery,
-                    outlined: true,
-                  ),
-                ),
-              ],
+            // ── Shutter + gallery ──────────────────────────────────────────
+            Center(child: _buildShutterButton()),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: _analysing ? null : _pickFromGallery,
+              icon: const Icon(Icons.folder_outlined),
+              label: const Text('Au pakia picha 📁'),
             ),
 
             const SizedBox(height: 20),
 
-            // ── Analyse button ─────────────────────────────────────────────
-            if (_analysing)
-              _buildLoadingWidget()
-            else
-              _buildAnalyseButton(),
+            if (_analysing) _buildLoadingWidget() else _buildAnalyseButton(),
 
             const SizedBox(height: 16),
-
-            // ── Tip card ───────────────────────────────────────────────────
             _buildTipCard(),
+            const SizedBox(height: 8),
+            _buildExpandableTips(),
 
             const SizedBox(height: 20),
           ],
@@ -330,59 +385,157 @@ class _ScanScreenState extends State<ScanScreen> {
         duration: const Duration(milliseconds: 200),
         height: 280,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           border: Border.all(
             color: _selectedImage != null
-                ? _typeColor
-                : _typeColor.withValues(alpha: 0.35),
+                ? AppColors.primary
+                : AppColors.primary.withValues(alpha: 0.35),
             width: _selectedImage != null ? 3 : 2,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: _typeColor.withValues(alpha: 0.12),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: AppShadow.sm,
         ),
-        child: _selectedImage == null
-            ? _buildCameraPlaceholder()
-            : ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.file(_selectedImage!, fit: BoxFit.cover),
-                    // Overlay: tap to retake
-                    Positioned(
-                      bottom: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.refresh,
-                                color: Colors.white, size: 14),
-                            const SizedBox(width: 4),
-                            Text('Badilisha',
-                                style: GoogleFonts.dmSans(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.xl - 2),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (_selectedImage != null)
+                Image.file(_selectedImage!, fit: BoxFit.cover)
+              else
+                _buildCameraPlaceholder(),
+              AnimatedBuilder(
+                animation: _bracketCtrl,
+                builder: (context, _) {
+                  final pulse = 0.85 + 0.15 * _bracketCtrl.value;
+                  return CustomPaint(
+                    painter: _ViewfinderPainter(
+                      color: AppColors.primaryLight
+                          .withValues(alpha: pulse),
                     ),
-                  ],
+                  );
+                },
+              ),
+              Positioned(
+                top: 12,
+                left: 0,
+                right: 0,
+                child: Text(
+                  'Lenga jani zima kwenye fremu',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    color: AppColors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    shadows: const [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
                 ),
               ),
+              if (_selectedImage != null)
+                Positioned(
+                  bottom: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.refresh,
+                            color: Colors.white, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Badilisha',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms);
+  }
+
+  Widget _buildShutterButton() {
+    return _ShutterButton(
+      analysing: _analysing,
+      hasImage: _selectedImage != null,
+      onTap: () {
+        if (_selectedImage == null) {
+          HapticFeedback.mediumImpact();
+          _takePhoto();
+        } else if (!_analysing) {
+          HapticFeedback.mediumImpact();
+          _analysePhoto();
+        }
+      },
+    );
+  }
+
+  Widget _buildExpandableTips() {
+    return Material(
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: InkWell(
+        onTap: () => setState(() => _tipsExpanded = !_tipsExpanded),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('💡', style: TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Vidokezo vya picha bora',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _tipsExpanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                  ),
+                ],
+              ),
+              if (_tipsExpanded) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Picha inayofaa: Mwanga mzuri, jani moja, karibu iwezekanavyo. Epuka picha zenye ukungu au giza.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -511,33 +664,18 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Widget _buildAnalyseButton() {
     final hasImage = _selectedImage != null;
-    return SizedBox(
-      height: 58,
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: hasImage ? _typeColor : Colors.grey.shade300,
-          foregroundColor: hasImage ? Colors.white : Colors.grey,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: hasImage ? 3 : 0,
-        ),
-        icon: Icon(
-          _selectedScanType == 'ugonjwa'
-              ? Icons.biotech
-              : _selectedScanType == 'magugu'
-                  ? Icons.grass
-                  : Icons.pest_control,
-          size: 24,
-        ),
-        label: Text(
-          hasImage
-              ? _currentType['buttonLabel'] as String
-              : 'Piga Picha Kwanza',
-          style: GoogleFonts.dmSans(
-              fontSize: 17, fontWeight: FontWeight.bold),
-        ),
-        onPressed: hasImage ? _analysePhoto : null,
-      ),
+    return ShambaButton(
+      label: hasImage
+          ? _currentType['buttonLabel'] as String
+          : 'Piga Picha Kwanza',
+      icon: _selectedScanType == 'ugonjwa'
+          ? Icons.biotech_outlined
+          : _selectedScanType == 'magugu'
+              ? Icons.grass_outlined
+              : Icons.pest_control_outlined,
+      onPressed: hasImage ? _analysePhoto : null,
+      fullWidth: true,
+      isLoading: _analysing,
     );
   }
 
@@ -547,21 +685,24 @@ class _ScanScreenState extends State<ScanScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _typeColor.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border:
-            Border.all(color: _typeColor.withValues(alpha: 0.2)),
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.lightbulb_outline, color: _typeColor, size: 20),
+          const Icon(Icons.lightbulb_outline,
+              color: AppColors.primary, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              _currentType['tip'] as String,
-              style: GoogleFonts.dmSans(
-                  fontSize: 13, color: AppColors.soil, height: 1.4),
+              '💡 Picha inayofaa: Mwanga mzuri, jani moja, karibu iwezekanavyo',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -570,55 +711,119 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 }
 
-// ── Reusable action button ────────────────────────────────────────────────────
-
-class _ActionBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
+class _ViewfinderPainter extends CustomPainter {
   final Color color;
-  final VoidCallback onTap;
-  final bool outlined;
+  const _ViewfinderPainter({required this.color});
 
-  const _ActionBtn({
-    required this.icon,
-    required this.label,
-    required this.color,
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    const len = 28.0;
+    const pad = 24.0;
+
+    void corner(double x, double y, bool top, bool left) {
+      final path = Path();
+      if (top && left) {
+        path.moveTo(x, y + len);
+        path.lineTo(x, y);
+        path.lineTo(x + len, y);
+      } else if (top && !left) {
+        path.moveTo(x - len, y);
+        path.lineTo(x, y);
+        path.lineTo(x, y + len);
+      } else if (!top && left) {
+        path.moveTo(x, y - len);
+        path.lineTo(x, y);
+        path.lineTo(x + len, y);
+      } else {
+        path.moveTo(x - len, y);
+        path.lineTo(x, y);
+        path.lineTo(x, y - len);
+      }
+      canvas.drawPath(path, paint);
+    }
+
+    corner(pad, pad, true, true);
+    corner(size.width - pad, pad, true, false);
+    corner(pad, size.height - pad, false, true);
+    corner(size.width - pad, size.height - pad, false, false);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ViewfinderPainter old) =>
+      old.color != color;
+}
+
+class _ShutterButton extends StatefulWidget {
+  final bool analysing;
+  final bool hasImage;
+  final VoidCallback onTap;
+
+  const _ShutterButton({
+    required this.analysing,
+    required this.hasImage,
     required this.onTap,
-    this.outlined = false,
   });
 
   @override
+  State<_ShutterButton> createState() => _ShutterButtonState();
+}
+
+class _ShutterButtonState extends State<_ShutterButton> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: outlined
-          ? OutlinedButton.icon(
-              icon: Icon(icon, size: 18),
-              label: Text(label,
-                  style:
-                      GoogleFonts.dmSans(fontWeight: FontWeight.w600)),
-              onPressed: onTap,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: color,
-                side: BorderSide(color: color),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            )
-          : ElevatedButton.icon(
-              icon: Icon(icon, size: 18),
-              label: Text(label,
-                  style:
-                      GoogleFonts.dmSans(fontWeight: FontWeight.w600)),
-              onPressed: onTap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                elevation: 2,
-              ),
-            ),
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.analysing ? null : widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.92 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: Container(
+          width: 76,
+          height: 76,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.white, width: 4),
+            boxShadow: AppShadow.green,
+          ),
+          child: Center(
+            child: widget.analysing
+                ? const SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      color: AppColors.white,
+                      strokeWidth: 3,
+                    ),
+                  )
+                : Container(
+                    width: 58,
+                    height: 58,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      widget.hasImage
+                          ? Icons.biotech_outlined
+                          : Icons.camera_alt_outlined,
+                      color: AppColors.white,
+                      size: 28,
+                    ),
+                  ),
+          ),
+        ),
+      ),
     );
   }
 }
+

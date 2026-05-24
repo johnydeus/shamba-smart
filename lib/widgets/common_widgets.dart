@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/user_model.dart';
-import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
+export 'shamba_card.dart';
 
 // Coloured pill showing the user's role
 class RoleChip extends StatelessWidget {
@@ -64,49 +65,6 @@ class UserAvatarCircle extends StatelessWidget {
           color: Colors.white,
           fontSize: size * 0.36,
           fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
-
-// Base card with cream background and subtle border — used throughout the app
-class ShambaCard extends StatelessWidget {
-  final Widget child;
-  final EdgeInsets? padding;
-  final VoidCallback? onTap;
-
-  const ShambaCard({
-    super.key,
-    required this.child,
-    this.padding,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.cream,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: padding ?? const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppColors.mid.withValues(alpha: 0.15),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.soil.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: child,
         ),
       ),
     );

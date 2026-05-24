@@ -252,93 +252,92 @@ Phone numbers in +255 format.
 
   // ─── TOSCI SEED VARIETIES ─────────────────────────────────────────────────
 
-  // Ask Claude for TOSCI-certified seed varieties for a specific crop
+  // Maps Swahili crop names (used in the UI) to English keys in seed_varieties table
+  static const Map<String, String> _cropSwToEn = {
+    'Mahindi': 'maize',       'Mchele': 'rice',         'Ngano': 'wheat',
+    'Mtama': 'sorghum',       'Uwele': 'millet',        'Ulezi': 'finger millet',
+    'Shayiri': 'barley',      'Maharagwe': 'beans',     'Choroko': 'cowpea',
+    'Karanga': 'groundnut',   'Soya': 'soybean',        'Mbaazi': 'pigeon pea',
+    'Kunde': 'cowpea',        'Nyanya': 'tomato',       'Kabichi': 'cabbage',
+    'Sukuma wiki': 'kale',    'Vitunguu': 'onion',      'Pilipili hoho': 'pepper',
+    'Pilipili manga': 'pepper','Karoti': 'carrot',       'Bamia': 'okra',
+    'Tango': 'cucumber',      'Mchicha': 'spinach',     'Tikiti maji': 'watermelon',
+    'Njegere': 'peas',        'Maharage ya Kata': 'beans',
+    'Muhogo': 'cassava',      'Viazi vitamu': 'sweet potato', 'Viazi': 'potato',
+    'Ndizi': 'banana',        'Embe': 'mango',          'Papai': 'papaya',
+    'Nanasi': 'pineapple',    'Avokado': 'avocado',     'Marakuja': 'passion fruit',
+    'Pamba': 'cotton',        'Alizeti': 'sunflower',   'Kahawa': 'coffee',
+    'Chai': 'tea',            'Korosho': 'cashew',      'Miwa': 'sugarcane',
+    'Tumbaku': 'tobacco',
+  };
+
+  // Fetch TOSCI seed varieties from Supabase — uses real scraped data (1,186 varieties)
   static Future<List<Map<String, dynamic>>> fetchSeedVarieties({
     required String cropName,
   }) async {
-    final prompt = '''
-You are an expert in Tanzania seed systems with complete knowledge of
-TOSCI (Tanzania Official Seed Certification Institute) certified seed varieties.
-
-List ALL certified seed varieties available in Tanzania for: $cropName
-
-For each variety include its TOSCI certification status, disease resistance,
-drought tolerance, pest resistance, maturity days, and yield potential.
-
-Return ONLY valid JSON array, no other text:
-
-[
-  {
-    "variety_name": "DK8031",
-    "crop": "$cropName",
-    "category": "Hybrid",
-    "company": "Dekalb / Bayer",
-    "tosci_certified": true,
-    "maturity_days": 110,
-    "yield_potential_ton_ha": 8.5,
-    "disease_resistance": ["Maize Streak Virus", "Grey Leaf Spot", "Turcicum Blight"],
-    "pest_resistance": ["Fall Armyworm tolerance"],
-    "drought_tolerance": "high",
-    "water_stress_rating": "Inastahimili ukame - inafaa mikoa kame",
-    "nutrient_efficiency": "medium",
-    "soil_types": ["Tifutifu", "Udongo mwekundu"],
-    "altitude_range_m": "0-1800",
-    "regions_recommended": ["Morogoro", "Dodoma", "Manyara"],
-    "seed_rate_kg_ha": 25,
-    "planting_spacing": "75cm x 25cm",
-    "description_sw": "Mseto wa mahindi wenye tija nyingi, unastahimili ukame na magonjwa mengi",
-    "best_for_sw": "Inafaa zaidi kwa wakulima wadogo katika mikoa yenye mvua chache",
-    "tosci_number": "VAR/CROP/001/2019",
-    "year_released": 2019
-  }
-]
-
-drought_tolerance values: "high", "medium", "low"
-nutrient_efficiency values: "high", "medium", "low"
-category values: "Hybrid", "OPV" (Open Pollinated Variety), "Improved OPV"
-
-Include at least 8 varieties covering:
-- High yield varieties
-- Drought tolerant varieties
-- Disease resistant varieties
-- Pest resistant varieties
-- Varieties for different altitude zones of Tanzania
-
-All description_sw and best_for_sw MUST be in Swahili.
-All disease_resistance and pest_resistance entries in English (scientific/common names).
-Varieties must be actually certified by TOSCI and available in Tanzania.
-''';
-
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 4096,
-          'messages': [
-            {'role': 'user', 'content': prompt}
-          ],
-        }),
-      );
+      // Map Swahili crop name to English key used in the database
+      final enKey = _cropSwToEn[cropName] ?? cropName.toLowerCase();
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['content'][0]['text'] as String;
-        final clean = content
-            .replaceAll('```json', '')
-            .replaceAll('```', '')
-            .trim();
-        final list = jsonDecode(clean) as List;
-        return list.cast<Map<String, dynamic>>();
-      }
+      // Query Supabase seed_varieties table
+      final res = await _db
+          .from('seed_varieties')
+          .select()
+          .or('crop_type_en.eq.$enKey,crop_type_sw.ilike.%$cropName%')
+          .order('variety_name')
+          .limit(100);
+
+      final rows = (res as List).cast<Map<String, dynamic>>();
+      if (rows.isEmpty) return [];
+
+      // Map DB field names to what the seed card widget expects
+      return rows.map((r) {
+        final droughtBool = r['drought_tolerant'];
+        final String droughtTol = droughtBool == true
+            ? 'high'
+            : droughtBool == false
+                ? 'low'
+                : 'medium';
+
+        // Convert yield: kg/acre → ton/ha  (1 kg/acre = 0.00247 ton/ha)
+        final yieldKg = r['yield_kg_per_acre'];
+        final double? yieldTonHa = yieldKg != null
+            ? (yieldKg as num).toDouble() * 0.00247
+            : null;
+
+        // Regions: stored as List or null
+        final regions = r['recommended_regions'];
+        final List<String> regionList = regions is List
+            ? regions.cast<String>()
+            : <String>[];
+
+        // Disease resistant: stored as List or null
+        final dis = r['disease_resistant'];
+        final List<String> disList =
+            dis is List ? dis.cast<String>() : <String>[];
+
+        return {
+          'variety_name':         r['variety_name'] ?? '',
+          'crop':                 cropName,
+          'company':              r['breeder'] ?? '',
+          'tosci_certified':      r['tosci_certified'] ?? true,
+          'maturity_days':        r['maturity_days'],
+          'yield_potential_ton_ha': yieldTonHa != null
+              ? double.parse(yieldTonHa.toStringAsFixed(1))
+              : null,
+          'drought_tolerance':    droughtTol,
+          'disease_resistance':   disList,
+          'pest_resistance':      <String>[],
+          'regions_recommended':  regionList,
+          'source_url':           r['source_url'] ?? '',
+          'category':             'OPV',
+          'description_sw':       '',
+          'best_for_sw':          '',
+        };
+      }).toList();
     } catch (e) {
-      debugPrint('DataSyncService seeds error: $e');
+      debugPrint('DataSyncService.fetchSeedVarieties error: $e');
+      return [];
     }
-    return [];
   }
 }

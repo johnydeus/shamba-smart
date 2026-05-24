@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/data_sync_service.dart';
 import '../services/local_data.dart';
@@ -82,26 +83,32 @@ class _SeedsScreenState extends State<SeedsScreen> {
     _loadVarieties();
   }
 
-  // Load seeds: local data instantly, Claude updates in background
+  // Load seeds from Supabase (1,186 TOSCI varieties), fall back to local data
   Future<void> _loadVarieties() async {
     setState(() {
       _loading = true;
       _varieties = [];
     });
 
-    // Step 1 — local TOSCI database loads instantly
-    final local = LocalData.seedsFor(_selectedCrop);
-    setState(() {
-      _varieties = local;
-      _loading = false;
-    });
+    // Primary: fetch from Supabase seed_varieties table
+    List<Map<String, dynamic>> results = [];
+    try {
+      results = await DataSyncService.fetchSeedVarieties(cropName: _selectedCrop);
+    } catch (e) {
+      debugPrint('seeds load error: $e');
+    }
 
-    // Step 2 — try Claude silently for extra varieties
-    DataSyncService.fetchSeedVarieties(cropName: _selectedCrop).then((fresh) {
-      if (fresh.isNotEmpty && mounted) {
-        setState(() => _varieties = fresh);
-      }
-    });
+    // Fallback: use local static data if Supabase returned nothing
+    if (results.isEmpty) {
+      results = LocalData.seedsFor(_selectedCrop);
+    }
+
+    if (mounted) {
+      setState(() {
+        _varieties = results;
+        _loading = false;
+      });
+    }
   }
 
   // Filter varieties by selected stress/trait filter

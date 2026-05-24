@@ -1,7 +1,12 @@
 import 'dart:async';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/app_theme.dart';
+import '../widgets/loading_skeleton.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../services/data_sync_service.dart';
@@ -117,11 +122,33 @@ class _MarketScreenState extends State<MarketScreen> {
       ),
       body: Column(
         children: [
+          // Best market banner
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.primary, AppColors.primaryMedium],
+              ),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              boxShadow: AppShadow.green,
+            ),
+            child: Text(
+              '📈 Bei Nzuri Zaidi Leo: Kariakoo — Mahindi 1,050 TZS/kg',
+              style: GoogleFonts.poppins(
+                color: AppColors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+
           // Source + last-updated banner
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: const Color(0xFFE8F5E9),
+            color: AppColors.primarySoft,
             child: Row(
               children: [
                 const Icon(Icons.source, color: Color(0xFF1A5C2E), size: 16),
@@ -199,30 +226,27 @@ class _MarketScreenState extends State<MarketScreen> {
           // Price list
           Expanded(
             child: _loading
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(color: Color(0xFF1A5C2E)),
-                        SizedBox(height: 16),
-                        Text('Inapakua bei kutoka masokoni...',
-                            style: TextStyle(color: Color(0xFF9E9E9E))),
-                      ],
-                    ),
+                ? ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: 5,
+                    itemBuilder: (_, __) => const SkeletonCard(),
                   )
                 : _filtered.isEmpty
                     ? const Center(
                         child: Text('Hakuna bei zilizopatikana.',
-                            style: TextStyle(color: Color(0xFF9E9E9E))))
+                            style: TextStyle(color: AppColors.textHint)))
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
                         itemCount: _filtered.length,
-                        itemBuilder: (context, i) =>
-                            _PriceCard(
-                              price: _filtered[i],
-                              trendColor: _trendColor,
-                              trendIcon: _trendIcon,
-                            ),
+                        itemBuilder: (context, i) => _PriceCard(
+                          price: _filtered[i],
+                          trendColor: _trendColor,
+                          trendIcon: _trendIcon,
+                        )
+                            .animate(
+                                delay: Duration(milliseconds: i * 60))
+                            .fadeIn(duration: 300.ms)
+                            .slideX(begin: 0.05, end: 0),
                       ),
           ),
         ],
@@ -261,67 +285,122 @@ class _PriceCard extends StatelessWidget {
     final cropName = price['crop_name'] as String? ?? '';
     final market   = price['market_name'] as String? ?? '';
 
+    final priceVal = (price['price_tzs_kg'] as num?)?.toInt() ?? 0;
+    final changeAmt = (price['change_tzs'] as num?)?.toInt();
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
-            // Crop avatar
             CircleAvatar(
-              backgroundColor: const Color(0xFFE8F5E9),
+              backgroundColor: AppColors.primarySoft,
               radius: 22,
               child: Text(
                 cropName.isNotEmpty ? cropName[0] : '?',
-                style: const TextStyle(
-                    color: Color(0xFF1A5C2E),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16),
+                style: GoogleFonts.poppins(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
               ),
             ),
             const SizedBox(width: 12),
-
-            // Crop name + market
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(cropName,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(
+                    cropName,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(market,
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.grey)),
-                  if ((price['source'] ?? '').isNotEmpty)
-                    Text(price['source'].toString(),
-                        style: const TextStyle(
-                            fontSize: 10, color: Color(0xFF9E9E9E))),
+                  Text(
+                    market,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 28,
+                    width: 72,
+                    child: LineChart(
+                      LineChartData(
+                        gridData: const FlGridData(show: false),
+                        titlesData: const FlTitlesData(show: false),
+                        borderData: FlBorderData(show: false),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: List.generate(
+                              7,
+                              (i) => FlSpot(
+                                i.toDouble(),
+                                priceVal * (0.9 + i * 0.02),
+                              ),
+                            ),
+                            isCurved: true,
+                            color: tColor,
+                            barWidth: 2,
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              color: tColor.withValues(alpha: 0.12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-
-            // Price + trend
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  'TZS ${price['price_tzs_kg']}/kg',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: tColor,
-                      fontSize: 13),
+                  'TZS $priceVal/kg',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    color: tColor,
+                    fontSize: 13,
+                  ),
                 ),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(trendIcon(trend), size: 13, color: tColor),
                     const SizedBox(width: 2),
-                    Text(trend ?? 'imara',
-                        style: TextStyle(fontSize: 10, color: tColor)),
+                    Text(
+                      trend == 'inapanda'
+                          ? '↑'
+                          : trend == 'inashuka'
+                              ? '↓'
+                              : '—',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: tColor,
+                      ),
+                    ),
                   ],
                 ),
+                if (changeAmt != null)
+                  Text(
+                    '${changeAmt >= 0 ? '+' : ''}$changeAmt TZS leo',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      color: tColor,
+                    ),
+                  ),
                 const SizedBox(height: 6),
                 // Contact button
                 GestureDetector(

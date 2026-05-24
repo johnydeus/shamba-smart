@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
-import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'farms_screen.dart';
 import 'scan_screen.dart';
@@ -35,8 +35,6 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
     final role = user?.role ?? UserRole.mkulima;
-    final roleColor = AppColors.roleColor(role);
-
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: IndexedStack(
@@ -46,7 +44,6 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: _BottomNav(
         currentIndex: _currentIndex,
         role: role,
-        roleColor: roleColor,
         onTap: (i) => setState(() => _currentIndex = i),
       ),
     );
@@ -56,13 +53,11 @@ class _MainShellState extends State<MainShell> {
 class _BottomNav extends StatelessWidget {
   final int currentIndex;
   final UserRole role;
-  final Color roleColor;
   final ValueChanged<int> onTap;
 
   const _BottomNav({
     required this.currentIndex,
     required this.role,
-    required this.roleColor,
     required this.onTap,
   });
 
@@ -80,29 +75,62 @@ class _BottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return Material(
-      color: const Color(0xFFFFFDF8),
-      elevation: 8,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, -4),
+          ),
+        ],
+        border: const Border(
+          top: BorderSide(color: AppColors.dividerLight, width: 1),
+        ),
+      ),
       child: SizedBox(
         height: 62 + bottomPadding,
         child: Padding(
           padding: EdgeInsets.only(bottom: bottomPadding),
           child: Row(
             children: [
-              _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home,
-                  label: 'Nyumbani', index: 0, current: currentIndex,
-                  color: roleColor, onTap: onTap),
-              _NavItem(icon: _tab2Icon(role), activeIcon: _tab2Icon(role),
-                  label: _tab2Label(role), index: 1, current: currentIndex,
-                  color: AppColors.leaf, onTap: onTap),
-              // Scan — centre button with elevated style
-              _ScanNavItem(isActive: currentIndex == 2, onTap: () => onTap(2)),
-              _NavItem(icon: Icons.forum_outlined, activeIcon: Icons.forum,
-                  label: 'Jamii', index: 3, current: currentIndex,
-                  color: roleColor, onTap: onTap),
-              _NavItem(icon: Icons.person_outline, activeIcon: Icons.person,
-                  label: 'Akaunti', index: 4, current: currentIndex,
-                  color: roleColor, onTap: onTap),
+              _NavItem(
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home_outlined,
+                label: 'Nyumbani',
+                index: 0,
+                current: currentIndex,
+                onTap: onTap,
+              ),
+              _NavItem(
+                icon: _tab2Icon(role),
+                activeIcon: _tab2Icon(role),
+                label: _tab2Label(role),
+                index: 1,
+                current: currentIndex,
+                onTap: onTap,
+              ),
+              _ScanNavItem(
+                isActive: currentIndex == 2,
+                onTap: () => onTap(2),
+              ),
+              _NavItem(
+                icon: Icons.forum_outlined,
+                activeIcon: Icons.forum_outlined,
+                label: 'Jamii',
+                index: 3,
+                current: currentIndex,
+                onTap: onTap,
+              ),
+              _NavItem(
+                icon: Icons.person_outline,
+                activeIcon: Icons.person_outline,
+                label: 'Akaunti',
+                index: 4,
+                current: currentIndex,
+                onTap: onTap,
+              ),
             ],
           ),
         ),
@@ -127,30 +155,31 @@ class _ScanNavItem extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 48,
-              height: 48,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: isActive ? AppColors.leaf : AppColors.leaf.withValues(alpha: 0.85),
+                color: isActive ? AppColors.primary : AppColors.primaryMedium,
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.leaf.withValues(alpha: 0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+                border: Border.all(color: AppColors.white, width: 3),
+                boxShadow: AppShadow.green,
               ),
-              child: const Icon(Icons.document_scanner_outlined,
-                  color: Colors.white, size: 22),
+              child: const Icon(
+                Icons.camera_alt_outlined,
+                color: AppColors.white,
+                size: 24,
+              ),
             ),
             const SizedBox(height: 2),
-            Text('Scan',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: isActive ? AppColors.leaf : const Color(0xFF9E9E9E),
-                )),
+            Text(
+              'Scan',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: isActive ? AppColors.primary : AppColors.textHint,
+              ),
+            ),
           ],
         ),
       ),
@@ -166,12 +195,14 @@ class _NavItem extends StatelessWidget {
   final String label;
   final int index;
   final int current;
-  final Color color;
   final ValueChanged<int> onTap;
 
   const _NavItem({
-    required this.icon, required this.activeIcon, required this.label,
-    required this.index, required this.current, required this.color,
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.index,
+    required this.current,
     required this.onTap,
   });
 
@@ -185,25 +216,37 @@ class _NavItem extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedContainer(
+            AnimatedScale(
+              scale: isActive ? 1.05 : 1.0,
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: isActive ? color.withValues(alpha: 0.12) : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
+              child: Icon(
+                isActive ? activeIcon : icon,
+                color: isActive ? AppColors.primary : AppColors.textHint,
+                size: 24,
               ),
-              child: Icon(isActive ? activeIcon : icon,
-                  color: isActive ? color : const Color(0xFF9E9E9E), size: 22),
             ),
-            const SizedBox(height: 2),
-            Text(label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                  color: isActive ? color : const Color(0xFF9E9E9E),
+            if (isActive)
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                width: 5,
+                height: 5,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
+              )
+            else
+              const SizedBox(height: 9),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                color: isActive ? AppColors.primary : AppColors.textHint,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),

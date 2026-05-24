@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/supabase_service.dart';
-import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
+import '../widgets/shamba_button.dart';
+import '../widgets/shamba_card.dart';
 
 const List<String> kSoilTypes = [
   'Mchanga (Sandy)',
@@ -73,6 +75,7 @@ class _IrrigationScreenState extends State<IrrigationScreen> {
         'morning_litres': (dailyLitres * 0.6).round(),
         'evening_litres': (dailyLitres * 0.4).round(),
         'sessions_per_day': 2,
+        'water_days': [true, false, true, false, true, false, true],
       };
     });
   }
@@ -106,9 +109,7 @@ class _IrrigationScreenState extends State<IrrigationScreen> {
     return Scaffold(
       backgroundColor: AppColors.mist,
       appBar: AppBar(
-        title: Text('Mpango wa Umwagiliaji',
-            style: GoogleFonts.playfairDisplay(
-                color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('Mpango wa Umwagiliaji'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -203,66 +204,107 @@ class _IrrigationScreenState extends State<IrrigationScreen> {
 
             // Results card
             if (_plan != null) ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Mpango Wako wa Umwagiliaji:',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A5C2E),
-                        ),
+              ShambaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.water_drop_outlined,
+                        color: AppColors.info, size: 48),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_plan!['daily_litres'].toInt()}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.info,
+                        height: 1,
                       ),
-                      const SizedBox(height: 16),
-
-                      // Daily total
-                      _PlanRow(
-                        icon: Icons.water_drop,
-                        label: 'Maji Kwa Siku',
-                        value: '${_plan!['daily_litres'].toInt()} Lita',
-                        color: const Color(0xFF0277BD),
+                    ),
+                    Text(
+                      'Lita kwa siku',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: AppColors.textTertiary,
                       ),
-                      const Divider(),
-
-                      // Morning session
-                      _PlanRow(
-                        icon: Icons.wb_sunny,
-                        label: 'Asubuhi (6am)',
-                        value: '${_plan!['morning_litres']} Lita',
-                        color: const Color(0xFFFF6F00),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      'Ratiba ya Wiki',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
-                      const Divider(),
-
-                      // Evening session
-                      _PlanRow(
-                        icon: Icons.nights_stay,
-                        label: 'Jioni (6pm)',
-                        value: '${_plan!['evening_litres']} Lita',
-                        color: const Color(0xFF5C6BC0),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(7, (i) {
+                        final days = ['Jt', 'Jn', 'Jt', 'Al', 'Ij', 'Ij', 'Jp'];
+                        final water = (_plan!['water_days'] as List)[i]
+                            as bool;
+                        return Column(
+                          children: [
+                            Text(days[i],
+                                style: GoogleFonts.poppins(fontSize: 10)),
+                            const SizedBox(height: 4),
+                            Text(
+                              water ? '💧' : '—',
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                          ],
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    const Divider(),
+                    _PlanRow(
+                      icon: Icons.wb_sunny_outlined,
+                      label: 'Asubuhi (6am)',
+                      value: '${_plan!['morning_litres']} Lita',
+                      color: AppColors.warning,
+                    ),
+                    const Divider(),
+                    _PlanRow(
+                      icon: Icons.nights_stay_outlined,
+                      label: 'Jioni (6pm)',
+                      value: '${_plan!['evening_litres']} Lita',
+                      color: const Color(0xFF5C6BC0),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    ShambaCard(
+                      backgroundColor: AppColors.infoBg,
+                      hasShadow: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Bila umwagiliaji: hatari ya ukame',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: AppColors.critical,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Na umwagiliaji: mavuno mazuri 🌾',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.success,
+                            ),
+                          ),
+                        ],
                       ),
-
-                      const SizedBox(height: 16),
-
-                      // Save button
-                      ElevatedButton.icon(
-                        icon: _loading
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Icon(Icons.save),
-                        label: Text(
-                            _loading ? 'Inahifadhi...' : 'Hifadhi Mpango'),
-                        onPressed: _loading ? null : _savePlan,
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    ShambaButton(
+                      label: _loading ? 'Inahifadhi...' : 'Hifadhi Mpango',
+                      icon: Icons.save_outlined,
+                      onPressed: _loading ? null : _savePlan,
+                      isLoading: _loading,
+                      fullWidth: true,
+                    ),
+                  ],
                 ),
               ),
             ],

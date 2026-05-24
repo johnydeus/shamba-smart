@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'theme/app_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'providers/auth_provider.dart';
 import 'providers/listing_provider.dart';
@@ -75,51 +75,7 @@ class ShambaSmart extends StatelessWidget {
     return MaterialApp(
       title: 'Shamba Smart',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1A5C2E),
-          primary: const Color(0xFF1A5C2E),
-          secondary: const Color(0xFF2E8B57),
-          surface: const Color(0xFFFDF6EE),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFFDF6EE),
-
-        // DM Sans as default body font
-        textTheme: GoogleFonts.dmSansTextTheme(
-          Theme.of(context).textTheme,
-        ),
-
-        cardTheme: const CardThemeData(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-          ),
-          elevation: 2,
-          color: Color(0xFFFFFDF8),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1A5C2E),
-            foregroundColor: Colors.white,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-            ),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          ),
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: const Color(0xFF1E1108),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: GoogleFonts.playfairDisplay(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
+      theme: AppTheme.light,
       home: const AuthGate(),
     );
   }
