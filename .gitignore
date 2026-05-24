@@ -11,3 +11,9 @@ android/local.properties
 .env
 *.env
 .flutter_sdk
+scraper_env/
+build/
+.flutter_sdk/
+*.pyc
+__pycache__/
+.env
