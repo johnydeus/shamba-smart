@@ -299,40 +299,66 @@ Phone numbers in +255 format.
                 ? 'low'
                 : 'medium';
 
-        // Convert yield: kg/acre → ton/ha  (1 kg/acre = 0.00247 ton/ha)
+        // Yield: prefer grain_yield_min (from TOSCI detail), fallback kg/acre
+        double? yieldTonHa;
+        final grainYieldMin = r['grain_yield_min'];
         final yieldKg = r['yield_kg_per_acre'];
-        final double? yieldTonHa = yieldKg != null
-            ? (yieldKg as num).toDouble() * 0.00247
-            : null;
+        if (grainYieldMin != null) {
+          yieldTonHa = (grainYieldMin as num).toDouble();
+        } else if (yieldKg != null) {
+          yieldTonHa = (yieldKg as num).toDouble() * 0.00247;
+        }
 
-        // Regions: stored as List or null
-        final regions = r['recommended_regions'];
-        final List<String> regionList = regions is List
-            ? regions.cast<String>()
-            : <String>[];
+        // Regions: prefer suitable_regions (new detailed column), fallback recommended_regions
+        final regionsSuitable = r['suitable_regions'];
+        final regionsOld = r['recommended_regions'];
+        final List<String> regionList = regionsSuitable is List
+            ? regionsSuitable.cast<String>()
+            : regionsOld is List
+                ? regionsOld.cast<String>()
+                : <String>[];
 
         // Disease resistant: stored as List or null
         final dis = r['disease_resistant'];
         final List<String> disList =
             dis is List ? dis.cast<String>() : <String>[];
 
+        // Company: prefer registrant (new), fallback breeder
+        final company = (r['registrant'] as String?)?.isNotEmpty == true
+            ? r['registrant']
+            : r['breeder'] ?? '';
+
+        // Altitude range for display
+        final altRange = r['altitude_range'] as String? ?? '';
+
+        // Registration year
+        final regYear = r['registration_year'];
+
+        // Distinctive characters as description
+        final description = r['distinctive_characters'] as String? ?? '';
+
         return {
-          'variety_name':         r['variety_name'] ?? '',
-          'crop':                 cropName,
-          'company':              r['breeder'] ?? '',
-          'tosci_certified':      r['tosci_certified'] ?? true,
-          'maturity_days':        r['maturity_days'],
+          'variety_name':           r['variety_name'] ?? '',
+          'crop':                   cropName,
+          'company':                company,
+          'tosci_certified':        r['tosci_certified'] ?? true,
+          'maturity_days':          r['maturity_days'],
           'yield_potential_ton_ha': yieldTonHa != null
               ? double.parse(yieldTonHa.toStringAsFixed(1))
               : null,
-          'drought_tolerance':    droughtTol,
-          'disease_resistance':   disList,
-          'pest_resistance':      <String>[],
-          'regions_recommended':  regionList,
-          'source_url':           r['source_url'] ?? '',
-          'category':             'OPV',
-          'description_sw':       '',
-          'best_for_sw':          '',
+          'drought_tolerance':      droughtTol,
+          'disease_resistance':     disList,
+          'pest_resistance':        <String>[],
+          'regions_recommended':    regionList,
+          'source_url':             r['source_url'] ?? '',
+          'category':               'OPV',
+          'description_sw':         description,
+          'best_for_sw':            '',
+          'altitude_range_m':       altRange,
+          'year_released':          regYear,
+          'grain_yield':            r['grain_yield'],
+          'detail_url':             r['detail_url'],
+          'crop_scientific':        r['crop_scientific'],
         };
       }).toList();
     } catch (e) {
