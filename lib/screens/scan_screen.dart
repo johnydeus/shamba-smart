@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../routes/fade_slide_route.dart';
+import '../services/mkulima_service.dart';
 import '../services/plant_id_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -141,10 +142,18 @@ class _ScanScreenState extends State<ScanScreen>
     if (_selectedImage == null) return;
     HapticFeedback.mediumImpact();
 
-    setState(() {
-      _analysing = true;
-      _statusMessage = 'Inatuma picha kwa Plant.id AI...';
-    });
+    // Step 1 — Mkulima AI: fast offline diagnosis (ugonjwa only)
+    MkulimaResult? mkulimaResult;
+    if (_selectedScanType == 'ugonjwa') {
+      setState(() {
+        _analysing = true;
+        _statusMessage = 'Mkulima AI inachunguza picha...';
+      });
+      mkulimaResult = await MkulimaService().analyze(_selectedImage!);
+    }
+
+    // Step 2 — Plant.id + Claude: full Swahili explanation
+    setState(() => _statusMessage = 'Inatuma picha kwa Plant.id AI...');
 
     final result = await PlantIdService.analysePhoto(
       imageFile: _selectedImage!,
@@ -158,6 +167,7 @@ class _ScanScreenState extends State<ScanScreen>
       cropName: _selectedCrop,
       claudeResponse: result,
       photoPath: _selectedImage!.path,
+      mkulimaResult: mkulimaResult,
     );
 
     setState(() => _analysing = false);
@@ -170,6 +180,7 @@ class _ScanScreenState extends State<ScanScreen>
           diagnosis: result,
           imagePath: _selectedImage!.path,
           cropName: _selectedCrop,
+          mkulimaResult: mkulimaResult,
         ),
       ),
     );

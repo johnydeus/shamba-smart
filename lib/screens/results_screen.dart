@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../routes/fade_slide_route.dart';
+import '../services/mkulima_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shamba_button.dart';
 import '../widgets/status_badge.dart';
@@ -15,12 +16,14 @@ class ResultsScreen extends StatefulWidget {
   final Map<String, dynamic> diagnosis;
   final String imagePath;
   final String cropName;
+  final MkulimaResult? mkulimaResult;
 
   const ResultsScreen({
     super.key,
     required this.diagnosis,
     required this.imagePath,
     required this.cropName,
+    this.mkulimaResult,
   });
 
   @override
@@ -127,6 +130,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
               ).animate().fadeIn(duration: 400.ms),
 
             const SizedBox(height: AppSpacing.md),
+
+            // ── Mkulima AI card (shown only for disease scans) ────────────
+            if (widget.mkulimaResult != null)
+              _MkulimaCard(result: widget.mkulimaResult!),
+
+            if (widget.mkulimaResult != null)
+              const SizedBox(height: AppSpacing.md),
 
             if (hasError)
               _AlertBanner(
@@ -510,6 +520,328 @@ class _AlertBanner extends StatelessWidget {
     );
   }
 }
+
+// ── Mkulima AI disease card ──────────────────────────────────────────────────
+
+class _MkulimaCard extends StatefulWidget {
+  final MkulimaResult result;
+  const _MkulimaCard({required this.result});
+
+  @override
+  State<_MkulimaCard> createState() => _MkulimaCardState();
+}
+
+class _MkulimaCardState extends State<_MkulimaCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.result;
+    final color = r.ukaliColor;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
+        boxShadow: AppShadow.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Header ──────────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadius.lg)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(r.emoji,
+                        style: const TextStyle(fontSize: 28)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1A5C2E),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.full),
+                                ),
+                                child: Text(
+                                  'Mkulima AI',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.15),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.full),
+                                ),
+                                child: Text(
+                                  'Ukali: ${r.ukali}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: color,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            r.jinaSw,
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          if (r.jinaEn.isNotEmpty)
+                            Text(
+                              r.jinaEn,
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // Confidence bar
+                Text(
+                  'Uhakika: ${(r.confidence * 100).toStringAsFixed(1)}%',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: r.confidence),
+                  duration: const Duration(milliseconds: 1000),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, _) => ClipRRect(
+                    borderRadius:
+                        BorderRadius.circular(AppRadius.full),
+                    child: LinearProgressIndicator(
+                      value: value,
+                      minHeight: 6,
+                      backgroundColor: Colors.black12,
+                      valueColor: AlwaysStoppedAnimation(color),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Urgent action alert (juu sana only) ─────────────────────────
+          if (r.isUrgent && r.hatuaYaHaraka.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.critical.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(
+                    color: AppColors.critical.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.warning_rounded,
+                      color: AppColors.critical, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hatua ya Haraka!',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: AppColors.critical,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(r.hatuaYaHaraka,
+                            style: GoogleFonts.poppins(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // ── Body rows ───────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (r.dalili.isNotEmpty) _InfoRow('🔍 Dalili', r.dalili),
+                if (r.sababu.isNotEmpty) _InfoRow('🦠 Sababu', r.sababu),
+                if (r.dawa.isNotEmpty) _InfoRow('💊 Dawa', r.dawa),
+                if (r.dawaAsili.isNotEmpty)
+                  _InfoRow('🌿 Dawa ya Asili', r.dawaAsili),
+
+                // Expandable prevention + top3
+                InkWell(
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Text(
+                          _expanded ? 'Ficha maelezo' : 'Ona zaidi',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          _expanded
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                if (_expanded) ...[
+                  if (r.kinga.isNotEmpty) _InfoRow('🛡️ Kinga', r.kinga),
+                  if (!r.isUrgent && r.hatuaYaHaraka.isNotEmpty)
+                    _InfoRow('⚡ Hatua ya Haraka', r.hatuaYaHaraka),
+                  if (r.wakatiHatari.isNotEmpty)
+                    _InfoRow('⏰ Wakati Hatari', r.wakatiHatari),
+                  const SizedBox(height: 8),
+                  // Top 3 predictions
+                  Text(
+                    'Matokeo 3 bora:',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...r.top3.map((p) {
+                    final conf = (p['confidence'] as double?) ?? 0.0;
+                    final jina = (p['jina_sw'] as String?) ?? '';
+                    final em = (p['emoji'] as String?) ?? '🌿';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Text(em,
+                              style: const TextStyle(fontSize: 14)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  jina,
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 12),
+                                ),
+                                const SizedBox(height: 2),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                      AppRadius.full),
+                                  child: LinearProgressIndicator(
+                                    value: conf.clamp(0.0, 1.0),
+                                    minHeight: 4,
+                                    backgroundColor: Colors.black12,
+                                    valueColor:
+                                        AlwaysStoppedAnimation(
+                                            AppColors.primary
+                                                .withValues(
+                                                    alpha: 0.6)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${(conf * 100).toStringAsFixed(0)}%',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.04, end: 0);
+  }
+
+  Widget _InfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(value, style: GoogleFonts.poppins(fontSize: 13)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Treatment card ───────────────────────────────────────────────────────────
 
 class _TreatmentCard extends StatelessWidget {
   final String title;

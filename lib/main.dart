@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'services/mkulima_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/listing_provider.dart';
 import 'providers/chat_provider.dart';
@@ -16,6 +17,11 @@ import 'screens/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Pre-load Mkulima AI model in background (non-blocking)
+  MkulimaService().initialize().catchError(
+    (e) => debugPrint('Mkulima AI init failed: $e'),
+  );
 
   // Load .env file for API keys
   await dotenv.load(fileName: '.env');

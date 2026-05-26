@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'mkulima_service.dart';
 
 class SupabaseService {
   // Get the Supabase client instance
@@ -13,6 +14,7 @@ class SupabaseService {
     required String photoPath,
     double? gpsLat,
     double? gpsLng,
+    MkulimaResult? mkulimaResult,
   }) async {
     try {
       final userId = _client.auth.currentUser?.id;
@@ -28,8 +30,8 @@ class SupabaseService {
             _client.storage.from('leaf-photos').getPublicUrl(fileName);
       }
 
-      // Insert the diagnosis record into the database
-      await _client.from('diagnoses').insert({
+      // Build row — add Mkulima fields if available (requires SQL migration)
+      final row = <String, dynamic>{
         'farmer_id': userId,
         'crop_name': cropName,
         'disease_name_en': claudeResponse['disease_name_en'],
@@ -40,7 +42,13 @@ class SupabaseService {
         'claude_response': claudeResponse,
         'gps_lat': gpsLat,
         'gps_lng': gpsLng,
-      });
+      };
+
+      if (mkulimaResult != null) {
+        row.addAll(mkulimaResult.toSupabaseRow());
+      }
+
+      await _client.from('diagnoses').insert(row);
     } catch (e) {
       // Print error but don't crash the app — diagnosis still shows on screen
       debugPrint('Error saving diagnosis: $e');
