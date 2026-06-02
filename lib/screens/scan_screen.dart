@@ -220,6 +220,68 @@ class _ScanScreenState extends State<ScanScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ── Mkulima AI branding banner ─────────────────────────────────
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  const Text('🌿', style: TextStyle(fontSize: 18)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Mkulima AI',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          'Inafanya kazi bila mtandao • Aina 34 za magonjwa',
+                          style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFB703).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color:
+                              const Color(0xFFFFB703).withValues(alpha: 0.5)),
+                    ),
+                    child: Text(
+                      'v2',
+                      style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFFFFB703),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // ── Scan type selector ─────────────────────────────────────────
             _buildScanTypeSelector(),
 
@@ -288,7 +350,30 @@ class _ScanScreenState extends State<ScanScreen>
             // ── Camera preview / tap area ──────────────────────────────────
             _buildCameraArea(),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
+
+            // ── Mkulima AI hint below viewfinder ───────────────────────────
+            if (!_analysing)
+              Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.biotech_outlined,
+                        size: 14,
+                        color: _typeColor.withValues(alpha: 0.7)),
+                    const SizedBox(width: 5),
+                    Text(
+                      'AI itachunguza ugonjwa wa zao lako',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 10),
 
             // ── Shutter + gallery ──────────────────────────────────────────
             Center(child: _buildShutterButton()),

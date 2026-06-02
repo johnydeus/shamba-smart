@@ -139,7 +139,7 @@ class _BottomNav extends StatelessWidget {
   }
 }
 
-// ── Centre scan button ────────────────────────────────────────────────────────
+// ── Centre Mkulima AI button ──────────────────────────────────────────────────
 
 class _ScanNavItem extends StatelessWidget {
   final bool isActive;
@@ -155,28 +155,60 @@ class _ScanNavItem extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.primary : AppColors.primaryMedium,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.white, width: 3),
-                boxShadow: AppShadow.green,
-              ),
-              child: const Icon(
-                Icons.camera_alt_outlined,
-                color: AppColors.white,
-                size: 24,
-              ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isActive
+                          ? [const Color(0xFF1B4332), const Color(0xFF2D6A4F)]
+                          : [const Color(0xFF2D6A4F), const Color(0xFF40916C)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.white, width: 3),
+                    boxShadow: AppShadow.green,
+                  ),
+                  child: const Icon(
+                    Icons.biotech_outlined,
+                    color: AppColors.white,
+                    size: 22,
+                  ),
+                ),
+                Positioned(
+                  top: -4,
+                  right: -6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFB300),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.white, width: 1),
+                    ),
+                    child: const Text(
+                      'AI',
+                      style: TextStyle(
+                        fontSize: 7,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 2),
             Text(
-              'Scan',
+              'Mkulima AI',
               style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
                 color: isActive ? AppColors.primary : AppColors.textHint,
               ),
             ),

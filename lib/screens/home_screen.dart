@@ -539,9 +539,34 @@ class _HeroDiagnosticCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
+                          // "Mkulima AI" brand badge
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Text('🌿',
+                                    style: TextStyle(fontSize: 11)),
+                                const SizedBox(width: 5),
+                                Text('Mkulima AI',
+                                    style: _jakarta(
+                                        size: 11,
+                                        weight: FontWeight.w700,
+                                        color: Colors.white)),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          // Offline badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: _kGold.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(20),
@@ -551,47 +576,50 @@ class _HeroDiagnosticCard extends StatelessWidget {
                             child: Row(
                               children: [
                                 Container(
-                                  width: 6,
-                                  height: 6,
+                                  width: 5,
+                                  height: 5,
                                   decoration: const BoxDecoration(
                                       color: _kGold,
                                       shape: BoxShape.circle),
                                 ),
-                                const SizedBox(width: 5),
-                                Text('AI Inafanya Kazi',
+                                const SizedBox(width: 4),
+                                Text('Bila Mtandao',
                                     style: _jakarta(
-                                        size: 10,
+                                        size: 9,
                                         weight: FontWeight.w600,
                                         color: _kGold)),
                               ],
                             ),
-                          ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.camera_alt_rounded,
-                                color: Colors.white, size: 18),
                           ),
                         ],
                       ),
 
                       const Spacer(),
 
-                      Text('Gundua Ugonjwa',
+                      Text('Mkulima AI',
                           style: _jakarta(
-                              size: 22,
+                              size: 26,
                               weight: FontWeight.w800,
                               color: Colors.white,
                               height: 1.1)),
                       const SizedBox(height: 4),
-                      Text('Piga picha ya jani — AI itachunguza',
+                      Text('Piga picha ya zao lako — tambua ugonjwa mara moja',
                           style: _jakarta(
-                              size: 13,
-                              color: _kMint.withValues(alpha: 0.8))),
+                              size: 12,
+                              color: _kMint.withValues(alpha: 0.9))),
+                      const SizedBox(height: 6),
+                      // "Powered by AI" sub-badge
+                      Row(
+                        children: [
+                          const Icon(Icons.offline_bolt_rounded,
+                              color: _kGold, size: 13),
+                          const SizedBox(width: 4),
+                          Text('Powered by AI • Inafanya kazi bila mtandao',
+                              style: _jakarta(
+                                  size: 10,
+                                  color: _kGold.withValues(alpha: 0.9))),
+                        ],
+                      ),
 
                       const SizedBox(height: 16),
 
@@ -629,7 +657,7 @@ class _HeroDiagnosticCard extends StatelessWidget {
                                   const Icon(Icons.camera_alt_rounded,
                                       color: _kGreenDark, size: 16),
                                   const SizedBox(width: 6),
-                                  Text('Piga Picha',
+                                  Text('Chunguza Sasa',
                                       style: _jakarta(
                                           size: 13,
                                           weight: FontWeight.w700,
@@ -641,10 +669,9 @@ class _HeroDiagnosticCard extends StatelessWidget {
 
                           const SizedBox(width: 10),
 
-                          // Text scan option
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
+                                horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(20),
@@ -652,11 +679,19 @@ class _HeroDiagnosticCard extends StatelessWidget {
                                   color:
                                       Colors.white.withValues(alpha: 0.2)),
                             ),
-                            child: Text('Elezea Dalili',
-                                style: _jakarta(
-                                    size: 13,
-                                    weight: FontWeight.w600,
-                                    color: Colors.white)),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.biotech_outlined,
+                                    color: Colors.white, size: 14),
+                                const SizedBox(width: 5),
+                                Text('Aina 34',
+                                    style: _jakarta(
+                                        size: 12,
+                                        weight: FontWeight.w600,
+                                        color: Colors.white)),
+                              ],
+                            ),
                           ),
                         ],
                       ),

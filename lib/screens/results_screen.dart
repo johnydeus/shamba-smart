@@ -523,6 +523,10 @@ class _AlertBanner extends StatelessWidget {
 
 // ── Mkulima AI disease card ──────────────────────────────────────────────────
 
+const _kMkulimaGreen = Color(0xFF2E7D32);
+const _kMkulimaOrange = Color(0xFFE65100);
+const _kMkulimaRed = Color(0xFFB71C1C);
+
 class _MkulimaCard extends StatefulWidget {
   final MkulimaResult result;
   const _MkulimaCard({required this.result});
@@ -532,311 +536,613 @@ class _MkulimaCard extends StatefulWidget {
 }
 
 class _MkulimaCardState extends State<_MkulimaCard> {
-  bool _expanded = false;
+  // Which section is expanded
+  final Map<String, bool> _open = {
+    'dalili': false,
+    'dawa': false,
+    'asili': false,
+    'kinga': false,
+    'top3': false,
+  };
+
+  // Feedback state
+  bool? _feedbackPositive; // null=none, true=confirm, false=reject
+
+  Color _confidenceColor(double c) {
+    if (c >= 0.70) return _kMkulimaGreen;
+    if (c >= 0.40) return _kMkulimaOrange;
+    return _kMkulimaRed;
+  }
+
+  Color _ukaliColor(String ukali) {
+    switch (ukali.toLowerCase()) {
+      case 'juu sana':
+      case 'hatari':
+        return _kMkulimaRed;
+      case 'juu':
+      case 'wastani':
+        return _kMkulimaOrange;
+      default:
+        return _kMkulimaGreen;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final r = widget.result;
-    final color = r.ukaliColor;
+    final confColor = _confidenceColor(r.confidence);
+    final ukaliCol = _ukaliColor(r.ukali);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
-        boxShadow: AppShadow.sm,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── Header ──────────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppRadius.lg)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return Column(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16),
+            border:
+                Border.all(color: _kMkulimaGreen.withValues(alpha: 0.25)),
+            boxShadow: [
+              BoxShadow(
+                color: _kMkulimaGreen.withValues(alpha: 0.10),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Gradient header ─────────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(15)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(r.emoji,
-                        style: const TextStyle(fontSize: 28)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                    // Brand row
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF1A5C2E),
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadius.full),
-                                ),
-                                child: Text(
-                                  'Mkulima AI',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.15),
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadius.full),
-                                ),
-                                child: Text(
-                                  'Ukali: ${r.ukali}',
+                              const Text('🌿',
+                                  style: TextStyle(fontSize: 10)),
+                              const SizedBox(width: 4),
+                              Text('Mkulima AI',
                                   style: GoogleFonts.poppins(
                                     fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: color,
-                                  ),
-                                ),
-                              ),
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  )),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            r.jinaSw,
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                        ),
+                        const Spacer(),
+                        // Severity badge
+                        if (r.ukali.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: ukaliCol.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: ukaliCol.withValues(alpha: 0.5)),
                             ),
-                          ),
-                          if (r.jinaEn.isNotEmpty)
-                            Text(
-                              r.jinaEn,
+                            child: Text(
+                              'Ukali: ${r.ukali}',
                               style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: ukaliCol == _kMkulimaRed
+                                    ? Colors.red[100]
+                                    : ukaliCol == _kMkulimaOrange
+                                        ? Colors.orange[100]
+                                        : Colors.green[100],
                               ),
                             ),
-                        ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Disease name
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(r.emoji,
+                            style: const TextStyle(fontSize: 32)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                r.jinaSw,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  height: 1.2,
+                                ),
+                              ),
+                              if (r.jinaEn.isNotEmpty)
+                                Text(
+                                  r.jinaEn,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.white60,
+                                  ),
+                                ),
+                              if (r.zao.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    'Zao: ${r.zao}',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      color: Colors.white54,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    // Confidence bar
+                    Row(
+                      children: [
+                        Text(
+                          'Uhakika: ${(r.confidence * 100).toStringAsFixed(1)}%',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: confColor.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            r.confidence >= 0.70
+                                ? 'Juu'
+                                : r.confidence >= 0.40
+                                    ? 'Wastani'
+                                    : 'Chini',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: r.confidence >= 0.70
+                                  ? Colors.green[200]
+                                  : r.confidence >= 0.40
+                                      ? Colors.orange[200]
+                                      : Colors.red[200],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: r.confidence),
+                      duration: const Duration(milliseconds: 1200),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) => ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: value,
+                          minHeight: 8,
+                          backgroundColor: Colors.white24,
+                          valueColor:
+                              AlwaysStoppedAnimation(confColor),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                // Confidence bar
-                Text(
-                  'Uhakika: ${(r.confidence * 100).toStringAsFixed(1)}%',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: r.confidence),
-                  duration: const Duration(milliseconds: 1000),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, value, _) => ClipRRect(
-                    borderRadius:
-                        BorderRadius.circular(AppRadius.full),
-                    child: LinearProgressIndicator(
-                      value: value,
-                      minHeight: 6,
-                      backgroundColor: Colors.black12,
-                      valueColor: AlwaysStoppedAnimation(color),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Urgent action alert (juu sana only) ─────────────────────────
-          if (r.isUrgent && r.hatuaYaHaraka.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.critical.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(
-                    color: AppColors.critical.withValues(alpha: 0.4)),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.warning_rounded,
-                      color: AppColors.critical, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hatua ya Haraka!',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            color: AppColors.critical,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(r.hatuaYaHaraka,
-                            style: GoogleFonts.poppins(fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
-          // ── Body rows ───────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (r.dalili.isNotEmpty) _InfoRow('🔍 Dalili', r.dalili),
-                if (r.sababu.isNotEmpty) _InfoRow('🦠 Sababu', r.sababu),
-                if (r.dawa.isNotEmpty) _InfoRow('💊 Dawa', r.dawa),
-                if (r.dawaAsili.isNotEmpty)
-                  _InfoRow('🌿 Dawa ya Asili', r.dawaAsili),
-
-                // Expandable prevention + top3
-                InkWell(
-                  onTap: () => setState(() => _expanded = !_expanded),
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(
-                      children: [
-                        Text(
-                          _expanded ? 'Ficha maelezo' : 'Ona zaidi',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          _expanded
-                              ? Icons.expand_less
-                              : Icons.expand_more,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                      ],
+              // ── Four expandable sections ─────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                child: Column(
+                  children: [
+                    _ExpandableSection(
+                      emoji: '🔍',
+                      label: 'Dalili',
+                      content: r.dalili,
+                      isOpen: _open['dalili']!,
+                      onToggle: () =>
+                          setState(() => _open['dalili'] = !_open['dalili']!),
                     ),
-                  ),
+                    _ExpandableSection(
+                      emoji: '💊',
+                      label: 'Dawa',
+                      content: r.dawa,
+                      isOpen: _open['dawa']!,
+                      onToggle: () =>
+                          setState(() => _open['dawa'] = !_open['dawa']!),
+                    ),
+                    _ExpandableSection(
+                      emoji: '🌿',
+                      label: 'Dawa ya Asili',
+                      content: r.dawaAsili,
+                      isOpen: _open['asili']!,
+                      onToggle: () =>
+                          setState(() => _open['asili'] = !_open['asili']!),
+                    ),
+                    _ExpandableSection(
+                      emoji: '🛡️',
+                      label: 'Kinga',
+                      content: r.kinga,
+                      isOpen: _open['kinga']!,
+                      onToggle: () =>
+                          setState(() => _open['kinga'] = !_open['kinga']!),
+                    ),
+                    // Top 3 predictions
+                    _ExpandableSection(
+                      emoji: '📊',
+                      label: 'Matokeo 3 bora',
+                      content: null,
+                      isOpen: _open['top3']!,
+                      onToggle: () =>
+                          setState(() => _open['top3'] = !_open['top3']!),
+                      customContent: _open['top3']!
+                          ? _Top3List(top3: r.top3)
+                          : null,
+                    ),
+                  ],
                 ),
+              ),
 
-                if (_expanded) ...[
-                  if (r.kinga.isNotEmpty) _InfoRow('🛡️ Kinga', r.kinga),
-                  if (!r.isUrgent && r.hatuaYaHaraka.isNotEmpty)
-                    _InfoRow('⚡ Hatua ya Haraka', r.hatuaYaHaraka),
-                  if (r.wakatiHatari.isNotEmpty)
-                    _InfoRow('⏰ Wakati Hatari', r.wakatiHatari),
-                  const SizedBox(height: 8),
-                  // Top 3 predictions
-                  Text(
-                    'Matokeo 3 bora:',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
+              // ── Urgent alert (juu sana) ───────────────────────────────────
+              if (r.isUrgent && r.hatuaYaHaraka.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _kMkulimaRed.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: _kMkulimaRed.withValues(alpha: 0.4)),
                   ),
-                  const SizedBox(height: 6),
-                  ...r.top3.map((p) {
-                    final conf = (p['confidence'] as double?) ?? 0.0;
-                    final jina = (p['jina_sw'] as String?) ?? '';
-                    final em = (p['emoji'] as String?) ?? '🌿';
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        children: [
-                          Text(em,
-                              style: const TextStyle(fontSize: 14)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  jina,
-                                  style: GoogleFonts.poppins(
-                                      fontSize: 12),
-                                ),
-                                const SizedBox(height: 2),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(
-                                      AppRadius.full),
-                                  child: LinearProgressIndicator(
-                                    value: conf.clamp(0.0, 1.0),
-                                    minHeight: 4,
-                                    backgroundColor: Colors.black12,
-                                    valueColor:
-                                        AlwaysStoppedAnimation(
-                                            AppColors.primary
-                                                .withValues(
-                                                    alpha: 0.6)),
-                                  ),
-                                ),
-                              ],
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warning_rounded,
+                          color: _kMkulimaRed, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '⚡ Hatua ya Haraka!',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: _kMkulimaRed,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${(conf * 100).toStringAsFixed(0)}%',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(r.hatuaYaHaraka,
+                                style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    color: const Color(0xFF7F1D1D))),
+                          ],
+                        ),
                       ),
-                    );
-                  }),
-                ],
-              ],
-            ),
+                    ],
+                  ),
+                ),
+
+              // ── Feedback buttons ─────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Je, jibu hili ni sahihi?',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () =>
+                                setState(() => _feedbackPositive = true),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 11),
+                              decoration: BoxDecoration(
+                                color: _feedbackPositive == true
+                                    ? _kMkulimaGreen
+                                    : _kMkulimaGreen.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _kMkulimaGreen
+                                      .withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.center,
+                                children: [
+                                  Text('✅',
+                                      style: const TextStyle(
+                                          fontSize: 14)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Ndiyo, Sahihi',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: _feedbackPositive == true
+                                          ? Colors.white
+                                          : _kMkulimaGreen,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () =>
+                                setState(() => _feedbackPositive = false),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 11),
+                              decoration: BoxDecoration(
+                                color: _feedbackPositive == false
+                                    ? _kMkulimaRed
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color: _kMkulimaRed
+                                        .withValues(alpha: 0.5)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.center,
+                                children: [
+                                  Text('❌',
+                                      style: const TextStyle(
+                                          fontSize: 14)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Hapana, Si Hilo',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: _feedbackPositive == false
+                                          ? Colors.white
+                                          : _kMkulimaRed,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_feedbackPositive != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _feedbackPositive!
+                              ? 'Asante! Maoni yako yanasaidia kuboresha Mkulima AI.'
+                              : 'Asante! Piga picha tena au wasiliana na mtaalamu.',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.04, end: 0);
   }
+}
 
-  Widget _InfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
+class _ExpandableSection extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final String? content;
+  final bool isOpen;
+  final VoidCallback onToggle;
+  final Widget? customContent;
+
+  const _ExpandableSection({
+    required this.emoji,
+    required this.label,
+    required this.content,
+    required this.isOpen,
+    required this.onToggle,
+    this.customContent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasContent =
+        (content != null && content!.isNotEmpty) || customContent != null;
+    if (!hasContent) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(
+              color: isOpen
+                  ? const Color(0xFF2E7D32).withValues(alpha: 0.06)
+                  : Colors.grey.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isOpen
+                    ? const Color(0xFF2E7D32).withValues(alpha: 0.2)
+                    : Colors.grey.withValues(alpha: 0.12),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 16)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isOpen
+                          ? const Color(0xFF2E7D32)
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: isOpen ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: isOpen
+                        ? const Color(0xFF2E7D32)
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 2),
-          Text(value, style: GoogleFonts.poppins(fontSize: 13)),
-        ],
-      ),
+        ),
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 200),
+          crossFadeState: isOpen
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          firstChild: const SizedBox.shrink(),
+          secondChild: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 2, bottom: 2),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2E7D32).withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color:
+                      const Color(0xFF2E7D32).withValues(alpha: 0.12)),
+            ),
+            child: customContent ??
+                Text(
+                  content ?? '',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                    height: 1.5,
+                  ),
+                ),
+          ),
+        ),
+        const SizedBox(height: 6),
+      ],
+    );
+  }
+}
+
+class _Top3List extends StatelessWidget {
+  final List<Map<String, dynamic>> top3;
+  const _Top3List({required this.top3});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: top3.map((p) {
+        final conf = (p['confidence'] as double?) ?? 0.0;
+        final jina = (p['jina_sw'] as String?) ?? '';
+        final em = (p['emoji'] as String?) ?? '🌿';
+        final barColor = conf >= 0.70
+            ? _kMkulimaGreen
+            : conf >= 0.40
+                ? _kMkulimaOrange
+                : _kMkulimaRed;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              Text(em, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(jina,
+                        style: GoogleFonts.poppins(fontSize: 12)),
+                    const SizedBox(height: 3),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: conf.clamp(0.0, 1.0),
+                        minHeight: 5,
+                        backgroundColor: Colors.black12,
+                        valueColor: AlwaysStoppedAnimation(barColor),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${(conf * 100).toStringAsFixed(0)}%',
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: barColor,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }
