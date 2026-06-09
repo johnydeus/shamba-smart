@@ -32,10 +32,6 @@ class ScanProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _phase = ScanPhase.cloud;
-      _statusMessage = 'Inachambua picha...';
-      notifyListeners();
-
       final result = await _service.analyze(request);
       _lastResult = result;
 
@@ -50,9 +46,14 @@ class ScanProvider extends ChangeNotifier {
       _statusMessage = 'Inahifadhi matokeo...';
       notifyListeners();
 
+      // Persist Mkulima diagnosis; merge cloud enrichment when present.
+      final toSave = Map<String, dynamic>.from(result.diagnosis);
+      if (result.cloudEnrichment != null) {
+        toSave['cloud_enrichment'] = result.cloudEnrichment;
+      }
       await SupabaseService.saveDiagnosis(
         cropName: request.cropName,
-        claudeResponse: result.diagnosis,
+        claudeResponse: toSave,
         photoPath: request.imagePath,
         gpsLat: request.gpsLat,
         gpsLng: request.gpsLng,

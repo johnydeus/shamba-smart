@@ -202,6 +202,7 @@ class _ScanScreenState extends State<ScanScreen>
           imagePath: _selectedImage!.path,
           cropName: _selectedCrop,
           mkulimaResult: result.mkulimaResult,
+          cloudEnrichment: result.cloudEnrichment,
           scanSource: result.sourceLabel,
           queuedForEnrichment: result.queuedForEnrichment,
         ),

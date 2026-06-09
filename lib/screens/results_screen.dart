@@ -17,6 +17,7 @@ class ResultsScreen extends StatefulWidget {
   final String imagePath;
   final String cropName;
   final MkulimaResult? mkulimaResult;
+  final Map<String, dynamic>? cloudEnrichment;
   final String? scanSource;
   final bool queuedForEnrichment;
 
@@ -26,6 +27,7 @@ class ResultsScreen extends StatefulWidget {
     required this.imagePath,
     required this.cropName,
     this.mkulimaResult,
+    this.cloudEnrichment,
     this.scanSource,
     this.queuedForEnrichment = false,
   });
@@ -145,28 +147,40 @@ class _ResultsScreenState extends State<ResultsScreen> {
             if (widget.scanSource != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: Row(
-                  children: [
-                    Icon(
-                      widget.queuedForEnrichment
-                          ? Icons.schedule
-                          : Icons.memory_outlined,
-                      size: 16,
-                      color: AppColors.textTertiary,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.2),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
                         widget.queuedForEnrichment
-                            ? '${widget.scanSource} — Ushauri wa ziada utatumwa mtandaoni urudipo'
-                            : widget.scanSource!,
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: AppColors.textTertiary,
+                            ? Icons.schedule
+                            : Icons.offline_bolt,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.scanSource!,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
 
@@ -330,6 +344,12 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     ],
                   ),
                 ),
+              ],
+
+              if (widget.cloudEnrichment != null &&
+                  widget.cloudEnrichment!['error'] != true) ...[
+                const SizedBox(height: AppSpacing.md),
+                _CloudEnrichmentCard(enrichment: widget.cloudEnrichment!),
               ],
 
               if (threatType.isNotEmpty)
@@ -549,6 +569,72 @@ class _AlertBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: child,
+    );
+  }
+}
+
+// ── Optional online enrichment (does not replace Mkulima) ───────────────────
+
+class _CloudEnrichmentCard extends StatelessWidget {
+  final Map<String, dynamic> enrichment;
+
+  const _CloudEnrichmentCard({required this.enrichment});
+
+  @override
+  Widget build(BuildContext context) {
+    final extraAction = enrichment['immediate_action_sw'] as String? ?? '';
+    final extraDesc = enrichment['description_sw'] as String? ?? '';
+    final extraPest = enrichment['pesticide_1_name'] as String? ?? '';
+
+    return ShambaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.cloud_done_outlined, color: AppColors.info, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Ushauri wa Ziada (Mtandaoni)',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.info,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Mkulima AI ndiyo uchunguzi mkuu — hii ni usaidizi wa ziada kutoka mtandaoni.',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: AppColors.textTertiary,
+            ),
+          ),
+          if (extraDesc.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(extraDesc, style: GoogleFonts.poppins(fontSize: 14)),
+          ],
+          if (extraAction.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Hatua ya ziada: $extraAction',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.warning,
+              ),
+            ),
+          ],
+          if (extraPest.isNotEmpty && extraPest != 'Hakuna') ...[
+            const SizedBox(height: 6),
+            Text(
+              'Dawa ya ziada: $extraPest',
+              style: GoogleFonts.poppins(fontSize: 13),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
