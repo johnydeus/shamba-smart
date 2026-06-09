@@ -16,6 +16,8 @@ class ClaudeService {
     required File imageFile,
     required String cropName,
     String scanType = 'ugonjwa', // 'ugonjwa' | 'magugu' | 'wadudu'
+    String? mkulimaContext,
+    String? region,
   }) async {
     final imageBytes = await imageFile.readAsBytes();
     final base64Image = base64Encode(imageBytes);
@@ -23,7 +25,12 @@ class ClaudeService {
     final extension = imageFile.path.split('.').last.toLowerCase();
     final mediaType = extension == 'png' ? 'image/png' : 'image/jpeg';
 
-    final prompt = _buildPhotoPrompt(cropName, scanType);
+    final prompt = _buildPhotoPrompt(
+      cropName,
+      scanType,
+      mkulimaContext: mkulimaContext,
+      region: region,
+    );
 
     try {
       final response = await http.post(
@@ -86,7 +93,19 @@ class ClaudeService {
   }
 
   // Build the correct prompt based on what the farmer is scanning for
-  static String _buildPhotoPrompt(String cropName, String scanType) {
+  static String _buildPhotoPrompt(
+    String cropName,
+    String scanType, {
+    String? mkulimaContext,
+    String? region,
+  }) {
+    final regionLine = region != null && region.isNotEmpty
+        ? 'Farmer region: $region (Tanzania)\n'
+        : '';
+    final mkulimaLine = mkulimaContext != null && mkulimaContext.isNotEmpty
+        ? '\nOn-device Mkulima AI pre-scan (cross-check and enrich your advice):\n$mkulimaContext\n'
+        : '';
+    final contextPrefix = '$regionLine$mkulimaLine';
     const jsonTemplate = '''
 {
   "disease_name_en": "English name",
@@ -108,6 +127,7 @@ class ClaudeService {
 
     if (scanType == 'magugu') {
       return '''
+$contextPrefix
 You are an expert weed scientist specialising in East African smallholder farming in Tanzania.
 A farmer has photographed a plant growing in or near their $cropName field.
 
@@ -132,6 +152,7 @@ Rules:
 
     if (scanType == 'wadudu') {
       return '''
+$contextPrefix
 You are an expert entomologist specialising in crop pest management for East African smallholder farmers in Tanzania.
 A farmer has photographed damage or an insect on their $cropName crop.
 
@@ -157,6 +178,7 @@ Rules:
 
     // Default: disease scan (ugonjwa)
     return '''
+$contextPrefix
 You are an expert agricultural pathologist specialising in East African smallholder farming.
 A farmer in Tanzania has photographed this leaf from their $cropName crop.
 

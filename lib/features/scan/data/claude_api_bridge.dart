@@ -2,17 +2,23 @@ import 'dart:convert';
 import 'dart:io';
 import '../../../config/api_keys.dart';
 import '../../../core/database/app_database.dart';
+import '../../../services/claude_service.dart';
 import '../../../services/mkulima_service.dart';
 import '../../../services/plant_id_service.dart';
 import '../../../services/supabase_service.dart';
 
-/// Online enrichment bridge — Plant.id + Claude with Mkulima context.
+/// Online enrichment — Plant.id when keys exist, otherwise Claude vision directly.
 class ClaudeApiBridge {
   static final ClaudeApiBridge _instance = ClaudeApiBridge._();
   factory ClaudeApiBridge() => _instance;
   ClaudeApiBridge._();
 
   final AppDatabase _db = AppDatabase();
+
+  bool _hasSpecialistApi(String scanType) => switch (scanType) {
+        'magugu' => ApiKeys.hasPlantId && ApiKeys.hasClaude,
+        _ => ApiKeys.hasCropHealth && ApiKeys.hasClaude,
+      };
 
   Future<Map<String, dynamic>> enrichOnline({
     required File imageFile,
@@ -21,16 +27,37 @@ class ClaudeApiBridge {
     MkulimaResult? mkulimaResult,
     String? region,
   }) async {
-    return PlantIdService.analysePhoto(
+    if (!ApiKeys.hasClaude) {
+      return {
+        'error': true,
+        'message': 'CLAUDE_API_KEY haijasanidiwa kwenye .env',
+        'is_healthy': false,
+      };
+    }
+
+    // Prefer Plant.id / crop.health when keys are configured.
+    if (_hasSpecialistApi(scanType)) {
+      return PlantIdService.analysePhoto(
+        imageFile: imageFile,
+        cropName: cropName,
+        scanType: scanType,
+        mkulimaContext: mkulimaResult?.toClaudeContext(),
+        region: region,
+      );
+    }
+
+    // Fallback: Claude vision only (works with CLAUDE_API_KEY alone).
+    final diagnosis = await ClaudeService.analyseLeafPhoto(
       imageFile: imageFile,
       cropName: cropName,
       scanType: scanType,
       mkulimaContext: mkulimaResult?.toClaudeContext(),
       region: region,
     );
+    diagnosis['source'] = 'claude_vision';
+    return diagnosis;
   }
 
-  /// Queue a scan for cloud enrichment when offline.
   Future<void> queueEnrichment({
     required String imagePath,
     required String cropName,
@@ -56,11 +83,11 @@ class ClaudeApiBridge {
     );
   }
 
-  /// Process a queued scan enrichment item (called by SyncCoordinator).
   Future<bool> processOutboxItem(Map<String, dynamic> item) async {
-    if (!ApiKeys.hasCropHealth && !ApiKeys.hasPlantId) return false;
+    if (!ApiKeys.hasClaude) return false;
 
-    final payload = jsonDecode(item['payload_json'] as String) as Map<String, dynamic>;
+    final payload =
+        jsonDecode(item['payload_json'] as String) as Map<String, dynamic>;
     final imagePath = payload['image_path'] as String?;
     if (imagePath == null || !File(imagePath).existsSync()) return true;
 
@@ -104,7 +131,9 @@ class ClaudeApiBridge {
           json['disease_data'] as Map? ?? {},
         ),
         top3: List<Map<String, dynamic>>.from(
-          (json['top3'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? [],
+          (json['top3'] as List?)
+                  ?.map((e) => Map<String, dynamic>.from(e as Map)) ??
+              [],
         ),
       );
     } catch (_) {

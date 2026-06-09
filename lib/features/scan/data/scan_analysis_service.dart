@@ -30,16 +30,15 @@ class ScanAnalysisService {
     final isOnline = results[0] as bool;
     final mkulimaResult = results[1] as MkulimaResult?;
 
-    final hasCloudKeys = request.scanType == 'magugu'
-        ? ApiKeys.hasPlantId && ApiKeys.hasClaude
-        : ApiKeys.hasCropHealth && ApiKeys.hasClaude;
+    // Cloud scans need Claude; Plant.id/crop.health are optional enhancements.
+    final hasCloud = ApiKeys.hasClaude;
 
-    // Offline or missing API keys — use Mkulima-only for ugonjwa.
-    if ((!isOnline || !hasCloudKeys) && isUgonjwa && mkulimaResult != null) {
+    // Offline or no Claude key — use Mkulima-only for ugonjwa.
+    if ((!isOnline || !hasCloud) && isUgonjwa && mkulimaResult != null) {
       final diagnosis =
           _mkulima.diagnosisFromMkulima(mkulimaResult, request.cropName);
 
-      if (!isOnline && hasCloudKeys) {
+      if (!isOnline && hasCloud) {
         await _bridge.queueEnrichment(
           imagePath: request.imagePath,
           cropName: request.cropName,
@@ -58,14 +57,14 @@ class ScanAnalysisService {
         scanType: request.scanType,
         mkulimaResult: mkulimaResult,
         source: !isOnline ? ScanSource.queued : ScanSource.mkulimaOnly,
-        queuedForEnrichment: !isOnline && hasCloudKeys,
+        queuedForEnrichment: !isOnline && hasCloud,
         gpsLat: request.gpsLat,
         gpsLng: request.gpsLng,
       );
     }
 
     // Online cloud path.
-    if (isOnline && hasCloudKeys) {
+    if (isOnline && hasCloud) {
       final cloudDiagnosis = await _bridge.enrichOnline(
         imageFile: imageFile,
         cropName: request.cropName,
@@ -107,6 +106,24 @@ class ScanAnalysisService {
         cropName: request.cropName,
         scanType: request.scanType,
         source: ScanSource.cloud,
+        gpsLat: request.gpsLat,
+        gpsLng: request.gpsLng,
+      );
+    }
+
+    if (!hasCloud) {
+      return ScanResult(
+        diagnosis: {
+          'error': true,
+          'message':
+              'Weka CLAUDE_API_KEY kwenye .env kwa uchunguzi wa mtandaoni. Ugonjwa unafanya kazi bila mtandao kupitia Mkulima AI.',
+          'is_healthy': false,
+        },
+        imagePath: request.imagePath,
+        cropName: request.cropName,
+        scanType: request.scanType,
+        mkulimaResult: mkulimaResult,
+        source: ScanSource.mkulimaOnly,
         gpsLat: request.gpsLat,
         gpsLng: request.gpsLng,
       );

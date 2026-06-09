@@ -28,10 +28,18 @@ class ScanResult {
   bool get hasError => diagnosis['error'] == true;
   bool get isHealthy => diagnosis['is_healthy'] == true;
 
-  String get sourceLabel => switch (source) {
-        ScanSource.mkulimaOnly => 'Mkulima AI (Bila Mtandao)',
-        ScanSource.cloud => 'Plant.id + Claude',
-        ScanSource.hybrid => 'Mkulima AI + Claude',
-        ScanSource.queued => 'Mkulima AI (Inasubiri mtandao)',
-      };
+  String get sourceLabel {
+    final cloudSource = diagnosis['source'] as String?;
+    if (cloudSource == 'claude_vision') {
+      return source == ScanSource.hybrid
+          ? 'Mkulima AI + Claude Vision'
+          : 'Claude Vision';
+    }
+    return switch (source) {
+      ScanSource.mkulimaOnly => 'Mkulima AI (Bila Mtandao)',
+      ScanSource.cloud => 'Plant.id + Claude',
+      ScanSource.hybrid => 'Mkulima AI + Claude',
+      ScanSource.queued => 'Mkulima AI (Inasubiri mtandao)',
+    };
+  }
 }
