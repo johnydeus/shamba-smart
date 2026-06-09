@@ -30,6 +30,10 @@
 	<string>Tunahitaji GPS kupata eneo la shamba lako</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Tunahitaji GPS kupata eneo la shamba lako</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Tunahitaji kamera kupiga picha za magonjwa ya mazao</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Tunahitaji kuchagua picha kutoka ghala yako kwa uchunguzi</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
