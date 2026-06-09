@@ -3,11 +3,15 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import '../features/soil/data/crop_requirement_service.dart';
+import '../features/soil/data/soil_crop_matcher.dart';
 import '../models/soil_data_model.dart';
 import '../services/claude_service.dart';
 import '../services/location_service.dart';
 import '../services/soil_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/soil/crop_suitability_chart.dart';
+import '../widgets/soil/soil_nutrient_chart.dart';
 
 class SoilScreen extends StatefulWidget {
   // When opened from FarmDetailScreen, use the farm's pinned GPS
@@ -130,6 +134,8 @@ class _SoilScreenState extends State<SoilScreen> {
               _buildTextureCard(),
               const SizedBox(height: 12),
               _buildNutrientsCard(),
+              const SizedBox(height: 12),
+              _buildCropSuitabilityCard(),
               const SizedBox(height: 12),
               _buildRecommendationCard(),
               const SizedBox(height: 12),
@@ -554,6 +560,39 @@ class _SoilScreenState extends State<SoilScreen> {
     if (value < high) return ('Wastani', Colors.orange.shade600);
     return ('Nzuri', const Color(0xFF2E7D32));
   }
+
+  // ── Crop suitability (Tanzania ECOCROP data) ──────────────
+
+  Widget _buildCropSuitabilityCard() => _SectionCard(
+        title: 'Mazao Yanayofaa kwa Udongo Huu',
+        icon: Icons.bar_chart,
+        iconColor: AppColors.leaf,
+        child: FutureBuilder(
+          future: CropRequirementService().fetchCrops(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+            }
+            final region = LocationService.regionFromCoords(
+              _soilData!.latitude,
+              _soilData!.longitude,
+            );
+            final matches = SoilCropMatcher.match(
+              soil: _soilData!,
+              crops: snapshot.data!,
+              farmerRegion: region,
+            );
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SoilNutrientChart(soil: _soilData!),
+                const SizedBox(height: 12),
+                CropSuitabilityChart(matches: matches),
+              ],
+            );
+          },
+        ),
+      );
 
   // ── Recommendation card ───────────────────────────────────
 

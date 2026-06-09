@@ -17,6 +17,8 @@ class ResultsScreen extends StatefulWidget {
   final String imagePath;
   final String cropName;
   final MkulimaResult? mkulimaResult;
+  final String? scanSource;
+  final bool queuedForEnrichment;
 
   const ResultsScreen({
     super.key,
@@ -24,6 +26,8 @@ class ResultsScreen extends StatefulWidget {
     required this.imagePath,
     required this.cropName,
     this.mkulimaResult,
+    this.scanSource,
+    this.queuedForEnrichment = false,
   });
 
   @override
@@ -137,6 +141,34 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
             if (widget.mkulimaResult != null)
               const SizedBox(height: AppSpacing.md),
+
+            if (widget.scanSource != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: Row(
+                  children: [
+                    Icon(
+                      widget.queuedForEnrichment
+                          ? Icons.schedule
+                          : Icons.memory_outlined,
+                      size: 16,
+                      color: AppColors.textTertiary,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        widget.queuedForEnrichment
+                            ? '${widget.scanSource} — Ushauri wa ziada utatumwa mtandaoni urudipo'
+                            : widget.scanSource!,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             if (hasError)
               _AlertBanner(

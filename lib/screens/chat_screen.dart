@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../features/messaging/domain/message_status.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
@@ -660,13 +661,19 @@ class _MessageBubble extends StatelessWidget {
                   if (sent) ...[
                     const SizedBox(width: 4),
                     Icon(
-                      message.isRead
-                          ? Icons.done_all_rounded
-                          : Icons.done_rounded,
+                      message.status == MessageStatus.pending ||
+                              message.status == MessageStatus.sending
+                          ? Icons.schedule
+                          : message.isRead
+                              ? Icons.done_all_rounded
+                              : Icons.done_rounded,
                       size: 14,
-                      color: message.isRead
-                          ? const Color(0xFF1976D2)
-                          : AppColors.mid,
+                      color: message.status == MessageStatus.pending ||
+                              message.status == MessageStatus.sending
+                          ? AppColors.warning
+                          : message.isRead
+                              ? const Color(0xFF1976D2)
+                              : AppColors.mid,
                     ),
                   ],
                 ],

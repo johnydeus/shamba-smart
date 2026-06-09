@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/listing_model.dart';
 import '../models/user_model.dart';
+import '../services/listing_service.dart';
 
 const _kListings = 'ss_listings';
 
@@ -32,7 +33,7 @@ class ListingProvider extends ChangeNotifier {
     return list;
   }
 
-  // Load listings from SharedPreferences — starts empty for real users
+  // Offline-first: load local cache, then sync from Supabase in background.
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kListings);
@@ -41,14 +42,30 @@ class ListingProvider extends ChangeNotifier {
       _listings = list
           .map((e) => ListingModel.fromJson(e as Map<String, dynamic>))
           .toList();
-      // Remove any old demo listings (IDs that start with '100000')
       final hadDemo = _listings.any((l) => l.id.startsWith('100000'));
       if (hadDemo) {
         _listings.removeWhere((l) => l.id.startsWith('100000'));
         await _save();
       }
+      notifyListeners();
     }
-    notifyListeners();
+    _syncFromSupabase();
+  }
+
+  Future<void> _syncFromSupabase() async {
+    try {
+      final remote = await ListingService.fetchAll();
+      if (remote.isEmpty) return;
+      final localIds = _listings.map((l) => l.id).toSet();
+      for (final r in remote) {
+        if (!localIds.contains(r.id)) _listings.add(r);
+      }
+      _listings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      await _save();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('ListingProvider._syncFromSupabase: $e');
+    }
   }
 
   // Add a new listing at the top of the list
@@ -56,13 +73,14 @@ class ListingProvider extends ChangeNotifier {
     _listings.insert(0, listing);
     await _save();
     notifyListeners();
+    ListingService.upsert(listing);
   }
 
-  // Delete a listing by id
   Future<void> deleteListing(String id) async {
     _listings.removeWhere((l) => l.id == id);
     await _save();
     notifyListeners();
+    ListingService.delete(id);
   }
 
   // Set category filter (null = all)

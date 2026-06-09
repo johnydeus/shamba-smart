@@ -16,6 +16,8 @@ class PlantIdService {
     required File imageFile,
     required String cropName,
     required String scanType,
+    String? mkulimaContext,
+    String? region,
   }) async {
     if (scanType == 'magugu') {
       if (!ApiKeys.hasPlantId) {
@@ -26,7 +28,7 @@ class PlantIdService {
           'is_healthy': false,
         };
       }
-      return _identifyWeed(imageFile, cropName);
+      return _identifyWeed(imageFile, cropName, region: region);
     }
 
     // ugonjwa + wadudu — both use crop.health
@@ -38,7 +40,13 @@ class PlantIdService {
         'is_healthy': false,
       };
     }
-    return _detectCropHealth(imageFile, cropName, scanType);
+    return _detectCropHealth(
+      imageFile,
+      cropName,
+      scanType,
+      mkulimaContext: mkulimaContext,
+      region: region,
+    );
   }
 
   // ── Disease + Pest detection via crop.health API ──────────────────────────
@@ -46,8 +54,10 @@ class PlantIdService {
   static Future<Map<String, dynamic>> _detectCropHealth(
     File imageFile,
     String cropName,
-    String scanType,
-  ) async {
+    String scanType, {
+    String? mkulimaContext,
+    String? region,
+  }) async {
     final base64Image = await _toBase64(imageFile);
 
     try {
@@ -65,7 +75,13 @@ class PlantIdService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return _parseCropHealthAndExplain(data, cropName, scanType);
+        return _parseCropHealthAndExplain(
+          data,
+          cropName,
+          scanType,
+          mkulimaContext: mkulimaContext,
+          region: region,
+        );
       }
 
       return _apiError(response.statusCode, response.body);
@@ -77,8 +93,10 @@ class PlantIdService {
   static Future<Map<String, dynamic>> _parseCropHealthAndExplain(
     Map<String, dynamic> data,
     String cropName,
-    String scanType,
-  ) async {
+    String scanType, {
+    String? mkulimaContext,
+    String? region,
+  }) async {
     final result = (data['result'] as Map<String, dynamic>?) ?? {};
 
     final isHealthyMap = result['is_healthy'] as Map<String, dynamic>?;
@@ -112,6 +130,8 @@ class PlantIdService {
       chemicalTreatment: (treatment['chemical'] as String?) ?? '',
       biologicalTreatment: (treatment['biological'] as String?) ?? '',
       prevention: (treatment['prevention'] as String?) ?? '',
+      mkulimaContext: mkulimaContext,
+      region: region,
     );
   }
 
@@ -119,8 +139,9 @@ class PlantIdService {
 
   static Future<Map<String, dynamic>> _identifyWeed(
     File imageFile,
-    String cropName,
-  ) async {
+    String cropName, {
+    String? region,
+  }) async {
     final base64Image = await _toBase64(imageFile);
 
     try {
@@ -138,7 +159,7 @@ class PlantIdService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return _parseWeedAndExplain(data, cropName);
+        return _parseWeedAndExplain(data, cropName, region: region);
       }
 
       return _apiError(response.statusCode, response.body);
@@ -149,8 +170,9 @@ class PlantIdService {
 
   static Future<Map<String, dynamic>> _parseWeedAndExplain(
     Map<String, dynamic> data,
-    String cropName,
-  ) async {
+    String cropName, {
+    String? region,
+  }) async {
     final result = (data['result'] as Map<String, dynamic>?) ?? {};
 
     final isPlantMap = result['is_plant'] as Map<String, dynamic>?;
@@ -193,6 +215,7 @@ class PlantIdService {
       weedCommonNames: commonNames,
       confidence: probability,
       description: description,
+      region: region,
     );
   }
 

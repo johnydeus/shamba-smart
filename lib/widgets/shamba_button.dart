@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_typography.dart';
 
 enum ButtonVariant { primary, secondary, outline, ghost, danger }
 
@@ -33,7 +34,7 @@ class _ShambaButtonState extends State<ShambaButton> {
 
   @override
   Widget build(BuildContext context) {
-    final height = widget.isSmall ? 44.0 : 52.0;
+    final height = widget.isSmall ? AppTypography.minTouchTarget : 52.0;
     final fontSize = widget.isSmall ? 13.0 : 15.0;
 
     Color bg;

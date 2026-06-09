@@ -120,4 +120,46 @@ class ListingModel {
         'badgeColorHex': badgeColorHex,
         'emoji': emoji,
       };
+
+  factory ListingModel.fromSupabaseJson(Map<String, dynamic> j) =>
+      ListingModel(
+        id: j['id'] as String,
+        type: ListingTypeX.fromKey(j['type'] as String),
+        title: j['title'] as String,
+        description: j['description'] as String? ?? '',
+        price: (j['price'] as num).toInt(),
+        unit: j['unit'] as String? ?? 'kg',
+        quantityAvailable: j['quantity_available'] as int? ?? 1,
+        location: j['location'] as String? ?? '',
+        createdAt: DateTime.parse(j['created_at'] as String),
+        seller: SellerInfo(
+          id: j['seller_id'] as String,
+          name: j['seller_name'] as String,
+          role: UserRoleX.fromKey(j['seller_role'] as String? ?? 'mkulima'),
+          colorHex: j['seller_color_hex'] as String? ?? '#2E7D32',
+        ),
+        badgeText: j['badge_text'] as String? ?? '',
+        badgeColorHex: j['badge_color_hex'] as String? ?? '#43A047',
+        emoji: j['emoji'] as String? ?? '📦',
+      );
+
+  Map<String, dynamic> toSupabaseJson() => {
+        'id': id,
+        'seller_id': seller.id,
+        'seller_name': seller.name,
+        'seller_role': seller.role.key,
+        'seller_color_hex': seller.colorHex,
+        'type': type.name,
+        'title': title,
+        'description': description,
+        'price': price,
+        'unit': unit,
+        'quantity_available': quantityAvailable,
+        'location': location,
+        'emoji': emoji,
+        'badge_text': badgeText,
+        'badge_color_hex': badgeColorHex,
+        'status': 'active',
+        'created_at': createdAt.toIso8601String(),
+      };
 }

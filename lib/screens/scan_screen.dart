@@ -4,10 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import '../features/scan/domain/scan_request.dart';
+import '../providers/auth_provider.dart';
+import '../providers/scan_provider.dart';
 import '../routes/fade_slide_route.dart';
-import '../services/mkulima_service.dart';
-import '../services/plant_id_service.dart';
-import '../services/supabase_service.dart';
+import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shamba_button.dart';
 import 'results_screen.dart';
@@ -142,45 +144,66 @@ class _ScanScreenState extends State<ScanScreen>
     if (_selectedImage == null) return;
     HapticFeedback.mediumImpact();
 
-    // Step 1 — Mkulima AI: fast offline diagnosis (ugonjwa only)
-    MkulimaResult? mkulimaResult;
-    if (_selectedScanType == 'ugonjwa') {
-      setState(() {
-        _analysing = true;
-        _statusMessage = 'Mkulima AI inachunguza picha...';
-      });
-      mkulimaResult = await MkulimaService().analyze(_selectedImage!);
-    }
+    _bracketCtrl.stop();
+    setState(() {
+      _analysing = true;
+      _statusMessage = 'Mkulima AI inachunguza picha...';
+    });
 
-    // Step 2 — Plant.id + Claude: full Swahili explanation
-    setState(() => _statusMessage = 'Inatuma picha kwa Plant.id AI...');
+    double? gpsLat;
+    double? gpsLng;
+    try {
+      final pos = await LocationService.getCurrentLocation();
+      gpsLat = pos.latitude;
+      gpsLng = pos.longitude;
+    } catch (_) {}
 
-    final result = await PlantIdService.analysePhoto(
-      imageFile: _selectedImage!,
-      cropName: _selectedCrop,
-      scanType: _selectedScanType,
-    );
-
-    setState(() => _statusMessage = 'Inahifadhi matokeo...');
-
-    await SupabaseService.saveDiagnosis(
-      cropName: _selectedCrop,
-      claudeResponse: result,
-      photoPath: _selectedImage!.path,
-      mkulimaResult: mkulimaResult,
-    );
-
-    setState(() => _analysing = false);
     if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    final region = auth.currentUser?.region;
+    final scanProvider = context.read<ScanProvider>();
+    final result = await scanProvider.analyze(
+      ScanRequest(
+        imagePath: _selectedImage!.path,
+        cropName: _selectedCrop,
+        scanType: _selectedScanType,
+        gpsLat: gpsLat,
+        gpsLng: gpsLng,
+        region: region,
+      ),
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _analysing = false;
+      _statusMessage = '';
+    });
+    _bracketCtrl.repeat(reverse: true);
+
+    if (result == null || (result.hasError && result.mkulimaResult == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result?.diagnosis['message'] as String? ??
+                scanProvider.errorMessage ??
+                'Uchunguzi umeshindwa. Jaribu tena.',
+          ),
+        ),
+      );
+      return;
+    }
 
     Navigator.pushReplacement(
       context,
       FadeSlideRoute(
         page: ResultsScreen(
-          diagnosis: result,
+          diagnosis: result.diagnosis,
           imagePath: _selectedImage!.path,
           cropName: _selectedCrop,
-          mkulimaResult: mkulimaResult,
+          mkulimaResult: result.mkulimaResult,
+          scanSource: result.sourceLabel,
+          queuedForEnrichment: result.queuedForEnrichment,
         ),
       ),
     );

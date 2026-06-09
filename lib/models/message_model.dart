@@ -1,3 +1,4 @@
+import '../features/messaging/domain/message_status.dart';
 import '../models/user_model.dart';
 
 // Types of messages that can be sent in a conversation
@@ -12,6 +13,7 @@ class MessageModel {
   final bool isFromMe;
   final bool isRead;
   final MessageType type;
+  final MessageStatus status;
 
   // ── Image message fields ──────────────────────────────────────────────────
   final String? imagePath;     // local file path to the image
@@ -35,6 +37,7 @@ class MessageModel {
     required this.isFromMe,
     this.isRead = false,
     this.type = MessageType.text,
+    this.status = MessageStatus.sent,
     this.imagePath,
     this.locationLat,
     this.locationLng,
@@ -65,6 +68,10 @@ class MessageModel {
           (t) => t.name == (j['type'] as String? ?? 'text'),
           orElse: () => MessageType.text,
         ),
+        status: MessageStatus.values.firstWhere(
+          (s) => s.name == (j['status'] as String? ?? 'sent'),
+          orElse: () => MessageStatus.sent,
+        ),
         imagePath: j['imagePath'] as String?,
         locationLat: (j['locationLat'] as num?)?.toDouble(),
         locationLng: (j['locationLng'] as num?)?.toDouble(),
@@ -82,6 +89,7 @@ class MessageModel {
         'timestamp': timestamp.toIso8601String(),
         'isFromMe': isFromMe,
         'type': type.name,
+        'status': status.name,
         if (imagePath != null) 'imagePath': imagePath,
         if (locationLat != null) 'locationLat': locationLat,
         if (locationLng != null) 'locationLng': locationLng,

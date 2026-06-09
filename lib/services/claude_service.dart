@@ -183,6 +183,8 @@ Rules:
     required String chemicalTreatment,
     required String biologicalTreatment,
     required String prevention,
+    String? mkulimaContext,
+    String? region,
   }) async {
     const jsonTemplate = '''
 {
@@ -204,9 +206,15 @@ Rules:
 }''';
 
     final typeLabel = scanType == 'wadudu' ? 'mdudu/wadudu' : 'ugonjwa';
+    final regionLine = region != null && region.isNotEmpty
+        ? 'Farmer region: $region (Tanzania)\n'
+        : '';
+    final mkulimaLine = mkulimaContext != null && mkulimaContext.isNotEmpty
+        ? '\nOn-device Mkulima AI pre-scan (use to cross-check and enrich advice):\n$mkulimaContext\n'
+        : '';
     final prompt = '''
 You are an agricultural advisor for smallholder farmers in Tanzania.
-Plant.id (a specialized agricultural vision AI) has identified the following $typeLabel on a $cropName crop:
+${regionLine}Plant.id (a specialized agricultural vision AI) has identified the following $typeLabel on a $cropName crop:
 
 Identified: $diseaseName
 Confidence: ${(confidence * 100).toStringAsFixed(0)}%
@@ -214,8 +222,8 @@ Description: $description
 Chemical treatment options: $chemicalTreatment
 Biological/organic treatment: $biologicalTreatment
 Prevention: $prevention
-
-Use this information to generate advice for a Tanzanian farmer. Respond ONLY with a valid JSON object:
+$mkulimaLine
+Use this information to generate region-specific advice for a Tanzanian farmer. Respond ONLY with a valid JSON object:
 
 $jsonTemplate
 
@@ -277,6 +285,7 @@ Rules:
     required List<String> weedCommonNames,
     required double confidence,
     required String description,
+    String? region,
   }) async {
     const jsonTemplate = '''
 {

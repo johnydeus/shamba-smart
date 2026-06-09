@@ -3,6 +3,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/sync/sync_coordinator.dart';
+import 'features/messaging/data/message_repository.dart';
+import 'features/scan/data/claude_api_bridge.dart';
 import 'services/mkulima_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/listing_provider.dart';
@@ -11,6 +14,7 @@ import 'providers/ai_provider.dart';
 import 'providers/satellite_provider.dart';
 import 'providers/farm_provider.dart';
 import 'providers/community_provider.dart';
+import 'providers/scan_provider.dart';
 import 'models/user_model.dart';
 import 'screens/main_shell.dart';
 import 'screens/login_screen.dart';
@@ -30,6 +34,18 @@ Future<void> main() async {
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL'] ?? '',
     anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+  );
+
+  // Core offline sync infrastructure
+  final syncCoordinator = SyncCoordinator();
+  await syncCoordinator.init();
+  syncCoordinator.registerHandler(
+    'scan_enrichment',
+    ClaudeApiBridge().processOutboxItem,
+  );
+  syncCoordinator.registerHandler(
+    'message',
+    MessageRepository().processOutboxItem,
   );
 
   // Initialise providers
@@ -67,14 +83,40 @@ Future<void> main() async {
         ChangeNotifierProvider.value(value: satelliteProvider),
         ChangeNotifierProvider.value(value: farmProvider),
         ChangeNotifierProvider.value(value: communityProvider),
+        ChangeNotifierProvider(create: (_) => ScanProvider()),
       ],
       child: const ShambaSmart(),
     ),
   );
 }
 
-class ShambaSmart extends StatelessWidget {
+class ShambaSmart extends StatefulWidget {
   const ShambaSmart({super.key});
+
+  @override
+  State<ShambaSmart> createState() => _ShambaSmartState();
+}
+
+class _ShambaSmartState extends State<ShambaSmart>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      SyncCoordinator().flushAll();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +152,7 @@ class _AuthGateState extends State<AuthGate> {
         context.read<FarmProvider>().init(user.id);
         context.read<ChatProvider>().init(user.id, user.displayName, user.role.key);
         context.read<CommunityProvider>().loadPosts();
+        SyncCoordinator().flushAll();
       });
     }
 

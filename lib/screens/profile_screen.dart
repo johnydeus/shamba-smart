@@ -13,7 +13,9 @@ import 'forum_screen.dart';
 import 'farms_screen.dart';
 import 'irrigation_screen.dart';
 import 'soil_screen.dart';
+import 'marketplace_screen.dart';
 import 'consultation_screen.dart';
+import '../widgets/soil/soil_profile_summary_card.dart';
 import 'expert_profile_screen.dart' show kSpecializations;
 
 class ProfileScreen extends StatelessWidget {
@@ -95,6 +97,16 @@ class ProfileScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 20),
+
+              // ── Soil health summary ───────────────────────────────────────
+              if (user.role == UserRole.mkulima || user.role == UserRole.afisa)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SoilProfileSummaryCard(farmerRegion: user.region),
+                ),
+
+              if (user.role == UserRole.mkulima || user.role == UserRole.afisa)
+                const SizedBox(height: 16),
 
               // ── Role switcher ──────────────────────────────────────────────
               Padding(
@@ -239,6 +251,14 @@ class ProfileScreen extends StatelessWidget {
             color: color,
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const SoilScreen())),
+          ),
+          _MenuItem(
+            icon: Icons.storefront_outlined,
+            title: 'Soko la Mazao',
+            subtitle: 'Nunua na uza mazao, mbegu, na zana',
+            color: color,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const MarketplaceScreen())),
           ),
           _MenuItem(
             icon: Icons.trending_up,

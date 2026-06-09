@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/sync_status_banner.dart';
 import 'home_screen.dart';
 import 'farms_screen.dart';
 import 'scan_screen.dart';
@@ -37,9 +38,16 @@ class _MainShellState extends State<MainShell> {
     final role = user?.role ?? UserRole.mkulima;
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens(role),
+      body: Column(
+        children: [
+          const SyncStatusBanner(),
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _screens(role),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: _BottomNav(
         currentIndex: _currentIndex,
