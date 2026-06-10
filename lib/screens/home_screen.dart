@@ -11,6 +11,7 @@ import 'soil_screen.dart';
 import 'consultation_screen.dart';
 import 'agrovet_screen.dart';
 import 'market_screen.dart';
+import 'market_intelligence_screen.dart';
 import 'irrigation_screen.dart';
 import 'forum_screen.dart';
 import 'login_screen.dart';
@@ -19,6 +20,13 @@ import 'seeds_screen.dart';
 import 'crop_protection_screen.dart';
 import 'messages_screen.dart';
 import 'farms_screen.dart';
+import 'ipm_screen.dart';
+import 'fertiliser_prescription_screen.dart';
+import 'spray_advisory_screen.dart';
+import 'soil_mapping_screen.dart';
+import 'premium_sensor_screen.dart';
+import 'farm_diary_screen.dart';
+import 'kilimo_kivuli_screen.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -891,6 +899,14 @@ class _QuickActions extends StatelessWidget {
        'onTap': () => nav(const AgrovetScreen())},
       {'emoji': '🤖', 'label': 'Mshauri AI', 'color': _kGreen,
        'onTap': () => nav(const ForumScreen())},
+      {'emoji': '🐛', 'label': 'IPM', 'color': const Color(0xFF4E342E),
+       'onTap': () => nav(const IpmScreen())},
+      {'emoji': '☁️', 'label': 'Kupulizia', 'color': const Color(0xFF0277BD),
+       'onTap': () => nav(const SprayAdvisoryScreen())},
+      {'emoji': '🌿', 'label': 'Kilimo Kivuli', 'color': const Color(0xFF1B5E20),
+       'onTap': () => nav(const KilimoKivuliScreen())},
+      {'emoji': '📔', 'label': 'Diari', 'color': const Color(0xFFE65100),
+       'onTap': () => nav(const FarmDiaryScreen())},
       if (role == UserRole.afisa)
         {'emoji': '👨‍🌾', 'label': 'Wakulima', 'color': const Color(0xFF00695C),
          'onTap': () => nav(const ConsultationScreen())},
@@ -1527,12 +1543,26 @@ class _ServicesSection extends StatelessWidget {
           () => go(const AgrovetScreen())),
       _ServiceItem('💧', 'Umwagiliaji', const Color(0xFF0277BD),
           () => go(const IrrigationScreen())),
-      _ServiceItem('📊', 'Bei za Mazao', const Color(0xFFFF6F00),
-          () => go(const MarketScreen())),
+      _ServiceItem('📊', 'Akili za Soko', const Color(0xFFFF6F00),
+          () => go(const MarketIntelligenceScreen())),
       _ServiceItem('🧪', 'Viuatilifu', const Color(0xFF6A1B9A),
           () => go(const ViuatiliziScreen())),
       _ServiceItem('🛡️', 'Ulinzi wa Mazao', const Color(0xFFE65100),
           () => go(const CropProtectionScreen())),
+      _ServiceItem('🐛', 'IPM — Maamuzi ya Kupulizia', const Color(0xFF4E342E),
+          () => go(const IpmScreen())),
+      _ServiceItem('💊', 'Dawa ya Mbolea', const Color(0xFF6A1B9A),
+          () => go(const FertiliserPrescriptionScreen())),
+      _ServiceItem('☁️', 'Ushauri wa Kupulizia', const Color(0xFF0277BD),
+          () => go(const SprayAdvisoryScreen())),
+      _ServiceItem('🗺️', 'Ramani ya Udongo', const Color(0xFF795548),
+          () => go(const SoilMappingScreen())),
+      _ServiceItem('📡', 'Sensor & Premium', const Color(0xFFF57F17),
+          () => go(const PremiumSensorScreen())),
+      _ServiceItem('📔', 'Diari ya Shamba', const Color(0xFFE65100),
+          () => go(const FarmDiaryScreen())),
+      _ServiceItem('🌿', 'Kilimo Kivuli', const Color(0xFF1B5E20),
+          () => go(const KilimoKivuliScreen())),
       if (role == UserRole.mkulima || role == UserRole.afisa)
         _ServiceItem('🌍', 'Data ya Udongo', const Color(0xFF795548),
             () => go(const SoilScreen())),

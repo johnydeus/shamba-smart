@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../routes/fade_slide_route.dart';
+import '../services/audio_service.dart';
 import '../services/mkulima_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shamba_button.dart';
@@ -234,12 +235,20 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Maelezo',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'Maelezo',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const Spacer(),
+                          SpeakerButton(
+                            text: 'Ugonjwa uliopatikana ni $diseaseSw. $descriptionSw. Hatua ya kuchukua: $actionSw',
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       Text(

@@ -72,6 +72,19 @@ dependencies:
   tflite_flutter: ^0.12.0
   image: ^4.1.3
 
+  # Audio TTS for Swahili voice responses
+  flutter_tts: ^3.8.5
+
+  # PDF generation for farm reports
+  pdf: ^3.10.8
+  printing: ^5.12.0
+
+  # Share functionality
+  share_plus: ^7.2.2
+
+  # Calendar for spray/fertiliser schedule
+  table_calendar: ^3.0.9
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
