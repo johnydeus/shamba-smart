@@ -221,37 +221,48 @@ ALTER TABLE farm_seasons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE greenhouse_setups ENABLE ROW LEVEL SECURITY;
 
 -- Basic RLS policies (farmers can see their own data)
-CREATE POLICY IF NOT EXISTS "farmer_ipm" ON ipm_records
+DROP POLICY IF EXISTS "farmer_ipm" ON ipm_records;
+CREATE POLICY "farmer_ipm" ON ipm_records
   FOR ALL USING (farmer_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "farmer_fertiliser" ON fertiliser_prescriptions
+DROP POLICY IF EXISTS "farmer_fertiliser" ON fertiliser_prescriptions;
+CREATE POLICY "farmer_fertiliser" ON fertiliser_prescriptions
   FOR ALL USING (farmer_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "farmer_spray" ON spray_records
+DROP POLICY IF EXISTS "farmer_spray" ON spray_records;
+CREATE POLICY "farmer_spray" ON spray_records
   FOR ALL USING (farmer_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "farmer_stations" ON sensor_stations
+DROP POLICY IF EXISTS "farmer_stations" ON sensor_stations;
+CREATE POLICY "farmer_stations" ON sensor_stations
   FOR ALL USING (farmer_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "farmer_readings" ON sensor_readings
+DROP POLICY IF EXISTS "farmer_readings" ON sensor_readings;
+CREATE POLICY "farmer_readings" ON sensor_readings
   FOR ALL USING (farmer_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "all_agronomists" ON agronomist_profiles
+DROP POLICY IF EXISTS "all_agronomists" ON agronomist_profiles;
+CREATE POLICY "all_agronomists" ON agronomist_profiles
   FOR SELECT USING (TRUE);
 
-CREATE POLICY IF NOT EXISTS "farmer_agro_messages" ON agronomist_messages
+DROP POLICY IF EXISTS "farmer_agro_messages" ON agronomist_messages;
+CREATE POLICY "farmer_agro_messages" ON agronomist_messages
   FOR ALL USING (farmer_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "farmer_alerts" ON price_alerts
+DROP POLICY IF EXISTS "farmer_alerts" ON price_alerts;
+CREATE POLICY "farmer_alerts" ON price_alerts
   FOR ALL USING (farmer_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "farmer_events" ON farm_events
+DROP POLICY IF EXISTS "farmer_events" ON farm_events;
+CREATE POLICY "farmer_events" ON farm_events
   FOR ALL USING (farmer_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "farmer_seasons" ON farm_seasons
+DROP POLICY IF EXISTS "farmer_seasons" ON farm_seasons;
+CREATE POLICY "farmer_seasons" ON farm_seasons
   FOR ALL USING (farmer_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "farmer_greenhouse" ON greenhouse_setups
+DROP POLICY IF EXISTS "farmer_greenhouse" ON greenhouse_setups;
+CREATE POLICY "farmer_greenhouse" ON greenhouse_setups
   FOR ALL USING (farmer_id = auth.uid());
 
 -- Seed one sample agronomist
