@@ -17,6 +17,9 @@ import 'marketplace_screen.dart';
 import 'consultation_screen.dart';
 import '../widgets/soil/soil_profile_summary_card.dart';
 import 'expert_profile_screen.dart' show kSpecializations;
+import 'find_officer_screen.dart';
+import 'officer_dashboard_screen.dart';
+import 'privacy_settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -247,10 +250,18 @@ class ProfileScreen extends StatelessWidget {
           _MenuItem(
             icon: Icons.landscape_outlined,
             title: 'Udongo wa Shamba',
-            subtitle: 'Pata data za udongo kwa GPS',
+            subtitle: 'Pata data za udongo kwa GPS sahihi',
             color: color,
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const SoilScreen())),
+          ),
+          _MenuItem(
+            icon: Icons.person_search_outlined,
+            title: 'Tafuta Mtaalamu wa Kilimo',
+            subtitle: 'Pata afisa kilimo wa mkoa wako',
+            color: const Color(0xFF00695C),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const FindOfficerScreen())),
           ),
           _MenuItem(
             icon: Icons.storefront_outlined,
@@ -283,6 +294,14 @@ class ProfileScreen extends StatelessWidget {
             color: color,
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
+          ),
+          _MenuItem(
+            icon: Icons.lock_outline,
+            title: 'Mipangilio ya Faragha',
+            subtitle: 'Simamia data yako na faragha yako',
+            color: AppColors.mid,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen())),
           ),
           _MenuItem(
             icon: Icons.settings_outlined,
@@ -318,6 +337,14 @@ class ProfileScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
           _MenuItem(
+            icon: Icons.lock_outline,
+            title: 'Mipangilio ya Faragha',
+            subtitle: 'Simamia data yako na faragha yako',
+            color: AppColors.mid,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen())),
+          ),
+          _MenuItem(
             icon: Icons.settings_outlined,
             title: 'Mipangilio',
             subtitle: 'Badilisha taarifa za akaunti yako',
@@ -343,6 +370,14 @@ class ProfileScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
           _MenuItem(
+            icon: Icons.lock_outline,
+            title: 'Mipangilio ya Faragha',
+            subtitle: 'Simamia data yako na faragha yako',
+            color: AppColors.mid,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen())),
+          ),
+          _MenuItem(
             icon: Icons.settings_outlined,
             title: 'Mipangilio',
             subtitle: 'Badilisha taarifa za akaunti yako',
@@ -351,6 +386,15 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       UserRole.afisa => [
+          _MenuItem(
+            icon: Icons.dashboard_outlined,
+            title: 'Dashibodi ya Afisa',
+            subtitle: 'Wakulima wako, matangazo, na takwimu za mkoa',
+            color: color,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) => const OfficerDashboardScreen())),
+          ),
           _MenuItem(
             icon: Icons.workspace_premium_outlined,
             title: 'Simamia Profaili ya Mtaalamu',
@@ -392,6 +436,15 @@ class ProfileScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
           _MenuItem(
+            icon: Icons.lock_outline,
+            title: 'Mipangilio ya Faragha',
+            subtitle: 'Simamia data yako na faragha yako',
+            color: AppColors.mid,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) => const PrivacySettingsScreen())),
+          ),
+          _MenuItem(
             icon: Icons.settings_outlined,
             title: 'Mipangilio',
             subtitle: 'Taarifa za akaunti yako',
@@ -415,6 +468,14 @@ class ProfileScreen extends StatelessWidget {
             color: color,
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
+          ),
+          _MenuItem(
+            icon: Icons.lock_outline,
+            title: 'Mipangilio ya Faragha',
+            subtitle: 'Simamia data yako na faragha yako',
+            color: AppColors.mid,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen())),
           ),
           _MenuItem(
             icon: Icons.settings_outlined,

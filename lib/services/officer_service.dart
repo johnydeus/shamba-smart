@@ -1,5 +1,4 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'location_service.dart';
 
 class OfficerService {
   static SupabaseClient get _db => Supabase.instance.client;
