@@ -31,6 +31,14 @@ class _SoilScreenState extends State<SoilScreen> {
   String? _errorMessage;
   bool _isFromCache = false;
 
+  // GPS accuracy state
+  bool _gpsSearching = false;
+  Map<String, dynamic>? _gpsResult;
+  bool _showManualEntry = false;
+  final _manualLatCtrl = TextEditingController();
+  final _manualLngCtrl = TextEditingController();
+  String? _manualError;
+
   // Crop advisory state
   String? _advisoryText;
   bool _advisoryLoading = false;
@@ -40,6 +48,13 @@ class _SoilScreenState extends State<SoilScreen> {
   void initState() {
     super.initState();
     _loadCachedData();
+  }
+
+  @override
+  void dispose() {
+    _manualLatCtrl.dispose();
+    _manualLngCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCachedData() async {
@@ -52,29 +67,56 @@ class _SoilScreenState extends State<SoilScreen> {
     }
   }
 
+  // Phase 1: Search GPS with accuracy feedback
   Future<void> _fetchSoilData() async {
+    // If farm coords are pinned, skip GPS search entirely
+    if (widget.farmLat != null && widget.farmLng != null) {
+      await _loadSoilForCoords(widget.farmLat!, widget.farmLng!);
+      return;
+    }
+
+    setState(() {
+      _gpsSearching = true;
+      _gpsResult = null;
+      _showManualEntry = false;
+      _errorMessage = null;
+    });
+
+    final result = await LocationService.getHighAccuracyLocation(
+      maxWaitSeconds: 30,
+      maxAcceptableAccuracyMetres: 50.0,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _gpsSearching = false;
+      _gpsResult = result;
+    });
+
+    if (result['success'] == true && result['is_accurate'] == true) {
+      // Good accuracy — proceed automatically
+      await _loadSoilForCoords(
+        result['recommended_lat'] as double,
+        result['recommended_lng'] as double,
+      );
+    }
+    // If poor accuracy or failed, UI shows options (retry / manual / proceed)
+  }
+
+  // Phase 2: Fetch soil data for confirmed coordinates
+  Future<void> _loadSoilForCoords(double lat, double lng) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-
     try {
-      double lat, lng;
-      // Use farm's pinned GPS if provided, otherwise use device GPS
-      if (widget.farmLat != null && widget.farmLng != null) {
-        lat = widget.farmLat!;
-        lng = widget.farmLng!;
-      } else {
-        final position = await LocationService.getCurrentLocation();
-        lat = position.latitude;
-        lng = position.longitude;
-      }
       final data = await SoilService.getSoilData(lat, lng);
       await SoilService.cacheResult(data);
       if (mounted) {
         setState(() {
           _soilData = data;
           _isFromCache = false;
+          _gpsResult = null; // hide GPS card when data is shown
         });
       }
     } catch (e) {
@@ -86,6 +128,42 @@ class _SoilScreenState extends State<SoilScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // Use GPS result (despite poor accuracy)
+  void _proceedWithGps() {
+    final r = _gpsResult;
+    if (r == null || r['success'] != true) return;
+    _loadSoilForCoords(
+      r['recommended_lat'] as double,
+      r['recommended_lng'] as double,
+    );
+  }
+
+  // Confirm manual coordinate entry
+  void _confirmManualEntry() {
+    final latText = _manualLatCtrl.text.trim();
+    final lngText = _manualLngCtrl.text.trim();
+    final lat = double.tryParse(latText);
+    final lng = double.tryParse(lngText);
+
+    if (lat == null || lng == null) {
+      setState(() => _manualError = 'Weka nambari halisi. Mfano: -6.8012');
+      return;
+    }
+
+    final validation = LocationService.validateManualCoordinates(lat, lng);
+    if (validation['success'] != true) {
+      setState(() => _manualError = validation['error'] as String);
+      return;
+    }
+
+    setState(() {
+      _manualError = null;
+      _showManualEntry = false;
+      _gpsResult = validation;
+    });
+    _loadSoilForCoords(lat, lng);
   }
 
   @override
@@ -113,6 +191,18 @@ class _SoilScreenState extends State<SoilScreen> {
             _buildIntroCard(),
             const SizedBox(height: 12),
             _buildLocationButton(),
+            if (_gpsSearching) ...[
+              const SizedBox(height: 16),
+              _buildGpsSearching(),
+            ],
+            if (_gpsResult != null && !_isLoading && _soilData == null) ...[
+              const SizedBox(height: 16),
+              _buildGpsAccuracyCard(),
+            ],
+            if (_showManualEntry) ...[
+              const SizedBox(height: 16),
+              _buildManualEntryCard(),
+            ],
             if (_isLoading) ...[
               const SizedBox(height: 24),
               _buildLoading(),
@@ -144,6 +234,406 @@ class _SoilScreenState extends State<SoilScreen> {
               _buildMap(),
               const SizedBox(height: 24),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── GPS searching indicator ───────────────────────────────
+
+  Widget _buildGpsSearching() => Card(
+        color: const Color(0xFFE8F5E9),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 20, height: 20,
+                child: CircularProgressIndicator(
+                    color: AppColors.leaf, strokeWidth: 2.5),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Inatafuta mahali pako...',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.leaf)),
+                    const SizedBox(height: 2),
+                    Text('Nenda mahali wazi ili GPS ifanye kazi vizuri.',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade600)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  // ── GPS accuracy result card ──────────────────────────────
+
+  Widget _buildGpsAccuracyCard() {
+    final r = _gpsResult!;
+    final bool ok = r['success'] == true;
+    final bool accurate = r['is_accurate'] == true;
+    final colorStr = r['accuracy_color'] as String? ?? 'red';
+    final Color accentColor = colorStr == 'green'
+        ? const Color(0xFF2E7D32)
+        : colorStr == 'orange'
+            ? Colors.orange.shade700
+            : colorStr == 'blue'
+                ? const Color(0xFF1565C0)
+                : const Color(0xFFB71C1C);
+
+    if (!ok) {
+      // GPS failed completely
+      return Card(
+        color: const Color(0xFFFFEBEE),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Icon(Icons.gps_off, color: accentColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(r['error'] as String? ?? 'GPS imeshindwa',
+                      style: TextStyle(
+                          color: accentColor, fontWeight: FontWeight.bold)),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _fetchSoilData,
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Jaribu Tena'),
+                    style: OutlinedButton.styleFrom(foregroundColor: accentColor),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => setState(() => _showManualEntry = true),
+                    icon: const Icon(Icons.edit_location_alt, size: 16),
+                    label: const Text('Weka Mkono'),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1565C0)),
+                  ),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final lat = (r['recommended_lat'] as double).toStringAsFixed(4);
+    final lng = (r['recommended_lng'] as double).toStringAsFixed(4);
+    final region = LocationService.getRegionFromCoordinates(
+        r['recommended_lat'] as double, r['recommended_lng'] as double);
+    final readingsTaken = r['readings_taken'] as int? ?? 1;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Accuracy badge
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: accentColor.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(accurate ? Icons.gps_fixed : Icons.gps_not_fixed,
+                          color: accentColor, size: 16),
+                      const SizedBox(width: 6),
+                      Text(r['accuracy_label'] as String? ?? '',
+                          style: TextStyle(
+                              color: accentColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13)),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Text('$readingsTaken usomaji',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Coordinates display
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_pin, size: 18, color: Colors.red),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('$lat, $lng',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text(region,
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _showManualEntry = true;
+                      _manualLatCtrl.text =
+                          (r['recommended_lat'] as double).toString();
+                      _manualLngCtrl.text =
+                          (r['recommended_lng'] as double).toString();
+                    }),
+                    style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF1565C0),
+                        padding: EdgeInsets.zero),
+                    child: const Text('Sahihisha', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            if (accurate) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _proceedWithGps,
+                  icon: const Icon(Icons.terrain, size: 18),
+                  label: const Text('Pata Data za Udongo'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.leaf,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ] else ...[
+              // Poor accuracy — show 3 options
+              const Text('GPS sahihi kidogo. Chagua jinsi ya kuendelea:',
+                  style: TextStyle(fontSize: 13, color: Colors.grey)),
+              const SizedBox(height: 10),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _fetchSoilData,
+                    child: const Text('🔄 Jaribu Tena', textAlign: TextAlign.center),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => setState(() => _showManualEntry = true),
+                    child: const Text('✏️ Weka Mkono', textAlign: TextAlign.center),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 6),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: _proceedWithGps,
+                  child: const Text('Endelea Hata Hivyo →',
+                      style: TextStyle(color: Colors.grey, fontSize: 12)),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Manual coordinate entry form ──────────────────────────
+
+  Widget _buildManualEntryCard() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.edit_location_alt,
+                      color: Color(0xFF1565C0)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text('Weka Mahali kwa Mkono',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: () =>
+                        setState(() => _showManualEntry = false),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Fungua Google Maps, bonyeza mahali pako kwa sekunde, '
+                'kisha nakili nambari hapa chini.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 14),
+
+              // Latitude field
+              TextField(
+                controller: _manualLatCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                    signed: true, decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Latitudo (Latitude)',
+                  hintText: 'Mfano: -6.8012',
+                  prefixIcon: const Icon(Icons.navigation),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  helperText: 'Nambari kati ya -11.7 na -1.0',
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Longitude field
+              TextField(
+                controller: _manualLngCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                    signed: true, decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Longitudo (Longitude)',
+                  hintText: 'Mfano: 36.9021',
+                  prefixIcon: const Icon(Icons.navigation_outlined),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  helperText: 'Nambari kati ya 29.3 na 40.4',
+                ),
+              ),
+
+              if (_manualError != null) ...[
+                const SizedBox(height: 8),
+                Text(_manualError!,
+                    style: const TextStyle(
+                        color: Color(0xFFB71C1C), fontSize: 12)),
+              ],
+
+              const SizedBox(height: 14),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showMapsHelpSheet(),
+                    icon: const Icon(Icons.help_outline, size: 16),
+                    label: const Text('Jinsi ya Kupata'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _confirmManualEntry,
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Tumia Kuratibu'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1565C0),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      );
+
+  void _showMapsHelpSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2))),
+            ),
+            const SizedBox(height: 16),
+            const Text('Jinsi ya Kupata Kuratibu kutoka Google Maps',
+                style:
+                    TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 16),
+            ...[
+              ('1', 'Fungua Google Maps kwenye simu yako'),
+              ('2', 'Tafuta au nenda mahali pa shamba lako'),
+              ('3', 'Bonyeza mahali hapo kwa sekunde 1-2 (long press)'),
+              ('4', 'Nambari mbili zinaonekana chini ya skrini'),
+              ('5', 'Nambari ya kwanza = Latitudo (mfano: -6.8012)'),
+              ('6', 'Nambari ya pili = Longitudo (mfano: 36.9021)'),
+              ('7', 'Nakili nambari hizo kwenye Shamba Smart'),
+            ]
+                .map((step) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 24, height: 24,
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.leaf.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(step.$1,
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.leaf)),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(step.$2,
+                                style: const TextStyle(fontSize: 13)),
+                          ),
+                        ],
+                      ),
+                    ))
+                .toList(),
+            const SizedBox(height: 12),
           ],
         ),
       ),

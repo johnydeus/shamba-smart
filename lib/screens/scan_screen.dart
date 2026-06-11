@@ -376,29 +376,6 @@ class _ScanScreenState extends State<ScanScreen>
 
             const SizedBox(height: 8),
 
-            // ── Mkulima AI hint below viewfinder ───────────────────────────
-            if (!_analysing)
-              Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.biotech_outlined,
-                        size: 14,
-                        color: _typeColor.withValues(alpha: 0.7)),
-                    const SizedBox(width: 5),
-                    Text(
-                      'AI itachunguza ugonjwa wa zao lako',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 10),
-
             // ── Shutter + gallery ──────────────────────────────────────────
             Center(child: _buildShutterButton()),
             const SizedBox(height: 12),
@@ -505,7 +482,9 @@ class _ScanScreenState extends State<ScanScreen>
         duration: const Duration(milliseconds: 200),
         height: 280,
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: _selectedImage != null
+              ? AppColors.white
+              : const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(AppRadius.xl),
           border: Border.all(
             color: _selectedImage != null
@@ -521,9 +500,7 @@ class _ScanScreenState extends State<ScanScreen>
             fit: StackFit.expand,
             children: [
               if (_selectedImage != null)
-                Image.file(_selectedImage!, fit: BoxFit.cover)
-              else
-                _buildCameraPlaceholder(),
+                Image.file(_selectedImage!, fit: BoxFit.cover),
               AnimatedBuilder(
                 animation: _bracketCtrl,
                 builder: (context, _) {
@@ -655,86 +632,6 @@ class _ScanScreenState extends State<ScanScreen>
               ],
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCameraPlaceholder() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Big camera icon with coloured circle
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            color: _typeColor.withValues(alpha: 0.10),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Icon(Icons.camera_alt_rounded,
-                    size: 56, color: _typeColor.withValues(alpha: 0.25)),
-                Icon(Icons.camera_alt_rounded, size: 48, color: _typeColor),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Gusa Hapa Kupiga Picha',
-          style: GoogleFonts.dmSans(
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-            color: _typeColor,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _currentType['subtitle'] as String,
-          style: GoogleFonts.dmSans(fontSize: 13, color: Colors.grey),
-        ),
-        const SizedBox(height: 20),
-        // Mini camera/gallery pills at bottom of placeholder
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _miniPill(Icons.camera_alt_rounded, 'Kamera', _typeColor),
-            const SizedBox(width: 10),
-            _miniPill(Icons.photo_library_rounded, 'Matunzio', _typeColor,
-                outlined: true),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _miniPill(IconData icon, String label, Color color,
-      {bool outlined = false}) {
-    return GestureDetector(
-      onTap: outlined ? _pickFromGallery : _takePhoto,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: outlined ? Colors.transparent : color,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon,
-                size: 14, color: outlined ? color : Colors.white),
-            const SizedBox(width: 5),
-            Text(label,
-                style: GoogleFonts.dmSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: outlined ? color : Colors.white)),
-          ],
         ),
       ),
     );

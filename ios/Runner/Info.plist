@@ -29,7 +29,9 @@
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Tunahitaji GPS kupata eneo la shamba lako</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Tunahitaji GPS kupata eneo la shamba lako</string>
+	<string>Tunahitaji GPS kupata eneo la shamba lako kwa usahihi wa juu kwa data za udongo</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Tunahitaji GPS kupata eneo sahihi la shamba lako kwa data za udongo</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Tunahitaji kamera kupiga picha za magonjwa ya mazao</string>
 	<key>NSPhotoLibraryUsageDescription</key>
