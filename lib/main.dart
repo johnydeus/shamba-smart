@@ -18,6 +18,11 @@ import 'providers/scan_provider.dart';
 import 'models/user_model.dart';
 import 'screens/main_shell.dart';
 import 'screens/login_screen.dart';
+import 'screens/kanda_screen.dart';
+import 'screens/mazao_yanayofaa_screen.dart';
+import 'screens/kalenda_screen.dart';
+import 'screens/mbolea_screen.dart';
+import 'screens/yield_gap_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -125,6 +130,13 @@ class _ShambaSmartState extends State<ShambaSmart>
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       home: const AuthGate(),
+      routes: {
+        '/kanda': (_) => const KandaScreen(),
+        '/mazao_yanayofaa': (_) => const MazaoYanayofaaScreen(),
+        '/kalenda': (_) => const KalendaScreen(),
+        '/mbolea_guide': (_) => const MboleaScreen(),
+        '/yield_gap': (_) => const YieldGapScreen(),
+      },
     );
   }
 }

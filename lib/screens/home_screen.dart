@@ -27,6 +27,10 @@ import 'soil_mapping_screen.dart';
 import 'premium_sensor_screen.dart';
 import 'farm_diary_screen.dart';
 import 'kilimo_kivuli_screen.dart';
+import 'kanda_screen.dart';
+import 'mazao_yanayofaa_screen.dart';
+import 'kalenda_screen.dart';
+import 'mbolea_screen.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -887,6 +891,14 @@ class _QuickActions extends StatelessWidget {
   List<Map<String, dynamic>> _actions(BuildContext ctx) {
     void nav(Widget w) => go(w);
     return [
+      {'emoji': '📍', 'label': 'Kanda Yangu', 'color': const Color(0xFF2E7D32),
+       'onTap': () => nav(const KandaScreen())},
+      {'emoji': '🌱', 'label': 'Mazao Yanayofaa', 'color': const Color(0xFF00897B),
+       'onTap': () => nav(const MazaoYanayofaaScreen())},
+      {'emoji': '📅', 'label': 'Kalenda ya Kilimo', 'color': const Color(0xFF1565C0),
+       'onTap': () => nav(const KalendaScreen())},
+      {'emoji': '💊', 'label': 'Mwongozo wa Mbolea', 'color': const Color(0xFFEF6C00),
+       'onTap': () => nav(const MboleaScreen())},
       {'emoji': '🛡️', 'label': 'Ulinzi', 'color': const Color(0xFFE65100),
        'onTap': () => nav(const CropProtectionScreen())},
       {'emoji': '💧', 'label': 'Maji', 'color': const Color(0xFF0277BD),
