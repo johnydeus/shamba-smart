@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -271,99 +272,124 @@ Phone numbers in +255 format.
     'Tumbaku': 'tobacco',
   };
 
-  // Fetch TOSCI seed varieties from Supabase — uses real scraped data (1,186 varieties)
+  // Cached copy of the bundled TOSCI dataset (1,199 varieties)
+  static List<Map<String, dynamic>>? _bundledSeeds;
+
+  // Fetch TOSCI seed varieties — Supabase first, bundled asset offline fallback
   static Future<List<Map<String, dynamic>>> fetchSeedVarieties({
     required String cropName,
   }) async {
-    try {
-      // Map Swahili crop name to English key used in the database
-      final enKey = _cropSwToEn[cropName] ?? cropName.toLowerCase();
+    // Map Swahili crop name to English key used in the database
+    final enKey = _cropSwToEn[cropName] ?? cropName.toLowerCase();
 
-      // Query Supabase seed_varieties table
+    // Primary: Supabase seed_varieties table
+    try {
       final res = await _db
           .from('seed_varieties')
           .select()
           .or('crop_type_en.eq.$enKey,crop_type_sw.ilike.%$cropName%')
           .order('variety_name')
-          .limit(100);
+          .limit(300);
 
       final rows = (res as List).cast<Map<String, dynamic>>();
-      if (rows.isEmpty) return [];
-
-      // Map DB field names to what the seed card widget expects
-      return rows.map((r) {
-        final droughtBool = r['drought_tolerant'];
-        final String droughtTol = droughtBool == true
-            ? 'high'
-            : droughtBool == false
-                ? 'low'
-                : 'medium';
-
-        // Yield: prefer grain_yield_min (from TOSCI detail), fallback kg/acre
-        double? yieldTonHa;
-        final grainYieldMin = r['grain_yield_min'];
-        final yieldKg = r['yield_kg_per_acre'];
-        if (grainYieldMin != null) {
-          yieldTonHa = (grainYieldMin as num).toDouble();
-        } else if (yieldKg != null) {
-          yieldTonHa = (yieldKg as num).toDouble() * 0.00247;
-        }
-
-        // Regions: prefer suitable_regions (new detailed column), fallback recommended_regions
-        final regionsSuitable = r['suitable_regions'];
-        final regionsOld = r['recommended_regions'];
-        final List<String> regionList = regionsSuitable is List
-            ? regionsSuitable.cast<String>()
-            : regionsOld is List
-                ? regionsOld.cast<String>()
-                : <String>[];
-
-        // Disease resistant: stored as List or null
-        final dis = r['disease_resistant'];
-        final List<String> disList =
-            dis is List ? dis.cast<String>() : <String>[];
-
-        // Company: prefer registrant (new), fallback breeder
-        final company = (r['registrant'] as String?)?.isNotEmpty == true
-            ? r['registrant']
-            : r['breeder'] ?? '';
-
-        // Altitude range for display
-        final altRange = r['altitude_range'] as String? ?? '';
-
-        // Registration year
-        final regYear = r['registration_year'];
-
-        // Distinctive characters as description
-        final description = r['distinctive_characters'] as String? ?? '';
-
-        return {
-          'variety_name':           r['variety_name'] ?? '',
-          'crop':                   cropName,
-          'company':                company,
-          'tosci_certified':        r['tosci_certified'] ?? true,
-          'maturity_days':          r['maturity_days'],
-          'yield_potential_ton_ha': yieldTonHa != null
-              ? double.parse(yieldTonHa.toStringAsFixed(1))
-              : null,
-          'drought_tolerance':      droughtTol,
-          'disease_resistance':     disList,
-          'pest_resistance':        <String>[],
-          'regions_recommended':    regionList,
-          'source_url':             r['source_url'] ?? '',
-          'category':               'OPV',
-          'description_sw':         description,
-          'best_for_sw':            '',
-          'altitude_range_m':       altRange,
-          'year_released':          regYear,
-          'grain_yield':            r['grain_yield'],
-          'detail_url':             r['detail_url'],
-          'crop_scientific':        r['crop_scientific'],
-        };
-      }).toList();
+      if (rows.isNotEmpty) {
+        return rows.map((r) => _mapSeedRow(r, cropName)).toList();
+      }
     } catch (e) {
       debugPrint('DataSyncService.fetchSeedVarieties error: $e');
+    }
+
+    // Fallback: bundled TOSCI dataset (works fully offline)
+    return _seedsFromBundle(cropName, enKey);
+  }
+
+  // Load + filter the bundled TOSCI dataset shipped with the app
+  static Future<List<Map<String, dynamic>>> _seedsFromBundle(
+      String cropName, String enKey) async {
+    try {
+      if (_bundledSeeds == null) {
+        final raw = await rootBundle
+            .loadString('assets/data/tosci_seed_varieties.json');
+        _bundledSeeds =
+            (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+      }
+      final cropLower = cropName.toLowerCase();
+      return _bundledSeeds!
+          .where((r) =>
+              r['crop_type_en'] == enKey ||
+              (r['crop_type_sw'] as String? ?? '')
+                  .toLowerCase()
+                  .contains(cropLower))
+          .map((r) => _mapSeedRow(r, cropName))
+          .toList();
+    } catch (e) {
+      debugPrint('DataSyncService bundled seeds error: $e');
       return [];
     }
+  }
+
+  // Map a TOSCI DB/asset row to the shape the seed card widget expects
+  static Map<String, dynamic> _mapSeedRow(
+      Map<String, dynamic> r, String cropName) {
+    final droughtBool = r['drought_tolerant'];
+    final String droughtTol = droughtBool == true
+        ? 'high'
+        : droughtBool == false
+            ? 'low'
+            : 'medium';
+
+    // Yield: prefer grain_yield_min (from TOSCI detail), fallback kg/acre
+    double? yieldTonHa;
+    final grainYieldMin = r['grain_yield_min'];
+    final yieldKg = r['yield_kg_per_acre'];
+    if (grainYieldMin != null) {
+      yieldTonHa = (grainYieldMin as num).toDouble();
+    } else if (yieldKg != null) {
+      yieldTonHa = (yieldKg as num).toDouble() * 0.00247;
+    }
+
+    // Regions: prefer suitable_regions (TOSCI detail), fallback recommended_regions
+    final regionsSuitable = r['suitable_regions'];
+    final regionsOld = r['recommended_regions'];
+    final List<String> regionList = regionsSuitable is List
+        ? regionsSuitable.cast<String>()
+        : regionsOld is List
+            ? regionsOld.cast<String>()
+            : <String>[];
+
+    // Disease resistant: stored as List or null
+    final dis = r['disease_resistant'];
+    final List<String> disList =
+        dis is List ? dis.cast<String>() : <String>[];
+
+    // Company: prefer registrant (TOSCI), fallback breeder
+    final company = (r['registrant'] as String?)?.isNotEmpty == true
+        ? r['registrant']
+        : r['breeder'] ?? '';
+
+    return {
+      'variety_name':           r['variety_name'] ?? '',
+      'crop':                   cropName,
+      'company':                company,
+      'tosci_certified':        r['tosci_certified'] ?? true,
+      'maturity_days':          r['maturity_days'],
+      'yield_potential_ton_ha': yieldTonHa != null
+          ? double.parse(yieldTonHa.toStringAsFixed(1))
+          : null,
+      'drought_tolerance':      droughtTol,
+      'disease_resistance':     disList,
+      'pest_resistance':        <String>[],
+      'regions_recommended':    regionList,
+      'source_url':             r['source_url'] ?? '',
+      'category':               'OPV',
+      'description_sw':         r['distinctive_characters'] as String? ?? '',
+      'special_attributes':     r['special_attributes'] as String? ?? '',
+      'best_for_sw':            '',
+      'altitude_range_m':       r['altitude_range'] as String? ?? '',
+      'year_released':          r['registration_year'],
+      'grain_yield':            r['grain_yield'],
+      'detail_url':             r['detail_url'],
+      'crop_scientific':        r['crop_scientific'],
+    };
   }
 }

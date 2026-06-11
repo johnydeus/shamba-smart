@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/data_sync_service.dart';
@@ -781,7 +780,7 @@ class _SeedCard extends StatelessWidget {
                   ),
                 ],
 
-                // Swahili description
+                // Distinctive characters (from TOSCI)
                 if ((variety['description_sw'] ?? '').isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Container(
@@ -790,9 +789,60 @@ class _SeedCard extends StatelessWidget {
                       color: const Color(0xFFE8F5E9),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      variety['description_sw'],
-                      style: const TextStyle(fontSize: 13),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Sifa za Kipekee:',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Color(0xFF1A5C2E)),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          variety['description_sw'],
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Special attributes (from TOSCI)
+                if ((variety['special_attributes'] ?? '')
+                    .toString()
+                    .isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3E5F5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.star,
+                                size: 15, color: Color(0xFF6A1B9A)),
+                            SizedBox(width: 5),
+                            Text(
+                              'Sifa Maalum:',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Color(0xFF6A1B9A)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          variety['special_attributes'].toString(),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ],
                     ),
                   ),
                 ],

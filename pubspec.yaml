@@ -98,6 +98,7 @@ flutter:
     - assets/images/
     - assets/data/diseases.json
     - assets/data/pesticides.json
+    - assets/data/tosci_seed_varieties.json
     - assets/mkulima_v2_best.tflite
     - assets/class_names_v2.json
     - assets/mkulima_diseases_sw.json
