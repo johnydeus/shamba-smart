@@ -89,6 +89,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -102,3 +103,12 @@ flutter:
     - assets/mkulima_v2_best.tflite
     - assets/class_names_v2.json
     - assets/mkulima_diseases_sw.json
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon_final.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#1A5C2E"
+  adaptive_icon_foreground: "assets/icon/app_icon_final.png"
+  remove_alpha_ios: true
