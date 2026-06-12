@@ -32,13 +32,8 @@ import 'mazao_yanayofaa_screen.dart';
 import 'kalenda_screen.dart';
 import 'mbolea_screen.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/section_header.dart';
-import '../widgets/status_badge.dart';
-import '../widgets/shamba_card.dart';
 import '../routes/fade_slide_route.dart';
-import 'results_screen.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -154,11 +149,6 @@ class _HomeScreenState extends State<HomeScreen>
           // ── Huduma section ──────────────────────────────────────────────
           SliverToBoxAdapter(
             child: _ServicesSection(role: role, go: go),
-          ),
-
-          // ── Recent diagnoses ────────────────────────────────────────────
-          const SliverToBoxAdapter(
-            child: _RecentDiagnosesSection(),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -1672,149 +1662,3 @@ class _ServiceTile extends StatelessWidget {
   }
 }
 
-// ── Recent diagnoses from Supabase ────────────────────────────────────────────
-
-class _RecentDiagnosesSection extends StatefulWidget {
-  const _RecentDiagnosesSection();
-
-  @override
-  State<_RecentDiagnosesSection> createState() =>
-      _RecentDiagnosesSectionState();
-}
-
-class _RecentDiagnosesSectionState extends State<_RecentDiagnosesSection> {
-  List<Map<String, dynamic>> _items = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final history = await SupabaseService.getDiagnosisHistory();
-    if (mounted) {
-      setState(() {
-        _items = history.take(3).toList();
-        _loading = false;
-      });
-    }
-  }
-
-  String _formatDate(dynamic raw) {
-    if (raw == null) return '';
-    try {
-      final dt = DateTime.parse(raw.toString());
-      return '${dt.day}/${dt.month}/${dt.year}';
-    } catch (_) {
-      return '';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SectionHeader(title: 'Uchunguzi wa Hivi Karibuni'),
-          if (_loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-            )
-          else if (_items.isEmpty)
-            ShambaCard(
-              child: Column(
-                children: [
-                  const Text('📷', style: TextStyle(fontSize: 36)),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Piga picha ya mmea wako ili kuanza',
-                    textAlign: TextAlign.center,
-                    style: _jakarta(
-                      size: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            ...List.generate(_items.length, (i) {
-              final d = _items[i];
-              final disease =
-                  d['disease_name_sw']?.toString() ?? 'Uchunguzi';
-              final crop = d['crop_name']?.toString() ?? '';
-              final severity = d['severity']?.toString();
-              final response = d['claude_response'] is Map
-                  ? Map<String, dynamic>.from(d['claude_response'] as Map)
-                  : <String, dynamic>{};
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: ShambaCard(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      FadeSlideRoute(
-                        page: ResultsScreen(
-                          diagnosis: response.isNotEmpty
-                              ? response
-                              : {
-                                  'disease_name_sw': disease,
-                                  'confidence': d['confidence'] ?? 0.0,
-                                  'severity': severity ?? 'low',
-                                },
-                          imagePath: '',
-                          cropName: crop,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              disease,
-                              style: _jakarta(
-                                size: 14,
-                                weight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '$crop · ${_formatDate(d['created_at'])}',
-                              style: _jakarta(
-                                size: 12,
-                                color: AppColors.textTertiary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      StatusBadge(
-                        label: severity ?? '—',
-                        type: StatusBadge.fromSeverity(severity),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-                  .animate(delay: Duration(milliseconds: i * 60))
-                  .fadeIn(duration: 300.ms)
-                  .slideX(begin: 0.05, end: 0);
-            }),
-        ],
-      ),
-    );
-  }
-}
