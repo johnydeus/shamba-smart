@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 -)"
+      "Bash(python3 -)",
+      "Bash(python3 -c ' *)",
+      "Bash(pip3 install *)",
+      "Bash(python3 -c \"from PIL import Image; print\\('PIL OK'\\)\")",
+      "Bash(python3 scripts/enhance_icon.py)",
+      "Bash(python3 scripts/crop_icon.py)",
+      "Bash(dart run *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
