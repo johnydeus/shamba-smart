@@ -12,6 +12,7 @@ import '../routes/fade_slide_route.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shamba_button.dart';
+import 'live_scan_screen.dart';
 import 'results_screen.dart';
 
 // All Tanzania crops — Ministry of Agriculture, TAHA, TOSCI, TanzaniaInvest
@@ -306,6 +307,11 @@ class _ScanScreenState extends State<ScanScreen>
               ),
             ),
 
+            // ── Live Scan shortcut ─────────────────────────────────────────
+            _buildLiveScanBanner(),
+
+            const SizedBox(height: 12),
+
             // ── Scan type selector ─────────────────────────────────────────
             _buildScanTypeSelector(),
 
@@ -395,6 +401,79 @@ class _ScanScreenState extends State<ScanScreen>
             _buildExpandableTips(),
 
             const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Live Scan banner ─────────────────────────────────────────────────────
+
+  Widget _buildLiveScanBanner() {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        Navigator.push(
+          context,
+          FadeSlideRoute(page: const LiveScanScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF0D3B26), Color(0xFF1B6B3A)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.videocam_outlined,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Skani ya Moja kwa Moja 🔴',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    'Lenga kamera kwenye mmea — matokeo ya papo hapo',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      color: Colors.white60,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white38,
+              size: 14,
+            ),
           ],
         ),
       ),
