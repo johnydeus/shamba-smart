@@ -365,23 +365,37 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(widget.contactName,
-                      style: GoogleFonts.dmSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
-                      overflow: TextOverflow.ellipsis),
-                  Text(
-                    chatProv.isReady
-                        ? widget.contactRole.label
-                        : 'Inaunganika...',
-                    style: GoogleFonts.dmSans(
-                        fontSize: 11,
-                        color: chatProv.isReady
-                            ? Colors.white60
-                            : Colors.orange),
+                  Row(
+                    children: [
+                      const Icon(Icons.lock_rounded,
+                          color: Colors.white70, size: 12),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(widget.contactName,
+                            style: GoogleFonts.dmSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
                   ),
+                  if (!chatProv.isReady)
+                    Text('Inaunganika...',
+                        style: GoogleFonts.dmSans(
+                            fontSize: 10, color: Colors.orange))
+                  else
+                    Row(
+                      children: [
+                        _AppBarRoleBadge(role: widget.contactRole),
+                        const SizedBox(width: 6),
+                        Text('Faragha',
+                            style: GoogleFonts.dmSans(
+                                fontSize: 10, color: Colors.white54)),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -425,6 +439,27 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
+
+          // ── Privacy notice ────────────────────────────────────────────────
+          Container(
+            width: double.infinity,
+            color: AppColors.leaf.withValues(alpha: 0.07),
+            padding:
+                const EdgeInsets.symmetric(vertical: 5, horizontal: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_rounded,
+                    size: 11, color: AppColors.leaf),
+                const SizedBox(width: 5),
+                Text('Mazungumzo haya ni ya faragha',
+                    style: GoogleFonts.dmSans(
+                        fontSize: 11,
+                        color: AppColors.leaf,
+                        fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
 
           // ── Messages list ──────────────────────────────────────────────────
           Expanded(
