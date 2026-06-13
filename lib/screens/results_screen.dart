@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../routes/fade_slide_route.dart';
 import '../services/audio_service.dart';
 import '../services/mkulima_service.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shamba_button.dart';
 import '../widgets/status_badge.dart';
@@ -140,7 +141,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
             // ── Mkulima AI card (shown only for disease scans) ────────────
             if (widget.mkulimaResult != null)
-              _MkulimaCard(result: widget.mkulimaResult!),
+              _MkulimaCard(
+                result: widget.mkulimaResult!,
+                imagePath: widget.imagePath,
+              ),
 
             if (widget.mkulimaResult != null)
               const SizedBox(height: AppSpacing.md),
@@ -656,7 +660,8 @@ const _kMkulimaRed = Color(0xFFB71C1C);
 
 class _MkulimaCard extends StatefulWidget {
   final MkulimaResult result;
-  const _MkulimaCard({required this.result});
+  final String imagePath;
+  const _MkulimaCard({required this.result, required this.imagePath});
 
   @override
   State<_MkulimaCard> createState() => _MkulimaCardState();
@@ -674,6 +679,7 @@ class _MkulimaCardState extends State<_MkulimaCard> {
 
   // Feedback state
   bool? _feedbackPositive; // null=none, true=confirm, false=reject
+  bool _feedbackSubmitted = false;
 
   Color _confidenceColor(double c) {
     if (c >= 0.70) return _kMkulimaGreen;
@@ -1002,8 +1008,22 @@ class _MkulimaCardState extends State<_MkulimaCard> {
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _feedbackPositive = true),
+                            onTap: _feedbackSubmitted
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _feedbackPositive = true;
+                                      _feedbackSubmitted = true;
+                                    });
+                                    SupabaseService.submitTrainingFeedback(
+                                      diseaseKey: widget.result.diseaseKey,
+                                      isCorrect: true,
+                                      imagePath: widget.imagePath,
+                                      cropName: widget.result.zao.isNotEmpty
+                                          ? widget.result.zao
+                                          : null,
+                                    );
+                                  },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.symmetric(
@@ -1044,8 +1064,22 @@ class _MkulimaCardState extends State<_MkulimaCard> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _feedbackPositive = false),
+                            onTap: _feedbackSubmitted
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _feedbackPositive = false;
+                                      _feedbackSubmitted = true;
+                                    });
+                                    SupabaseService.submitTrainingFeedback(
+                                      diseaseKey: widget.result.diseaseKey,
+                                      isCorrect: false,
+                                      imagePath: widget.imagePath,
+                                      cropName: widget.result.zao.isNotEmpty
+                                          ? widget.result.zao
+                                          : null,
+                                    );
+                                  },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.symmetric(

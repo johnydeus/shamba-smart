@@ -75,6 +75,41 @@ class SupabaseService {
     }
   }
 
+  // Submit farmer feedback for the Mkulima AI training loop.
+  // Uploads the photo if not yet uploaded, then writes to training_submissions.
+  static Future<void> submitTrainingFeedback({
+    required String diseaseKey,
+    required bool isCorrect,
+    required String imagePath,
+    String? cropName,
+    String modelVersion = 'v2',
+  }) async {
+    try {
+      final userId = _client.auth.currentUser?.id;
+
+      String? photoUrl;
+      if (imagePath.isNotEmpty) {
+        final file = File(imagePath);
+        final fileName =
+            'training/${userId ?? 'anon'}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        await _client.storage.from('leaf-photos').upload(fileName, file);
+        photoUrl =
+            _client.storage.from('leaf-photos').getPublicUrl(fileName);
+      }
+
+      await _client.from('training_submissions').insert({
+        'farmer_id': userId,
+        'disease_key': diseaseKey,
+        'is_correct': isCorrect,
+        'crop_name': cropName,
+        'photo_url': photoUrl,
+        'model_version': modelVersion,
+      });
+    } catch (e) {
+      debugPrint('submitTrainingFeedback error: $e');
+    }
+  }
+
   // Get agrovets in a specific region
   static Future<List<Map<String, dynamic>>> getAgrovetsByRegion({
     required String region,

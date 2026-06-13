@@ -22,6 +22,7 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
   final _searchCtrl = TextEditingController();
 
   List<Map<String, dynamic>> _farms = [];
+  List<Map<String, dynamic>> _submissions = [];
   bool _loading = true;
   String? _error;
   String _search = '';
@@ -31,8 +32,9 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
     _loadFarms();
+    _loadSubmissions();
   }
 
   @override
@@ -96,6 +98,21 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
       if (mounted) setState(() { _farms = merged; _loading = false; });
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _loadSubmissions() async {
+    try {
+      final rows = await _db
+          .from('training_submissions')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(100);
+      if (mounted) {
+        setState(() => _submissions = List<Map<String, dynamic>>.from(rows));
+      }
+    } catch (_) {
+      // Non-critical — farms may load fine; training tab shows empty state
     }
   }
 
@@ -194,6 +211,8 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
                       text: 'Ramani (${_mappable.length})'),
                   Tab(icon: const Icon(Icons.list_alt_outlined, size: 18),
                       text: 'Orodha (${_filtered.length})'),
+                  Tab(icon: const Icon(Icons.model_training_outlined, size: 18),
+                      text: 'Mafunzo AI (${_submissions.length})'),
                 ],
               ),
             ],
@@ -210,6 +229,7 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
                   children: [
                     _MapTab(farms: _mappable, onTap: _openFarm),
                     _ListTab(farms: _filtered, onTap: _openFarm),
+                    _TrainingTab(submissions: _submissions),
                   ],
                 ),
     );
@@ -486,6 +506,224 @@ class _FarmListCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 3: MAFUNZO AI — training submissions verification
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _TrainingTab extends StatelessWidget {
+  final List<Map<String, dynamic>> submissions;
+  const _TrainingTab({required this.submissions});
+
+  @override
+  Widget build(BuildContext context) {
+    if (submissions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('🤖', style: TextStyle(fontSize: 48)),
+            const SizedBox(height: 12),
+            Text(
+              'Hakuna maoni ya wakulima bado',
+              style: GoogleFonts.playfairDisplay(
+                  color: AppColors.soil, fontSize: 16),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Maoni yataonekana hapa baada ya\nwakulima kutumia Mkulima AI',
+              style: GoogleFonts.dmSans(color: AppColors.mid, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final correct = submissions.where((s) => s['is_correct'] == true).length;
+    final incorrect = submissions.length - correct;
+
+    return Column(
+      children: [
+        // Summary bar
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: const Color(0xFF1B4332).withValues(alpha: 0.05),
+          child: Row(
+            children: [
+              _StatChip(
+                  label: 'Sahihi', count: correct, color: AppColors.leaf),
+              const SizedBox(width: 12),
+              _StatChip(
+                  label: 'Si Hilo',
+                  count: incorrect,
+                  color: Colors.red.shade700),
+              const Spacer(),
+              Text(
+                '${submissions.length} jumla',
+                style: GoogleFonts.dmSans(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: submissions.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            itemBuilder: (context, i) =>
+                _SubmissionCard(data: submissions[i]),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+  const _StatChip(
+      {required this.label, required this.count, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        '$count $label',
+        style: GoogleFonts.dmSans(
+            fontSize: 12, fontWeight: FontWeight.w700, color: color),
+      ),
+    );
+  }
+}
+
+class _SubmissionCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const _SubmissionCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final diseaseKey = data['disease_key'] as String? ?? '—';
+    final isCorrect = data['is_correct'] as bool? ?? false;
+    final cropName = data['crop_name'] as String?;
+    final photoUrl = data['photo_url'] as String?;
+    final modelVersion = data['model_version'] as String? ?? 'v2';
+    final createdAt = data['created_at'] as String?;
+    final dateLabel = createdAt != null
+        ? createdAt.substring(0, 10)
+        : '—';
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            // Photo thumbnail or placeholder
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: photoUrl != null
+                  ? Image.network(
+                      photoUrl,
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, _) => _PlaceholderThumb(),
+                    )
+                  : _PlaceholderThumb(),
+            ),
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    diseaseKey,
+                    style: GoogleFonts.dmSans(
+                        fontSize: 13, fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (cropName != null)
+                    Text(
+                      cropName,
+                      style: GoogleFonts.dmSans(
+                          fontSize: 11, color: AppColors.textSecondary),
+                    ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isCorrect
+                              ? Colors.green.shade50
+                              : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: isCorrect
+                                  ? Colors.green.shade300
+                                  : Colors.red.shade300),
+                        ),
+                        child: Text(
+                          isCorrect ? '✅ Sahihi' : '❌ Si Hilo',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: isCorrect
+                                ? Colors.green.shade800
+                                : Colors.red.shade800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'model $modelVersion',
+                        style: GoogleFonts.dmSans(
+                            fontSize: 10, color: AppColors.mid),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            Text(
+              dateLabel,
+              style: GoogleFonts.dmSans(
+                  fontSize: 11, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaceholderThumb extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 56,
+      height: 56,
+      color: AppColors.leaf.withValues(alpha: 0.1),
+      child: const Icon(Icons.image_outlined,
+          color: AppColors.leaf, size: 24),
     );
   }
 }

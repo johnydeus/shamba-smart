@@ -7,6 +7,7 @@ import 'core/sync/sync_coordinator.dart';
 import 'features/messaging/data/message_repository.dart';
 import 'features/scan/data/claude_api_bridge.dart';
 import 'services/mkulima_service.dart';
+import 'services/model_update_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/listing_provider.dart';
 import 'providers/chat_provider.dart';
@@ -39,6 +40,11 @@ Future<void> main() async {
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL'] ?? '',
     anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+  );
+
+  // Check for OTA model updates (non-blocking, fires after Supabase init)
+  ModelUpdateService().checkAndUpdate().catchError(
+    (e) => debugPrint('Model update check failed: $e'),
   );
 
   // Core offline sync infrastructure

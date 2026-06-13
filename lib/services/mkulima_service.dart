@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
+import 'model_update_service.dart';
 
 // ── Result returned by MkulimaService.analyze() ────────────────────────────
 
@@ -16,11 +16,19 @@ class MkulimaResult {
   final Map<String, dynamic> diseaseData;
   final List<Map<String, dynamic>> top3;
 
+  /// True when the gate rejected this image (low confidence or not-a-plant).
+  final bool isRejected;
+
+  /// Human-readable Swahili rejection reason shown to the farmer.
+  final String? rejectionReason;
+
   const MkulimaResult({
     required this.diseaseKey,
     required this.confidence,
     required this.diseaseData,
     required this.top3,
+    this.isRejected = false,
+    this.rejectionReason,
   });
 
   // Convenience getters from diseaseData JSON
@@ -93,9 +101,17 @@ class MkulimaService {
   Future<void> initialize() async {
     if (_initialized) return;
     try {
-      _interpreter = await Interpreter.fromAsset(
-        'assets/mkulima_v2_best.tflite',
-      );
+      // Prefer a downloaded model over the bundled asset so OTA updates
+      // take effect without a full app release.
+      final downloadedPath = await ModelUpdateService().activePath;
+      if (downloadedPath != null) {
+        _interpreter = Interpreter.fromFile(File(downloadedPath));
+        debugPrint('MkulimaService: loaded OTA model from $downloadedPath');
+      } else {
+        _interpreter = await Interpreter.fromAsset(
+          'assets/mkulima_v2_best.tflite',
+        );
+      }
 
       final classJson =
           await rootBundle.loadString('assets/class_names_v2.json');
@@ -123,6 +139,19 @@ class MkulimaService {
 
       final resized =
           img.copyResize(rawImage, width: _inputSize, height: _inputSize);
+
+      // Gate 1: plant check — reject if < 15% of pixels are green-dominant.
+      if (_greenPixelRatio(resized) < 0.15) {
+        return MkulimaResult(
+          diseaseKey: 'rejected_no_plant',
+          confidence: 0,
+          diseaseData: const {},
+          top3: const [],
+          isRejected: true,
+          rejectionReason:
+              'Picha haina mmea wa kutosha. Piga picha karibu na majani ya mmea wako.',
+        );
+      }
 
       // Build [1, 224, 224, 3] input — MobileNetV2 normalization [-1, 1]
       final inputBuffer = Float32List(_inputSize * _inputSize * 3);
@@ -169,6 +198,21 @@ class MkulimaService {
       final bestKey =
           bestIdx < _classNames.length ? _classNames[bestIdx] : 'Unknown';
       final bestConf = scores[bestIdx];
+
+      // Gate 2: confidence gate — reject results below 70 %.
+      if (bestConf < 0.70) {
+        return MkulimaResult(
+          diseaseKey: 'rejected_low_confidence',
+          confidence: bestConf,
+          diseaseData: const {},
+          top3: top3,
+          isRejected: true,
+          rejectionReason:
+              'Mkulima AI haijui kwa uhakika (${(bestConf * 100).toStringAsFixed(0)}%). '
+              'Piga picha ya wazi ya majani ya mmea wako kwenye mwanga mzuri.',
+        );
+      }
+
       final diseaseData = Map<String, dynamic>.from(
         (_diseases[bestKey] as Map<String, dynamic>?) ??
             {'jina_swahili': bestKey, 'jina_kiingereza': bestKey},
@@ -203,5 +247,22 @@ class MkulimaService {
     final exps = logits.map((l) => math.exp(l - maxLogit)).toList();
     final sum = exps.fold(0.0, (a, b) => a + b);
     return exps.map((e) => e / sum).toList();
+  }
+
+  // Returns the fraction of pixels that are green-dominant.
+  // A pixel qualifies when green is noticeably stronger than red AND blue.
+  double _greenPixelRatio(img.Image image) {
+    int greenCount = 0;
+    final total = image.width * image.height;
+    for (int y = 0; y < image.height; y++) {
+      for (int x = 0; x < image.width; x++) {
+        final p = image.getPixel(x, y);
+        final r = p.r.toInt();
+        final g = p.g.toInt();
+        final b = p.b.toInt();
+        if (g > r + 15 && g > b + 15 && g > 50) greenCount++;
+      }
+    }
+    return greenCount / total;
   }
 }

@@ -29,6 +29,24 @@ class ScanAnalysisService {
       final mkulimaResult = await _mkulima.analyze(imageFile);
 
       if (mkulimaResult != null) {
+        // Gate rejection: show farmer-friendly message, skip cloud fallback.
+        if (mkulimaResult.isRejected) {
+          return ScanResult(
+            diagnosis: {
+              'error': true,
+              'message': mkulimaResult.rejectionReason ??
+                  'Mkulima AI ilikataa picha hii. Jaribu tena.',
+              'is_healthy': false,
+            },
+            imagePath: request.imagePath,
+            cropName: request.cropName,
+            scanType: request.scanType,
+            source: ScanSource.mkulimaOnly,
+            gpsLat: request.gpsLat,
+            gpsLng: request.gpsLng,
+          );
+        }
+
         final diagnosis =
             _mkulima.diagnosisFromMkulima(mkulimaResult, request.cropName);
 
