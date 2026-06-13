@@ -163,23 +163,66 @@ class _ScanScreenState extends State<ScanScreen>
     final auth = context.read<AuthProvider>();
     final region = auth.currentUser?.region;
     final scanProvider = context.read<ScanProvider>();
-    final result = await scanProvider.analyze(
-      ScanRequest(
-        imagePath: _selectedImage!.path,
-        cropName: _selectedCrop,
-        scanType: _selectedScanType,
-        gpsLat: gpsLat,
-        gpsLng: gpsLng,
-        region: region,
-      ),
+    final imagePath = _selectedImage!.path;
+
+    final request = ScanRequest(
+      imagePath: imagePath,
+      cropName: _selectedCrop,
+      scanType: _selectedScanType,
+      gpsLat: gpsLat,
+      gpsLng: gpsLng,
+      region: region,
     );
 
-    if (!mounted) return;
+    // ── Disease scans: two-stage flow (Mkulima fast → Claude verify) ──────────
+    if (_selectedScanType == 'ugonjwa') {
+      final preliminary = await scanProvider.mkulimaOnlyAnalyze(request);
 
-    setState(() {
-      _analysing = false;
-      _statusMessage = '';
-    });
+      if (!mounted) return;
+      setState(() { _analysing = false; _statusMessage = ''; });
+      _bracketCtrl.repeat(reverse: true);
+
+      if (preliminary == null ||
+          (preliminary.hasError && preliminary.mkulimaResult == null)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              preliminary?.diagnosis['message'] as String? ??
+                  'Uchunguzi umeshindwa. Jaribu tena.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      // Check connectivity here so ResultsScreen knows whether to auto-verify.
+      // Guard mounted before using context after async gap.
+      final online = await scanProvider.checkOnline();
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        FadeSlideRoute(
+          page: ResultsScreen(
+            diagnosis: preliminary.diagnosis,
+            imagePath: imagePath,
+            cropName: _selectedCrop,
+            mkulimaResult: preliminary.mkulimaResult,
+            scanSource: preliminary.sourceLabel,
+            // Two-stage fields:
+            isVerifying: online,
+            scanRequest: request,
+          ),
+        ),
+      );
+      return;
+    }
+
+    // ── Weeds / pests: single-stage flow (cloud only) ─────────────────────────
+    final result = await scanProvider.analyze(request);
+
+    if (!mounted) return;
+    setState(() { _analysing = false; _statusMessage = ''; });
     _bracketCtrl.repeat(reverse: true);
 
     if (result == null || (result.hasError && result.mkulimaResult == null)) {
@@ -200,7 +243,7 @@ class _ScanScreenState extends State<ScanScreen>
       FadeSlideRoute(
         page: ResultsScreen(
           diagnosis: result.diagnosis,
-          imagePath: _selectedImage!.path,
+          imagePath: imagePath,
           cropName: _selectedCrop,
           mkulimaResult: result.mkulimaResult,
           cloudEnrichment: result.cloudEnrichment,

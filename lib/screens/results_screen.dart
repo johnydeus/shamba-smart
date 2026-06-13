@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../features/scan/domain/scan_request.dart';
 import '../routes/fade_slide_route.dart';
 import '../services/audio_service.dart';
+import '../services/claude_service.dart';
 import '../services/mkulima_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -23,6 +25,10 @@ class ResultsScreen extends StatefulWidget {
   final String? scanSource;
   final bool queuedForEnrichment;
 
+  // Two-stage verification fields (disease scans only)
+  final bool isVerifying;      // true → auto-fire Claude verification on open
+  final ScanRequest? scanRequest; // needed to run verifyDiagnosis
+
   const ResultsScreen({
     super.key,
     required this.diagnosis,
@@ -32,6 +38,8 @@ class ResultsScreen extends StatefulWidget {
     this.cloudEnrichment,
     this.scanSource,
     this.queuedForEnrichment = false,
+    this.isVerifying = false,
+    this.scanRequest,
   });
 
   @override
@@ -40,6 +48,61 @@ class ResultsScreen extends StatefulWidget {
 
 class _ResultsScreenState extends State<ResultsScreen> {
   bool _aiExpanded = false;
+
+  // ── Two-stage verification state ──────────────────────────────────────────
+  bool _verifying = false;
+  Map<String, dynamic>? _verification; // Claude's structured verification result
+  String? _verifyError;                // human-readable error if Claude call failed
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isVerifying && widget.scanRequest != null) {
+      _runVerification();
+    }
+  }
+
+  Future<void> _runVerification() async {
+    if (_verifying) return;
+    setState(() { _verifying = true; _verifyError = null; });
+
+    try {
+      final req = widget.scanRequest!;
+      final mkulima = widget.mkulimaResult;
+      final result = await ClaudeService.verifyDiagnosis(
+        imageFile: File(req.imagePath),
+        mkulimaGuess: mkulima?.jinaSw ?? 'Haijulikani',
+        mkulimaConfidence: mkulima?.confidence ?? 0.0,
+        mkulimaWasLowConfidence: mkulima == null,
+        regionContext: req.region,
+      );
+
+      if (!mounted) return;
+
+      if (result['error'] == true) {
+        setState(() {
+          _verifying = false;
+          _verifyError = result['message'] as String?;
+        });
+        return;
+      }
+
+      // Save full result to Supabase (fire-and-forget)
+      SupabaseService.saveDiagnosis(
+        cropName: req.cropName,
+        claudeResponse: result,
+        photoPath: req.imagePath,
+        gpsLat: req.gpsLat,
+        gpsLng: req.gpsLng,
+        mkulimaResult: mkulima,
+      );
+
+      setState(() { _verifying = false; _verification = result; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _verifying = false; _verifyError = e.toString(); });
+    }
+  }
 
   Color _severityColor(String severity) {
     switch (severity.toLowerCase()) {
@@ -138,6 +201,36 @@ class _ResultsScreenState extends State<ResultsScreen> {
               ).animate().fadeIn(duration: 400.ms),
 
             const SizedBox(height: AppSpacing.md),
+
+            // ── Claude verification result (two-stage flow) ───────────────
+            if (_verifying)
+              _VerifyingBanner(),
+
+            if (!_verifying && _verification != null)
+              _VerificationCard(
+                verification: _verification!,
+                mkulimaGuess: widget.mkulimaResult?.jinaSw,
+                onRetry: null, // already verified
+              ),
+
+            // ── Offline banner + "Hakiki Tena" button ─────────────────────
+            if (!_verifying &&
+                _verification == null &&
+                widget.isVerifying == false &&
+                widget.scanRequest != null)
+              _OfflineBanner(onRetry: _runVerification),
+
+            // ── Verification error (Claude call failed) ────────────────────
+            if (!_verifying && _verifyError != null && _verification == null)
+              _VerifyErrorBanner(
+                message: _verifyError!,
+                onRetry: _runVerification,
+              ),
+
+            if (_verifying ||
+                _verification != null ||
+                (_verifyError != null && _verification == null))
+              const SizedBox(height: AppSpacing.md),
 
             // ── Mkulima AI card (shown only for disease scans) ────────────
             if (widget.mkulimaResult != null)
@@ -1140,6 +1233,495 @@ class _MkulimaCardState extends State<_MkulimaCard> {
         ),
       ],
     ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.04, end: 0);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Two-stage verification widgets
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Spinner banner shown while Claude is verifying.
+class _VerifyingBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B4332),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation(Colors.white70),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Mkulima AI inahakiki na mtaalamu wa AI (Claude)...',
+              style: GoogleFonts.poppins(
+                  fontSize: 13, color: Colors.white, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 300.ms);
+  }
+}
+
+/// The trusted final result from Claude — shown once verification completes.
+class _VerificationCard extends StatelessWidget {
+  final Map<String, dynamic> verification;
+  final String? mkulimaGuess;
+  final VoidCallback? onRetry;
+
+  const _VerificationCard({
+    required this.verification,
+    this.mkulimaGuess,
+    this.onRetry,
+  });
+
+  Color _confidenceBadgeColor(String conf) {
+    switch (conf.toLowerCase()) {
+      case 'high':
+        return const Color(0xFF2E7D32);
+      case 'medium':
+        return const Color(0xFFE65100);
+      default:
+        return const Color(0xFFB71C1C);
+    }
+  }
+
+  String _confidenceLabel(String conf) {
+    switch (conf.toLowerCase()) {
+      case 'high':
+        return 'Uhakika Mkubwa';
+      case 'medium':
+        return 'Uhakika wa Kati';
+      default:
+        return 'Uhakika Mdogo';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final detectedCrop = verification['detected_crop'] as String? ?? '';
+    final agrees = verification['agrees_with_mkulima'] as bool? ?? false;
+    final diagSw = verification['final_diagnosis_sw'] as String? ?? '';
+    final diagEn = verification['final_diagnosis_en'] as String? ?? '';
+    final confStr = verification['confidence'] as String? ?? 'low';
+    final isHealthy = verification['is_healthy'] as bool? ?? false;
+    final imageQualityOk = verification['image_quality_ok'] as bool? ?? true;
+    final explanationSw = verification['explanation_sw'] as String? ?? '';
+    final actionSw = verification['recommended_action_sw'] as String? ?? '';
+    final pest1Name = verification['pesticide_1_name'] as String? ?? '';
+    final pest1Dose = verification['pesticide_1_dose'] as String? ?? '';
+    final pest2Name = verification['pesticide_2_name'] as String? ?? '';
+    final pest2Dose = verification['pesticide_2_dose'] as String? ?? '';
+
+    // If Claude says "not a crop plant"
+    if (detectedCrop == 'SI_MMEA') {
+      return Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.warningLight.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            const Text('⚠️', style: TextStyle(fontSize: 28)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Hii haionekani kama mmea wa kilimo. '
+                'Piga picha ya jani la zao lako.',
+                style: GoogleFonts.poppins(
+                    fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+      ).animate().fadeIn().slideY(begin: 0.08, end: 0);
+    }
+
+    // Poor image quality
+    if (!imageQualityOk) {
+      return Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.warningLight.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            const Text('📸', style: TextStyle(fontSize: 28)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Picha haiko wazi vya kutosha. Tafadhali piga tena '
+                'kwa ukaribu na mwanga mzuri.',
+                style: GoogleFonts.poppins(fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      ).animate().fadeIn().slideY(begin: 0.08, end: 0);
+    }
+
+    final badgeColor = _confidenceBadgeColor(confStr);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Header ────────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF004D40), Color(0xFF00695C)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(15)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Brand + trust badge row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(children: [
+                        const Text('✅', style: TextStyle(fontSize: 10)),
+                        const SizedBox(width: 4),
+                        Text('Uchunguzi wa Uhakika',
+                            style: GoogleFonts.poppins(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white)),
+                      ]),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: badgeColor.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: badgeColor.withValues(alpha: 0.5)),
+                      ),
+                      child: Text(
+                        _confidenceLabel(confStr),
+                        style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white70),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Diagnosis name
+                if (isHealthy) ...[
+                  const Text('🌱', style: TextStyle(fontSize: 32)),
+                  const SizedBox(height: 6),
+                  Text('Mmea Wako Una Afya Njema!',
+                      style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white)),
+                ] else ...[
+                  Text(diagSw.isNotEmpty ? diagSw : 'Ugonjwa Uligunduliwa',
+                      style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          height: 1.2)),
+                  if (diagEn.isNotEmpty)
+                    Text(diagEn,
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: Colors.white60)),
+                ],
+
+                if (detectedCrop.isNotEmpty && detectedCrop != 'SI_MMEA') ...[
+                  const SizedBox(height: 6),
+                  Text('Zao: $detectedCrop',
+                      style: GoogleFonts.poppins(
+                          fontSize: 11, color: Colors.white54)),
+                ],
+
+                // Correction note — only when Claude disagreed with Mkulima
+                if (!agrees &&
+                    mkulimaGuess != null &&
+                    mkulimaGuess!.isNotEmpty &&
+                    !mkulimaGuess!.startsWith('Inahakiki') &&
+                    !isHealthy) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: Colors.orange.withValues(alpha: 0.4)),
+                    ),
+                    child: Text(
+                      'Mkulima AI ilidhani "$mkulimaGuess", '
+                      'lakini uchunguzi wa kina unaonyesha '
+                      '"${diagSw.isNotEmpty ? diagSw : diagEn}".',
+                      style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: Colors.orange[100]),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // ── Explanation ────────────────────────────────────────────────
+          if (explanationSw.isNotEmpty)
+            Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: Text(
+                explanationSw,
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.5),
+              ),
+            ),
+
+          // ── Recommended action ─────────────────────────────────────────
+          if (actionSw.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.bolt,
+                      size: 18, color: AppColors.warning),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      actionSw,
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // ── Pesticides ─────────────────────────────────────────────────
+          if (pest1Name.isNotEmpty &&
+              pest1Name != 'Hakuna' &&
+              !isHealthy) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: _VerifyPesticideTile(
+                  name: pest1Name, dose: pest1Dose, isPrimary: true),
+            ),
+            if (pest2Name.isNotEmpty && pest2Name != 'Hakuna')
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                child: _VerifyPesticideTile(
+                    name: pest2Name, dose: pest2Dose, isPrimary: false),
+              ),
+          ],
+
+          const SizedBox(height: 16),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.06, end: 0);
+  }
+}
+
+class _VerifyPesticideTile extends StatelessWidget {
+  final String name;
+  final String dose;
+  final bool isPrimary;
+  const _VerifyPesticideTile(
+      {required this.name, required this.dose, required this.isPrimary});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isPrimary
+            ? AppColors.primary.withValues(alpha: 0.06)
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: AppColors.primary.withValues(alpha: isPrimary ? 0.3 : 0.1)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.medication_outlined,
+              size: 18,
+              color:
+                  isPrimary ? AppColors.primary : AppColors.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style: GoogleFonts.poppins(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
+                if (dose.isNotEmpty && dose != 'Hakuna')
+                  Text(dose,
+                      style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Banner shown when offline — farmer can retry verification later.
+class _OfflineBanner extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _OfflineBanner({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.wifi_off_outlined,
+                  size: 18, color: AppColors.warning),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '⚠️ Uchunguzi wa awali (bila intaneti)',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.warning),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Pata uchunguzi kamili ukiwa na intaneti.',
+            style: GoogleFonts.poppins(
+                fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh, size: 16),
+              label: Text('Hakiki Tena',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 300.ms);
+  }
+}
+
+/// Small error banner with retry when Claude call failed.
+class _VerifyErrorBanner extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _VerifyErrorBanner(
+      {required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.critical.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.critical.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline,
+              size: 18, color: AppColors.critical),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Hakikisho halikufaulu. Jaribu tena.',
+              style: GoogleFonts.poppins(
+                  fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: Text('Jaribu',
+                style: GoogleFonts.poppins(
+                    fontSize: 12, color: AppColors.primary)),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 300.ms);
   }
 }
 
