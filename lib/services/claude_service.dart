@@ -11,6 +11,144 @@ class ClaudeService {
   // Read API key safely from .env file
   static String get _apiKey => dotenv.env['CLAUDE_API_KEY'] ?? '';
 
+  // ── COMBINED crop detection + Mkulima verification (ONE API call) ───────────
+  //
+  // Sends the image + Mkulima's guess to Claude and receives a single structured
+  // JSON that identifies the crop AND verifies (or corrects) the diagnosis.
+  //
+  // Returns the parsed map on success, or an error map on failure.
+  // Never throws — always returns a valid map so callers can fallback cleanly.
+  static Future<Map<String, dynamic>> verifyDiagnosis({
+    required File imageFile,
+    required String mkulimaGuess,     // jinaSw of the top Mkulima result
+    required double mkulimaConfidence, // 0.0–1.0
+    required bool mkulimaWasLowConfidence, // true when gate rejected it
+    String? regionContext,
+  }) async {
+    try {
+      final imageBytes = await imageFile.readAsBytes();
+      final base64Image = base64Encode(imageBytes);
+      final extension = imageFile.path.split('.').last.toLowerCase();
+      final mediaType = extension == 'png' ? 'image/png' : 'image/jpeg';
+
+      final regionLine = (regionContext?.isNotEmpty == true)
+          ? 'Farmer location: $regionContext, Tanzania.\n'
+          : 'Farmer location: Tanzania.\n';
+
+      final mkulimaLine = mkulimaWasLowConfidence
+          ? 'The on-device model (Mkulima AI) was NOT confident — it guessed '
+            '"$mkulimaGuess" at only ${(mkulimaConfidence * 100).toStringAsFixed(0)}% confidence. '
+            'Treat this as a weak hint, not a reliable answer.\n'
+          : 'The on-device model (Mkulima AI) guessed: "$mkulimaGuess" at '
+            '${(mkulimaConfidence * 100).toStringAsFixed(0)}% confidence.\n';
+
+      final prompt = '''
+$regionLine
+$mkulimaLine
+You are an expert agronomist specialising in East African smallholder crops (Tanzania).
+
+Look carefully at the image and do TWO things in ONE response:
+
+TASK 1 — Identify the crop plant in the image.
+TASK 2 — Diagnose any disease visible on the leaf/plant.
+
+If the image does NOT show a crop plant or agricultural plant at all, return:
+  "detected_crop": "SI_MMEA"
+  and leave all other fields as empty strings / false.
+
+If the image quality is too poor to make any diagnosis, set image_quality_ok to false.
+
+If the leaf looks HEALTHY (no disease), set is_healthy to true.
+
+Respond ONLY with this JSON — no markdown, no explanation, no extra text:
+
+{
+  "detected_crop": "English name / Swahili name, e.g. Tomato / Nyanya. Use SI_MMEA if not a crop.",
+  "agrees_with_mkulima": true,
+  "final_diagnosis_sw": "Jina la ugonjwa kwa Kiswahili (au 'Mmea Una Afya')",
+  "final_diagnosis_en": "Disease name in English (or 'Healthy')",
+  "confidence": "high",
+  "is_healthy": false,
+  "image_quality_ok": true,
+  "explanation_sw": "Maelezo mafupi ya hali ya mmea kwa Kiswahili rahisi (maneno 2-3 mafupi)",
+  "recommended_action_sw": "Hatua inayopaswa kufanywa SASA kwa Kiswahili",
+  "pesticide_1_name": "Dawa inayofaa (iliyosajiliwa Tanzania/TPRI) au Hakuna",
+  "pesticide_1_dose": "Kipimo kwa dumu la lita 15 au Hakuna",
+  "pesticide_2_name": "Dawa ya pili au Hakuna",
+  "pesticide_2_dose": "Kipimo au Hakuna"
+}
+
+Rules:
+- detected_crop: crop name in English / Swahili or exactly "SI_MMEA"
+- agrees_with_mkulima: true if your diagnosis matches Mkulima AI's guess, false otherwise
+- confidence: "high" (>80%), "medium" (50–80%), or "low" (<50%)
+- Only recommend pesticides/fungicides registered in Tanzania (TPRI list)
+- All Swahili fields must be in simple Swahili a rural farmer can understand
+- Do NOT include any text outside the JSON object
+''';
+
+      final response = await http.post(
+        Uri.parse(_apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': _apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'max_tokens': 1024,
+          'messages': [
+            {
+              'role': 'user',
+              'content': [
+                {
+                  'type': 'image',
+                  'source': {
+                    'type': 'base64',
+                    'media_type': mediaType,
+                    'data': base64Image,
+                  },
+                },
+                {'type': 'text', 'text': prompt},
+              ],
+            },
+          ],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['content'][0]['text'] as String;
+        final cleanJson =
+            content.replaceAll('```json', '').replaceAll('```', '').trim();
+        return jsonDecode(cleanJson) as Map<String, dynamic>;
+      }
+
+      return _verifyError(
+          'Hitilafu ya mtandao (${response.statusCode}). Jaribu tena.');
+    } catch (e) {
+      return _verifyError('Hitilafu: ${e.toString()}');
+    }
+  }
+
+  static Map<String, dynamic> _verifyError(String message) => {
+        'error': true,
+        'message': message,
+        'detected_crop': '',
+        'agrees_with_mkulima': false,
+        'final_diagnosis_sw': '',
+        'final_diagnosis_en': '',
+        'confidence': 'low',
+        'is_healthy': false,
+        'image_quality_ok': true,
+        'explanation_sw': '',
+        'recommended_action_sw': '',
+        'pesticide_1_name': 'Hakuna',
+        'pesticide_1_dose': 'Hakuna',
+        'pesticide_2_name': 'Hakuna',
+        'pesticide_2_dose': 'Hakuna',
+      };
+
   // Analyse a photo — handles disease, weed, or insect pest detection
   static Future<Map<String, dynamic>> analyseLeafPhoto({
     required File imageFile,

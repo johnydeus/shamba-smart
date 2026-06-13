@@ -4,7 +4,7 @@ import '../features/scan/domain/scan_request.dart';
 import '../features/scan/domain/scan_result.dart';
 import '../services/supabase_service.dart';
 
-enum ScanPhase { idle, mkulima, cloud, saving, complete, error }
+enum ScanPhase { idle, mkulima, verifying, cloud, saving, complete, error }
 
 class ScanProvider extends ChangeNotifier {
   final ScanAnalysisService _service = ScanAnalysisService();
@@ -22,6 +22,38 @@ class ScanProvider extends ChangeNotifier {
       _phase == ScanPhase.mkulima ||
       _phase == ScanPhase.cloud ||
       _phase == ScanPhase.saving;
+
+  /// Mkulima-only fast path for the two-stage disease scan flow.
+  /// Returns a preliminary [ScanResult] (or error) in < 500 ms.
+  Future<ScanResult?> mkulimaOnlyAnalyze(ScanRequest request) async {
+    _phase = ScanPhase.mkulima;
+    _statusMessage = 'Mkulima AI inachunguza picha...';
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final result = await _service.mkulimaOnlyAnalyze(request);
+
+      if (result == null || result.hasError) {
+        _phase = ScanPhase.error;
+        _errorMessage = result?.diagnosis['message'] as String?;
+        notifyListeners();
+        return result;
+      }
+
+      _phase = ScanPhase.verifying;
+      _statusMessage = '';
+      notifyListeners();
+      return result;
+    } catch (e) {
+      _phase = ScanPhase.error;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> checkOnline() => _service.isOnline();
 
   Future<ScanResult?> analyze(ScanRequest request) async {
     _phase = ScanPhase.mkulima;

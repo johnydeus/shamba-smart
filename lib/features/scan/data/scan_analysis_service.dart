@@ -17,6 +17,96 @@ class ScanAnalysisService {
   final ClaudeApiBridge _bridge = ClaudeApiBridge();
   final ConnectivityService _connectivity = ConnectivityService();
 
+  /// Fast Mkulima-only scan — returns in <500 ms with no network usage.
+  ///
+  /// For `ugonjwa` (disease) scans this is the FIRST stage of the two-stage
+  /// pipeline. `scan_screen.dart` calls this, navigates to ResultsScreen
+  /// immediately, then ResultsScreen fires [ClaudeService.verifyDiagnosis]
+  /// in the background to produce the trusted final result.
+  ///
+  /// Returns:
+  /// - `ScanResult` with `mkulimaResult` populated on success
+  /// - `ScanResult` with `error: true` when the image is not a plant
+  /// - `null` when the model is unavailable
+  Future<ScanResult?> mkulimaOnlyAnalyze(ScanRequest request) async {
+    final imageFile = File(request.imagePath);
+
+    final mkulimaResult = await _mkulima.analyze(imageFile);
+
+    // Model not loaded (first launch race / init failure)
+    if (mkulimaResult == null) {
+      return ScanResult(
+        diagnosis: {
+          'error': true,
+          'message': 'Mkulima AI haikupatikana. Jaribu tena.',
+          'is_healthy': false,
+        },
+        imagePath: request.imagePath,
+        cropName: request.cropName,
+        scanType: request.scanType,
+        source: ScanSource.mkulimaOnly,
+        gpsLat: request.gpsLat,
+        gpsLng: request.gpsLng,
+      );
+    }
+
+    // Gate 1: not a plant — stop entirely, don't send to Claude.
+    if (mkulimaResult.isRejected &&
+        mkulimaResult.diseaseKey == 'rejected_no_plant') {
+      return ScanResult(
+        diagnosis: {
+          'error': true,
+          'message': mkulimaResult.rejectionReason ??
+              'Hii haionekani kama mmea wa kilimo. '
+                  'Piga picha ya jani la zao lako.',
+          'is_healthy': false,
+        },
+        imagePath: request.imagePath,
+        cropName: request.cropName,
+        scanType: request.scanType,
+        source: ScanSource.mkulimaOnly,
+        gpsLat: request.gpsLat,
+        gpsLng: request.gpsLng,
+      );
+    }
+
+    // Gate 2 (low confidence) or normal result — both proceed to Claude.
+    // Build a preliminary diagnosis map so ResultsScreen can show something
+    // immediately. When Mkulima was low-confidence, show a holding message.
+    final Map<String, dynamic> prelimDiagnosis;
+    if (mkulimaResult.isRejected) {
+      // Low-confidence — don't show a wrong disease name; just say "verifying"
+      prelimDiagnosis = {
+        'is_healthy': false,
+        'disease_name_sw': 'Inahakikiwa...',
+        'disease_name_en': 'Verifying...',
+        'confidence': mkulimaResult.confidence,
+        'severity': 'low',
+        'description_sw': 'Mkulima AI haikuwa na uhakika wa kutosha. '
+            'Claude anaangalia picha kwa makini zaidi.',
+        'source': 'mkulima_low_confidence',
+      };
+    } else {
+      prelimDiagnosis =
+          _mkulima.diagnosisFromMkulima(mkulimaResult, request.cropName);
+    }
+
+    return ScanResult(
+      diagnosis: prelimDiagnosis,
+      imagePath: request.imagePath,
+      cropName: request.cropName,
+      scanType: request.scanType,
+      // Pass mkulimaResult only when it's not rejected, so ResultsScreen
+      // knows whether to show the Mkulima AI card.
+      mkulimaResult: mkulimaResult.isRejected ? null : mkulimaResult,
+      source: ScanSource.mkulimaOnly,
+      gpsLat: request.gpsLat,
+      gpsLng: request.gpsLng,
+    );
+  }
+
+  Future<bool> isOnline() => _connectivity.checkNow();
+
   Future<ScanResult> analyze(ScanRequest request) async {
     final imageFile = File(request.imagePath);
     final isUgonjwa = request.scanType == 'ugonjwa';
