@@ -889,32 +889,14 @@ class _QuickActions extends StatelessWidget {
        'onTap': () => nav(const KalendaScreen())},
       {'emoji': '💊', 'label': 'Mwongozo wa Mbolea', 'color': const Color(0xFFEF6C00),
        'onTap': () => nav(const MboleaScreen())},
-      {'emoji': '🛡️', 'label': 'Ulinzi', 'color': const Color(0xFFE65100),
-       'onTap': () => nav(const CropProtectionScreen())},
-      {'emoji': '💧', 'label': 'Maji', 'color': const Color(0xFF0277BD),
-       'onTap': () => nav(const IrrigationScreen())},
-      {'emoji': '🌾', 'label': 'Mbegu', 'color': _kGreenMid,
-       'onTap': () => nav(const SeedsScreen())},
-      {'emoji': '💊', 'label': 'Viuatilifu', 'color': const Color(0xFF6A1B9A),
-       'onTap': () => nav(const ViuatiliziScreen())},
-      {'emoji': '🏪', 'label': 'Maduka', 'color': const Color(0xFF2E8B57),
-       'onTap': () => nav(const AgrovetScreen())},
       {'emoji': '🤖', 'label': 'Mshauri AI', 'color': _kGreen,
        'onTap': () => nav(const ForumScreen())},
-      {'emoji': '🐛', 'label': 'IPM', 'color': const Color(0xFF4E342E),
-       'onTap': () => nav(const IpmScreen())},
-      {'emoji': '☁️', 'label': 'Kupulizia', 'color': const Color(0xFF0277BD),
-       'onTap': () => nav(const SprayAdvisoryScreen())},
-      {'emoji': '🌿', 'label': 'Kilimo Kivuli', 'color': const Color(0xFF1B5E20),
-       'onTap': () => nav(const KilimoKivuliScreen())},
-      {'emoji': '📔', 'label': 'Diari', 'color': const Color(0xFFE65100),
-       'onTap': () => nav(const FarmDiaryScreen())},
+      if (role == UserRole.mkulima)
+        {'emoji': '🏡', 'label': 'Mashamba Yangu', 'color': _kGreenMid,
+         'onTap': () => nav(const FarmsScreen())},
       if (role == UserRole.afisa)
         {'emoji': '👨‍🌾', 'label': 'Wakulima', 'color': const Color(0xFF00695C),
          'onTap': () => nav(const ConsultationScreen())},
-      if (role == UserRole.mkulima)
-        {'emoji': '🌍', 'label': 'Udongo', 'color': const Color(0xFF795548),
-         'onTap': () => nav(const SoilScreen())},
     ];
   }
 }
@@ -1530,6 +1512,62 @@ class _SparklinePainter extends CustomPainter {
 
 // ── Services Section ──────────────────────────────────────────────────────────
 
+class _SectionHeader extends StatelessWidget {
+  final String emoji;
+  final String title;
+  const _SectionHeader({required this.emoji, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: _kGreenDark.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(emoji, style: const TextStyle(fontSize: 14)),
+        ),
+        const SizedBox(width: 8),
+        Text(title,
+            style: _jakarta(
+                size: 13, weight: FontWeight.w700, color: _kGreenDark)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Container(
+              height: 1, color: _kGreenDark.withValues(alpha: 0.08)),
+        ),
+      ],
+    );
+  }
+}
+
+class _ServiceGrid extends StatelessWidget {
+  final List<_ServiceItem> items;
+  final int startIndex;
+  const _ServiceGrid({required this.items, this.startIndex = 0});
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.5,
+      ),
+      itemCount: items.length,
+      itemBuilder: (_, i) => _ServiceTile(item: items[i])
+          .animate(delay: Duration(milliseconds: (startIndex + i) * 60))
+          .fadeIn(duration: 300.ms)
+          .slideX(begin: 0.05, end: 0),
+    );
+  }
+}
+
 class _ServicesSection extends StatelessWidget {
   final UserRole role;
   final void Function(Widget) go;
@@ -1538,67 +1576,102 @@ class _ServicesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final services = [
-      _ServiceItem('🌱', 'Mbegu za TOSCI', _kGreenMid,
-          () => go(const SeedsScreen())),
-      _ServiceItem('🏪', 'Maduka ya Dawa', const Color(0xFF2E8B57),
-          () => go(const AgrovetScreen())),
+    final udongonaShambaItems = [
       _ServiceItem('💧', 'Umwagiliaji', const Color(0xFF0277BD),
           () => go(const IrrigationScreen())),
-      _ServiceItem('📊', 'Akili za Soko', const Color(0xFFFF6F00),
-          () => go(const MarketIntelligenceScreen())),
-      _ServiceItem('🧪', 'Viuatilifu', const Color(0xFF6A1B9A),
-          () => go(const ViuatiliziScreen())),
-      _ServiceItem('🛡️', 'Ulinzi wa Mazao', const Color(0xFFE65100),
-          () => go(const CropProtectionScreen())),
-      _ServiceItem('🐛', 'IPM — Maamuzi ya Kupulizia', const Color(0xFF4E342E),
-          () => go(const IpmScreen())),
-      _ServiceItem('💊', 'Dawa ya Mbolea', const Color(0xFF6A1B9A),
-          () => go(const FertiliserPrescriptionScreen())),
-      _ServiceItem('☁️', 'Ushauri wa Kupulizia', const Color(0xFF0277BD),
-          () => go(const SprayAdvisoryScreen())),
-      _ServiceItem('🗺️', 'Ramani ya Udongo', const Color(0xFF795548),
-          () => go(const SoilMappingScreen())),
-      _ServiceItem('📡', 'Sensor & Premium', const Color(0xFFF57F17),
-          () => go(const PremiumSensorScreen())),
-      _ServiceItem('📔', 'Diari ya Shamba', const Color(0xFFE65100),
-          () => go(const FarmDiaryScreen())),
-      _ServiceItem('🌿', 'Kilimo Kivuli', const Color(0xFF1B5E20),
-          () => go(const KilimoKivuliScreen())),
       if (role == UserRole.mkulima || role == UserRole.afisa)
         _ServiceItem('🌍', 'Data ya Udongo', const Color(0xFF795548),
             () => go(const SoilScreen())),
-      if (role == UserRole.mkulima)
-        _ServiceItem('🏡', 'Mashamba Yangu', _kGreen,
-            () => go(const FarmsScreen())),
+      _ServiceItem('🗺️', 'Ramani ya Udongo', const Color(0xFF795548),
+          () => go(const SoilMappingScreen())),
+      _ServiceItem('📔', 'Diari ya Shamba', const Color(0xFFE65100),
+          () => go(const FarmDiaryScreen())),
     ];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Huduma Zote',
               style: _jakarta(
-                  size: 16,
-                  weight: FontWeight.w700,
-                  color: _kGreenDark)),
-          const SizedBox(height: 14),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.6,
-            ),
-            itemCount: services.length,
-            itemBuilder: (_, i) => _ServiceTile(item: services[i])
-                .animate(delay: Duration(milliseconds: i * 60))
-                .fadeIn(duration: 300.ms)
-                .slideX(begin: 0.05, end: 0),
+                  size: 16, weight: FontWeight.w700, color: _kGreenDark)),
+          const SizedBox(height: 16),
+
+          // ── 1. Pembejeo na Ulinzi wa Mazao ───────────────────────────
+          const _SectionHeader(
+              emoji: '🌱', title: 'Pembejeo na Ulinzi wa Mazao'),
+          const SizedBox(height: 10),
+          _ServiceGrid(
+            startIndex: 0,
+            items: [
+              _ServiceItem('🌱', 'Mbegu za TOSCI', _kGreenMid,
+                  () => go(const SeedsScreen())),
+              _ServiceItem('🏪', 'Maduka ya Dawa', const Color(0xFF2E8B57),
+                  () => go(const AgrovetScreen())),
+              _ServiceItem('🧪', 'Viuatilifu', const Color(0xFF6A1B9A),
+                  () => go(const ViuatiliziScreen())),
+              _ServiceItem('🛡️', 'Ulinzi wa Mazao', const Color(0xFFE65100),
+                  () => go(const CropProtectionScreen())),
+              _ServiceItem('💊', 'Dawa ya Mbolea', const Color(0xFF6A1B9A),
+                  () => go(const FertiliserPrescriptionScreen())),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── 2. Afya ya Mazao ─────────────────────────────────────────
+          const _SectionHeader(emoji: '🌿', title: 'Afya ya Mazao'),
+          const SizedBox(height: 10),
+          _ServiceGrid(
+            startIndex: 5,
+            items: [
+              _ServiceItem('🐛', 'IPM — Maamuzi ya Kupulizia',
+                  const Color(0xFF4E342E), () => go(const IpmScreen())),
+              _ServiceItem('☁️', 'Ushauri wa Kupulizia',
+                  const Color(0xFF0277BD),
+                  () => go(const SprayAdvisoryScreen())),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── 3. Soko ──────────────────────────────────────────────────
+          const _SectionHeader(emoji: '📊', title: 'Soko'),
+          const SizedBox(height: 10),
+          _ServiceGrid(
+            startIndex: 7,
+            items: [
+              _ServiceItem('📊', 'Akili za Soko', const Color(0xFFFF6F00),
+                  () => go(const MarketIntelligenceScreen())),
+              _ServiceItem('💹', 'Bei za Soko', const Color(0xFF2E7D32),
+                  () => go(const MarketScreen())),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── 4. Kilimo cha Kisasa ──────────────────────────────────────
+          const _SectionHeader(emoji: '🚀', title: 'Kilimo cha Kisasa'),
+          const SizedBox(height: 10),
+          _ServiceGrid(
+            startIndex: 9,
+            items: [
+              _ServiceItem('🌿', 'Kilimo Kivuli', const Color(0xFF1B5E20),
+                  () => go(const KilimoKivuliScreen())),
+              _ServiceItem('📡', 'Sensor & Premium', const Color(0xFFF57F17),
+                  () => go(const PremiumSensorScreen())),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── 5. Udongo na Shamba ───────────────────────────────────────
+          const _SectionHeader(emoji: '🗺️', title: 'Udongo na Shamba'),
+          const SizedBox(height: 10),
+          _ServiceGrid(
+            startIndex: 11,
+            items: udongonaShambaItems,
           ),
         ],
       ),
@@ -1628,21 +1701,20 @@ class _ServiceTile extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: AppShadow.sm,
-          border: Border.all(
-              color: item.color.withValues(alpha: 0.1)),
+          border: Border.all(color: item.color.withValues(alpha: 0.12)),
         ),
         child: Row(
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: item.color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
                 child: Text(item.emoji,
-                    style: const TextStyle(fontSize: 20)),
+                    style: const TextStyle(fontSize: 22)),
               ),
             ),
             const SizedBox(width: 10),
@@ -1650,7 +1722,7 @@ class _ServiceTile extends StatelessWidget {
               child: Text(item.label,
                   style: _jakarta(
                       size: 12,
-                      weight: FontWeight.w600,
+                      weight: FontWeight.w700,
                       color: _kGreenDark),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis),
