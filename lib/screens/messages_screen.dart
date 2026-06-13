@@ -10,6 +10,7 @@ import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../providers/community_provider.dart';
+import '../services/privacy_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/common_widgets.dart';
 import 'chat_screen.dart';
@@ -153,9 +154,11 @@ class _MessagesScreenState extends State<MessagesScreen>
           if (user == null) return const SizedBox.shrink();
           return FloatingActionButton.extended(
             backgroundColor: AppColors.leaf,
-            icon: const Icon(Icons.edit, color: Colors.white),
-            label: const Text('Chapisho Jipya',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.add_photo_alternate_rounded,
+                color: Colors.white),
+            label: const Text('Andika / Picha',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
             onPressed: () => _showPostSheet(context, user),
           );
         },
@@ -625,16 +628,32 @@ class _PostCardState extends State<_PostCard> {
                 // Direct message button
                 if (user != null && post.authorId != user.id)
                   TextButton.icon(
-                    onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => ChatScreen(
-                                  contactId: post.authorId,
-                                  contactName: post.authorName,
-                                  contactRole: post.role,
-                                  contactColorHex:
-                                      post.role.colorHex,
-                                ))),
+                    onPressed: () async {
+                      final canMsg =
+                          await PrivacyService.canSendMessage(
+                        senderId: user.id,
+                        recipientId: post.authorId,
+                        senderIsOfficer:
+                            user.role == UserRole.afisa,
+                      );
+                      if (!context.mounted) return;
+                      if (!canMsg) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Mtu huyu haukuruhusu kupokea ujumbe.')));
+                        return;
+                      }
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                    contactId: post.authorId,
+                                    contactName: post.authorName,
+                                    contactRole: post.role,
+                                    contactColorHex: post.role.colorHex,
+                                  )));
+                    },
                     icon: const Icon(Icons.send, size: 14),
                     label: const Text('Wasiliana',
                         style: TextStyle(fontSize: 11)),
@@ -1092,18 +1111,35 @@ class _UserCard extends StatelessWidget {
 
             // Chat button
             ElevatedButton.icon(
-              onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => ChatScreen(
-                            contactId: id,
-                            contactName: displayName,
-                            contactRole: role,
-                            contactColorHex: colorHex,
-                          ))),
+              onPressed: () async {
+                final auth = context.read<AuthProvider>();
+                final myId = auth.currentUser?.id ?? '';
+                final myRole = auth.currentUser?.role;
+                final canMsg = await PrivacyService.canSendMessage(
+                  senderId: myId,
+                  recipientId: id,
+                  senderIsOfficer: myRole == UserRole.afisa,
+                );
+                if (!context.mounted) return;
+                if (!canMsg) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              'Mtu huyu haukuruhusu kupokea ujumbe.')));
+                  return;
+                }
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                              contactId: id,
+                              contactName: displayName,
+                              contactRole: role,
+                              contactColorHex: colorHex,
+                            )));
+              },
               icon: const Icon(Icons.chat_bubble_outline, size: 14),
-              label: const Text('Ongea',
-                  style: TextStyle(fontSize: 12)),
+              label: const Text('Ongea', style: TextStyle(fontSize: 12)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: color,
                 foregroundColor: Colors.white,

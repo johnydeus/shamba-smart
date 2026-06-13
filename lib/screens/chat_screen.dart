@@ -626,6 +626,42 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
+// ── App-bar role badge (works on dark/coloured header) ────────────────────────
+
+class _AppBarRoleBadge extends StatelessWidget {
+  final UserRole role;
+  const _AppBarRoleBadge({required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAfisa = role == UserRole.afisa;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isAfisa) ...[
+          const Icon(Icons.verified_rounded,
+              color: Colors.white70, size: 12),
+          const SizedBox(width: 3),
+        ],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: Colors.white.withValues(alpha: 0.3)),
+          ),
+          child: Text(role.label,
+              style: GoogleFonts.dmSans(
+                  fontSize: 9,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold)),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Message bubble — renders all 4 types ──────────────────────────────────────
 
 class _MessageBubble extends StatelessWidget {
