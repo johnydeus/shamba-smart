@@ -1,17 +1,19 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // This service asks Claude for live Tanzania agricultural data
 // and caches results in Supabase so the app works offline too
 class DataSyncService {
-  static const String _apiUrl = 'https://api.anthropic.com/v1/messages';
   static const String _model = 'claude-sonnet-4-5';
-  static String get _apiKey => dotenv.env['CLAUDE_API_KEY'] ?? '';
   static SupabaseClient get _db => Supabase.instance.client;
+
+  static Future<Map<String, dynamic>> _invokeClaude(
+      Map<String, dynamic> payload) async {
+    final res = await _db.functions.invoke('claude-proxy', body: payload);
+    return res.data as Map<String, dynamic>;
+  }
 
   // ─── MARKET PRICES ────────────────────────────────────────────────────────
 
@@ -45,36 +47,20 @@ Prices must be realistic TZS per kg wholesale prices for Tanzania 2025.
 ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 2048,
-          'messages': [
-            {'role': 'user', 'content': prompt}
-          ],
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['content'][0]['text'] as String;
-        final clean = content
-            .replaceAll('```json', '')
-            .replaceAll('```', '')
-            .trim();
-        final list = jsonDecode(clean) as List;
-        final prices = list.cast<Map<String, dynamic>>();
-
-        // Save to Supabase so offline works
-        await _cachePricesToSupabase(prices);
-        return prices;
-      }
+      final data = await _invokeClaude({
+        'model': _model,
+        'max_tokens': 2048,
+        'messages': [
+          {'role': 'user', 'content': prompt}
+        ],
+      });
+      final content = data['content'][0]['text'] as String;
+      final clean =
+          content.replaceAll('```json', '').replaceAll('```', '').trim();
+      final list = jsonDecode(clean) as List;
+      final prices = list.cast<Map<String, dynamic>>();
+      await _cachePricesToSupabase(prices);
+      return prices;
     } catch (e) {
       debugPrint('DataSyncService prices error: $e');
     }
@@ -159,32 +145,18 @@ All description_sw and safety_sw must be in Swahili.
 ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 4096,
-          'messages': [
-            {'role': 'user', 'content': prompt}
-          ],
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['content'][0]['text'] as String;
-        final clean = content
-            .replaceAll('```json', '')
-            .replaceAll('```', '')
-            .trim();
-        final list = jsonDecode(clean) as List;
-        return list.cast<Map<String, dynamic>>();
-      }
+      final data = await _invokeClaude({
+        'model': _model,
+        'max_tokens': 4096,
+        'messages': [
+          {'role': 'user', 'content': prompt}
+        ],
+      });
+      final content = data['content'][0]['text'] as String;
+      final clean =
+          content.replaceAll('```json', '').replaceAll('```', '').trim();
+      final list = jsonDecode(clean) as List;
+      return list.cast<Map<String, dynamic>>();
     } catch (e) {
       debugPrint('DataSyncService pesticides error: $e');
     }
@@ -219,32 +191,18 @@ Phone numbers in +255 format.
 ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 1024,
-          'messages': [
-            {'role': 'user', 'content': prompt}
-          ],
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['content'][0]['text'] as String;
-        final clean = content
-            .replaceAll('```json', '')
-            .replaceAll('```', '')
-            .trim();
-        final list = jsonDecode(clean) as List;
-        return list.cast<Map<String, dynamic>>();
-      }
+      final data = await _invokeClaude({
+        'model': _model,
+        'max_tokens': 1024,
+        'messages': [
+          {'role': 'user', 'content': prompt}
+        ],
+      });
+      final content = data['content'][0]['text'] as String;
+      final clean =
+          content.replaceAll('```json', '').replaceAll('```', '').trim();
+      final list = jsonDecode(clean) as List;
+      return list.cast<Map<String, dynamic>>();
     } catch (e) {
       debugPrint('DataSyncService agrovets error: $e');
     }

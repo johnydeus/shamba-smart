@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/audio_service.dart';
 import '../services/claude_service.dart';
 import '../services/location_service.dart';
@@ -68,16 +68,8 @@ class _SoilMappingScreenState extends State<SoilMappingScreen> {
     if (_lat == null || _lng == null) return;
     setState(() { _loading = true; _error = null; _soilData = {}; _aiRecommendation = null; });
 
-    final token = dotenv.env['ISDASOIL_TOKEN'] ?? '';
-    // Use ISRIC SoilGrids as free fallback when no iSDAsoil token
-    final useIsda = token.isNotEmpty;
-
     try {
-      if (useIsda) {
-        await _fetchFromIsdaSoil(token);
-      } else {
-        await _fetchFromSoilGrids();
-      }
+      await _fetchFromIsdaSoil();
       _lastFetch = DateTime.now();
     } catch (e) {
       setState(() { _error = 'Hitilafu ya data ya udongo: $e'; });
@@ -86,7 +78,7 @@ class _SoilMappingScreenState extends State<SoilMappingScreen> {
     }
   }
 
-  Future<void> _fetchFromIsdaSoil(String token) async {
+  Future<void> _fetchFromIsdaSoil() async {
     final props = ['ph', 'nitrogen_total', 'phosphorus_extractable',
                    'potassium_extractable', 'organic_carbon', 'clay',
                    'sand', 'silt', 'bulk_density', 'cation_exchange_capacity'];
@@ -94,28 +86,20 @@ class _SoilMappingScreenState extends State<SoilMappingScreen> {
 
     for (final prop in props) {
       try {
-        final uri = Uri.parse('https://api.isda-africa.com/v1/soil').replace(
-          queryParameters: {
+        final res = await Supabase.instance.client.functions.invoke(
+          'isda-proxy',
+          body: {
             'lat': _lat!.toStringAsFixed(6),
             'lon': _lng!.toStringAsFixed(6),
             'property': prop,
             'depth': '0-20',
           },
         );
-        final resp = await http.get(
-          uri,
-          headers: {'Authorization': 'Bearer $token'},
-        ).timeout(const Duration(seconds: 15));
-
-        if (resp.statusCode == 200) {
-          final json = jsonDecode(resp.body) as Map<String, dynamic>;
-          final val = json['data']?['value'];
-          if (val != null) combined[prop] = val;
-        } else if (resp.statusCode == 401) {
-          throw Exception('Token ya iSDAsoil imeisha muda — angalia mipangilio');
-        }
+        final json = res.data as Map<String, dynamic>;
+        final val = json['data']?['value'];
+        if (val != null) combined[prop] = val;
       } catch (e) {
-        // Skip individual property failure, try SoilGrids instead
+        // Skip individual property failure, fall through to SoilGrids
       }
     }
 

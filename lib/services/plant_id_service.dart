@@ -1,17 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
-import '../config/api_keys.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'claude_service.dart';
 
 class PlantIdService {
-  // crop.health — disease + pest detection (ugonjwa + wadudu)
-  static const String _cropHealthUrl =
-      'https://crop.kindwise.com/api/v1/identification';
-  // plant.id — plant/weed species identification (magugu)
-  static const String _plantIdUrl =
-      'https://api.plant.id/v3/identification';
-
   static Future<Map<String, dynamic>> analysePhoto({
     required File imageFile,
     required String cropName,
@@ -20,25 +12,7 @@ class PlantIdService {
     String? region,
   }) async {
     if (scanType == 'magugu') {
-      if (!ApiKeys.hasPlantId) {
-        return {
-          'error': true,
-          'message':
-              'Kugundua magugu kunahitaji plant.id API key. Weka PLANT_ID_KEY kwenye .env',
-          'is_healthy': false,
-        };
-      }
       return _identifyWeed(imageFile, cropName, region: region);
-    }
-
-    // ugonjwa + wadudu — both use crop.health
-    if (!ApiKeys.hasCropHealth) {
-      return {
-        'error': true,
-        'message':
-            'CROP_HEALTH_KEY haijasanidiwa. Weka key kwenye .env',
-        'is_healthy': false,
-      };
     }
     return _detectCropHealth(
       imageFile,
@@ -61,30 +35,23 @@ class PlantIdService {
     final base64Image = await _toBase64(imageFile);
 
     try {
-      final response = await http.post(
-        Uri.parse(_cropHealthUrl),
-        headers: {
-          'Api-Key': ApiKeys.cropHealth,
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+      final res = await Supabase.instance.client.functions.invoke(
+        'plant-id-proxy',
+        body: {
+          'service': 'crop_health',
           'images': [base64Image],
           'similar_images': false,
-        }),
+        },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return _parseCropHealthAndExplain(
-          data,
-          cropName,
-          scanType,
-          mkulimaContext: mkulimaContext,
-          region: region,
-        );
-      }
-
-      return _apiError(response.statusCode, response.body);
+      final data = res.data as Map<String, dynamic>;
+      return _parseCropHealthAndExplain(
+        data,
+        cropName,
+        scanType,
+        mkulimaContext: mkulimaContext,
+        region: region,
+      );
     } catch (e) {
       return _networkError(e);
     }
@@ -145,24 +112,17 @@ class PlantIdService {
     final base64Image = await _toBase64(imageFile);
 
     try {
-      final response = await http.post(
-        Uri.parse(_plantIdUrl),
-        headers: {
-          'Api-Key': ApiKeys.plantId,
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+      final res = await Supabase.instance.client.functions.invoke(
+        'plant-id-proxy',
+        body: {
+          'service': 'plant_id',
           'images': [base64Image],
           'similar_images': false,
-        }),
+        },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return _parseWeedAndExplain(data, cropName, region: region);
-      }
-
-      return _apiError(response.statusCode, response.body);
+      final data = res.data as Map<String, dynamic>;
+      return _parseWeedAndExplain(data, cropName, region: region);
     } catch (e) {
       return _networkError(e);
     }
@@ -226,23 +186,6 @@ class PlantIdService {
     final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
     final bytes = await imageFile.readAsBytes();
     return 'data:$mime;base64,${base64Encode(bytes)}';
-  }
-
-  static Map<String, dynamic> _apiError(int statusCode, [String? body]) {
-    String detail = '';
-    if (body != null && body.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(body) as Map<String, dynamic>;
-        detail = ' — ${decoded['description'] ?? decoded['error'] ?? ''}';
-      } catch (_) {
-        if (body.length < 200) detail = ' — $body';
-      }
-    }
-    return {
-      'error': true,
-      'message': 'Hitilafu $statusCode$detail. Jaribu tena.',
-      'is_healthy': false,
-    };
   }
 
   static Map<String, dynamic> _networkError(Object e) => {

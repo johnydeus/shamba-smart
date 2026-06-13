@@ -1,32 +1,34 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import '../config/api_keys.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-// Planet Labs satellite data service
-// If no API key: returns realistic demo NDVI data for Tanzania
 class PlanetService {
-  static const String _baseUrl = 'https://api.planet.com/data/v1';
+  static Future<dynamic> _proxy({
+    required String method,
+    required String path,
+    Map<String, dynamic>? body,
+  }) async {
+    final res = await Supabase.instance.client.functions.invoke(
+      'satellite-proxy',
+      body: {
+        'service': 'planet',
+        'method': method,
+        'path': path,
+        if (body != null) 'body': body,
+      },
+    );
+    return res.data;
+  }
 
-  static bool get hasKey => ApiKeys.hasPlanet;
-
-  // Get NDVI for farm coordinates — returns map with ndvi value and metadata
   static Future<Map<String, dynamic>> getFarmNDVI({
     required double lat,
     required double lng,
     required double farmAcres,
   }) async {
-    if (!hasKey) {
-      return _demoNdviData(lat, lng);
-    }
-
     try {
-      // 1. Search for recent satellite imagery
       final searchResult = await _searchImagery(lat, lng);
       if (searchResult == null) return _demoNdviData(lat, lng);
 
-      // 2. Get NDVI statistics for the scene
       final ndvi = await _getNdviStats(searchResult['id'] as String, lat, lng);
       return ndvi ?? _demoNdviData(lat, lng);
     } catch (e) {
@@ -37,70 +39,59 @@ class PlanetService {
 
   static Future<Map<String, dynamic>?> _searchImagery(
       double lat, double lng) async {
-    final body = {
-      'item_types': ['PSScene'],
-      'filter': {
-        'type': 'AndFilter',
-        'config': [
-          {
-            'type': 'GeometryFilter',
-            'field_name': 'geometry',
-            'config': {
-              'type': 'Point',
-              'coordinates': [lng, lat],
-            },
+    try {
+      final data = await _proxy(
+        method: 'POST',
+        path: '/quick-search',
+        body: {
+          'item_types': ['PSScene'],
+          'filter': {
+            'type': 'AndFilter',
+            'config': [
+              {
+                'type': 'GeometryFilter',
+                'field_name': 'geometry',
+                'config': {
+                  'type': 'Point',
+                  'coordinates': [lng, lat],
+                },
+              },
+              {
+                'type': 'DateRangeFilter',
+                'field_name': 'acquired',
+                'config': {
+                  'gte': DateTime.now()
+                      .subtract(const Duration(days: 14))
+                      .toIso8601String(),
+                  'lte': DateTime.now().toIso8601String(),
+                },
+              },
+              {
+                'type': 'RangeFilter',
+                'field_name': 'cloud_cover',
+                'config': {'lte': 0.3},
+              },
+            ],
           },
-          {
-            'type': 'DateRangeFilter',
-            'field_name': 'acquired',
-            'config': {
-              'gte': DateTime.now()
-                  .subtract(const Duration(days: 14))
-                  .toIso8601String(),
-              'lte': DateTime.now().toIso8601String(),
-            },
-          },
-          {
-            'type': 'RangeFilter',
-            'field_name': 'cloud_cover',
-            'config': {'lte': 0.3},
-          },
-        ],
-      },
-    };
-
-    final response = await http
-        .post(
-          Uri.parse('$_baseUrl/quick-search'),
-          headers: {
-            'Authorization': 'api-key ${ApiKeys.planetApiKey}',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 15));
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final features = (data['features'] as List?) ?? [];
-      return features.isNotEmpty
-          ? features.first as Map<String, dynamic>
-          : null;
+        },
+      );
+      final features = ((data as Map<String, dynamic>)['features'] as List?) ?? [];
+      return features.isNotEmpty ? features.first as Map<String, dynamic> : null;
+    } catch (e) {
+      debugPrint('PlanetService _searchImagery error: $e');
+      return null;
     }
-    return null;
   }
 
   static Future<Map<String, dynamic>?> _getNdviStats(
       String sceneId, double lat, double lng) async {
-    // Planet NDVI endpoint (requires Assets API + activated scene)
-    final response = await http.get(
-      Uri.parse('$_baseUrl/item-types/PSScene/items/$sceneId'),
-      headers: {'Authorization': 'api-key ${ApiKeys.planetApiKey}'},
-    ).timeout(const Duration(seconds: 10));
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final props = data['properties'] as Map<String, dynamic>?;
+    try {
+      final data = await _proxy(
+        method: 'GET',
+        path: '/item-types/PSScene/items/$sceneId',
+      );
+      final props =
+          (data as Map<String, dynamic>)['properties'] as Map<String, dynamic>?;
       return {
         'ndvi': _estimateNdviFromSatData(props),
         'scene_id': sceneId,
@@ -108,23 +99,22 @@ class PlanetService {
         'acquired': props?['acquired'],
         'source': 'Planet Labs',
       };
+    } catch (e) {
+      debugPrint('PlanetService _getNdviStats error: $e');
+      return null;
     }
-    return null;
   }
 
   static double _estimateNdviFromSatData(Map<String, dynamic>? props) {
-    // Approximate NDVI from vegetation_percentage if NDVI band unavailable
     final veg = (props?['vegetation_percentage'] as num?)?.toDouble() ?? 0.5;
     return (veg * 0.7).clamp(0.1, 0.9);
   }
 
-  // Realistic demo NDVI based on Tanzania geography and season
   static Map<String, dynamic> _demoNdviData(double lat, double lng) {
     final rng = Random(lat.toInt() * 100 + lng.toInt());
     final month = DateTime.now().month;
-
-    // Tanzania rainy seasons: Mar-May (masika), Oct-Dec (vuli)
-    final isRainySeason = (month >= 3 && month <= 5) || (month >= 10 && month <= 12);
+    final isRainySeason =
+        (month >= 3 && month <= 5) || (month >= 10 && month <= 12);
     final baseNdvi = isRainySeason ? 0.55 : 0.38;
     final noise = (rng.nextDouble() - 0.5) * 0.12;
     final ndvi = (baseNdvi + noise).clamp(0.15, 0.85);
@@ -149,7 +139,6 @@ class PlanetService {
     };
   }
 
-  // Historical NDVI trend (last 30 days)
   static List<Map<String, dynamic>> getDemoNdviTrend(
       double lat, double lng, int days) {
     final rng = Random(lat.toInt() * 10 + lng.toInt());

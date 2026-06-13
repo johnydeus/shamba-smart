@@ -1,9 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-// Three possible states for the AI response box
 enum AiState { idle, loading, success, error }
 
 class AiProvider extends ChangeNotifier {
@@ -14,15 +11,12 @@ class AiProvider extends ChangeNotifier {
   String get response => _response;
   bool get isLoading => _state == AiState.loading;
 
-  static const _url = 'https://api.anthropic.com/v1/messages';
   static const _model = 'claude-sonnet-4-5';
-  static String get _key => dotenv.env['CLAUDE_API_KEY'] ?? '';
 
-  // Ask Claude a question as a Tanzania farming advisor
   Future<void> askQuestion({
     required String question,
-    required String userRole,   // e.g. "Mkulima"
-    required String userRegion, // e.g. "Morogoro"
+    required String userRole,
+    required String userRegion,
   }) async {
     if (question.trim().isEmpty) return;
 
@@ -31,14 +25,9 @@ class AiProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await http.post(
-        Uri.parse(_url),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _key,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
+      final res = await Supabase.instance.client.functions.invoke(
+        'claude-proxy',
+        body: {
           'model': _model,
           'max_tokens': 800,
           'system':
@@ -50,17 +39,12 @@ class AiProvider extends ChangeNotifier {
           'messages': [
             {'role': 'user', 'content': question}
           ],
-        }),
+        },
       );
 
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        _response = data['content'][0]['text'] as String;
-        _state = AiState.success;
-      } else {
-        _response = '⚠️ Hitilafu ya mtandao. Jaribu tena.';
-        _state = AiState.error;
-      }
+      final data = res.data as Map<String, dynamic>;
+      _response = data['content'][0]['text'] as String;
+      _state = AiState.success;
     } catch (e) {
       _response = '⚠️ Hitilafu ya mtandao. Jaribu tena.';
       _state = AiState.error;
@@ -70,7 +54,6 @@ class AiProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Reset back to idle (clear response)
   void reset() {
     _state = AiState.idle;
     _response = '';

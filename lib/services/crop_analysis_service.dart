@@ -1,6 +1,4 @@
-import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/satellite_models.dart';
 import 'eosda_service.dart';
 
@@ -9,9 +7,7 @@ class CropAnalysisService {
 
   CropAnalysisService(this._eosda);
 
-  static const _claudeUrl = 'https://api.anthropic.com/v1/messages';
   static const _model = 'claude-sonnet-4-5';
-  static String get _claudeKey => dotenv.env['CLAUDE_API_KEY'] ?? '';
 
   // ── Main analysis pipeline ─────────────────────────────────────────────────
 
@@ -372,26 +368,18 @@ Andika kwa Kiswahili rahisi, tumia emoji. Maneno mafupi yanayofaa kusomwa kwenye
 ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_claudeUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _claudeKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
+      final response = await Supabase.instance.client.functions.invoke(
+        'claude-proxy',
+        body: {
           'model': _model,
           'max_tokens': 600,
           'messages': [
             {'role': 'user', 'content': prompt}
           ],
-        }),
+        },
       );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['content'][0]['text'] as String;
-      }
+      final data = response.data as Map<String, dynamic>;
+      return data['content'][0]['text'] as String;
     } catch (e) {
       // Fallback to a rule-based summary
     }

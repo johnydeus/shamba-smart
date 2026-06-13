@@ -1,28 +1,22 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ClaudeService {
-  // Claude API endpoint
-  static const String _apiUrl = 'https://api.anthropic.com/v1/messages';
   static const String _model = 'claude-sonnet-4-5';
 
-  // Read API key safely from .env file
-  static String get _apiKey => dotenv.env['CLAUDE_API_KEY'] ?? '';
+  static Future<Map<String, dynamic>> _invoke(Map<String, dynamic> payload) async {
+    final response = await Supabase.instance.client.functions
+        .invoke('claude-proxy', body: payload);
+    return response.data as Map<String, dynamic>;
+  }
 
   // ── COMBINED crop detection + Mkulima verification (ONE API call) ───────────
-  //
-  // Sends the image + Mkulima's guess to Claude and receives a single structured
-  // JSON that identifies the crop AND verifies (or corrects) the diagnosis.
-  //
-  // Returns the parsed map on success, or an error map on failure.
-  // Never throws — always returns a valid map so callers can fallback cleanly.
   static Future<Map<String, dynamic>> verifyDiagnosis({
     required File imageFile,
-    required String mkulimaGuess,     // jinaSw of the top Mkulima result
-    required double mkulimaConfidence, // 0.0–1.0
-    required bool mkulimaWasLowConfidence, // true when gate rejected it
+    required String mkulimaGuess,
+    required double mkulimaConfidence,
+    required bool mkulimaWasLowConfidence,
     String? regionContext,
   }) async {
     try {
@@ -87,45 +81,31 @@ Rules:
 - Do NOT include any text outside the JSON object
 ''';
 
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 1024,
-          'messages': [
-            {
-              'role': 'user',
-              'content': [
-                {
-                  'type': 'image',
-                  'source': {
-                    'type': 'base64',
-                    'media_type': mediaType,
-                    'data': base64Image,
-                  },
+      final data = await _invoke({
+        'model': _model,
+        'max_tokens': 1024,
+        'messages': [
+          {
+            'role': 'user',
+            'content': [
+              {
+                'type': 'image',
+                'source': {
+                  'type': 'base64',
+                  'media_type': mediaType,
+                  'data': base64Image,
                 },
-                {'type': 'text', 'text': prompt},
-              ],
-            },
-          ],
-        }),
-      );
+              },
+              {'type': 'text', 'text': prompt},
+            ],
+          },
+        ],
+      });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['content'][0]['text'] as String;
-        final cleanJson =
-            content.replaceAll('```json', '').replaceAll('```', '').trim();
-        return jsonDecode(cleanJson) as Map<String, dynamic>;
-      }
-
-      return _verifyError(
-          'Hitilafu ya mtandao (${response.statusCode}). Jaribu tena.');
+      final content = data['content'][0]['text'] as String;
+      final cleanJson =
+          content.replaceAll('```json', '').replaceAll('```', '').trim();
+      return jsonDecode(cleanJson) as Map<String, dynamic>;
     } catch (e) {
       return _verifyError('Hitilafu: ${e.toString()}');
     }
@@ -149,17 +129,15 @@ Rules:
         'pesticide_2_dose': 'Hakuna',
       };
 
-  // Analyse a photo — handles disease, weed, or insect pest detection
   static Future<Map<String, dynamic>> analyseLeafPhoto({
     required File imageFile,
     required String cropName,
-    String scanType = 'ugonjwa', // 'ugonjwa' | 'magugu' | 'wadudu'
+    String scanType = 'ugonjwa',
     String? mkulimaContext,
     String? region,
   }) async {
     final imageBytes = await imageFile.readAsBytes();
     final base64Image = base64Encode(imageBytes);
-
     final extension = imageFile.path.split('.').last.toLowerCase();
     final mediaType = extension == 'png' ? 'image/png' : 'image/jpeg';
 
@@ -171,56 +149,31 @@ Rules:
     );
 
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 1024,
-          'messages': [
-            {
-              'role': 'user',
-              'content': [
-                {
-                  'type': 'image',
-                  'source': {
-                    'type': 'base64',
-                    'media_type': mediaType,
-                    'data': base64Image,
-                  },
+      final data = await _invoke({
+        'model': _model,
+        'max_tokens': 1024,
+        'messages': [
+          {
+            'role': 'user',
+            'content': [
+              {
+                'type': 'image',
+                'source': {
+                  'type': 'base64',
+                  'media_type': mediaType,
+                  'data': base64Image,
                 },
-                {
-                  'type': 'text',
-                  'text': prompt,
-                },
-              ],
-            },
-          ],
-        }),
-      );
+              },
+              {'type': 'text', 'text': prompt},
+            ],
+          },
+        ],
+      });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['content'][0]['text'] as String;
-
-        // Remove any markdown code fences Claude might add
-        final cleanJson = content
-            .replaceAll('```json', '')
-            .replaceAll('```', '')
-            .trim();
-
-        return jsonDecode(cleanJson) as Map<String, dynamic>;
-      } else {
-        return {
-          'error': true,
-          'message': 'Hitilafu ya mtandao. Jaribu tena.',
-          'is_healthy': false,
-        };
-      }
+      final content = data['content'][0]['text'] as String;
+      final cleanJson =
+          content.replaceAll('```json', '').replaceAll('```', '').trim();
+      return jsonDecode(cleanJson) as Map<String, dynamic>;
     } catch (e) {
       return {
         'error': true,
@@ -230,7 +183,6 @@ Rules:
     }
   }
 
-  // Build the correct prompt based on what the farmer is scanning for
   static String _buildPhotoPrompt(
     String cropName,
     String scanType, {
@@ -314,7 +266,6 @@ Rules:
 ''';
     }
 
-    // Default: disease scan (ugonjwa)
     return '''
 $contextPrefix
 You are an expert agricultural pathologist specialising in East African smallholder farming.
@@ -333,7 +284,6 @@ Rules:
 ''';
   }
 
-  // Explain a Plant.id disease/pest diagnosis in Swahili with Tanzania context
   static Future<Map<String, dynamic>> explainDiagnosisInSwahili({
     required String cropName,
     required String scanType,
@@ -401,34 +351,18 @@ Rules:
 ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 1024,
-          'messages': [
-            {'role': 'user', 'content': prompt},
-          ],
-        }),
-      );
+      final data = await _invoke({
+        'model': _model,
+        'max_tokens': 1024,
+        'messages': [
+          {'role': 'user', 'content': prompt},
+        ],
+      });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['content'][0]['text'] as String;
-        final cleanJson =
-            content.replaceAll('```json', '').replaceAll('```', '').trim();
-        return jsonDecode(cleanJson) as Map<String, dynamic>;
-      }
-      return {
-        'error': true,
-        'message': 'Hitilafu ya mtandao. Jaribu tena.',
-        'is_healthy': false,
-      };
+      final content = data['content'][0]['text'] as String;
+      final cleanJson =
+          content.replaceAll('```json', '').replaceAll('```', '').trim();
+      return jsonDecode(cleanJson) as Map<String, dynamic>;
     } catch (e) {
       return {
         'error': true,
@@ -438,7 +372,6 @@ Rules:
     }
   }
 
-  // Explain a Plant.id weed identification in Swahili with Tanzania context
   static Future<Map<String, dynamic>> explainWeedInSwahili({
     required String cropName,
     required String weedScientificName,
@@ -496,34 +429,18 @@ Rules:
 ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 1024,
-          'messages': [
-            {'role': 'user', 'content': prompt},
-          ],
-        }),
-      );
+      final data = await _invoke({
+        'model': _model,
+        'max_tokens': 1024,
+        'messages': [
+          {'role': 'user', 'content': prompt},
+        ],
+      });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['content'][0]['text'] as String;
-        final cleanJson =
-            content.replaceAll('```json', '').replaceAll('```', '').trim();
-        return jsonDecode(cleanJson) as Map<String, dynamic>;
-      }
-      return {
-        'error': true,
-        'message': 'Hitilafu ya mtandao. Jaribu tena.',
-        'is_healthy': false,
-      };
+      final content = data['content'][0]['text'] as String;
+      final cleanJson =
+          content.replaceAll('```json', '').replaceAll('```', '').trim();
+      return jsonDecode(cleanJson) as Map<String, dynamic>;
     } catch (e) {
       return {
         'error': true,
@@ -533,7 +450,6 @@ Rules:
     }
   }
 
-  // Diagnose by text symptoms (no photo needed — for offline/text-only situations)
   static Future<Map<String, dynamic>> diagnoseBySymptoms({
     required String cropName,
     required String symptomsDescription,
@@ -576,37 +492,18 @@ Kanuni:
 ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 1024,
-          'messages': [
-            {'role': 'user', 'content': prompt},
-          ],
-        }),
-      );
+      final data = await _invoke({
+        'model': _model,
+        'max_tokens': 1024,
+        'messages': [
+          {'role': 'user', 'content': prompt},
+        ],
+      });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['content'][0]['text'] as String;
-        final cleanJson = content
-            .replaceAll('```json', '')
-            .replaceAll('```', '')
-            .trim();
-        return jsonDecode(cleanJson) as Map<String, dynamic>;
-      } else {
-        return {
-          'error': true,
-          'message': 'Hitilafu ya mtandao. Jaribu tena.',
-          'is_healthy': false,
-        };
-      }
+      final content = data['content'][0]['text'] as String;
+      final cleanJson =
+          content.replaceAll('```json', '').replaceAll('```', '').trim();
+      return jsonDecode(cleanJson) as Map<String, dynamic>;
     } catch (e) {
       return {
         'error': true,
@@ -616,7 +513,6 @@ Kanuni:
     }
   }
 
-  // Generate irrigation advice based on soil + weather context
   static Future<String> generateIrrigationAdvice({
     required Map<String, dynamic> soilData,
     required Map<String, dynamic> weatherData,
@@ -643,26 +539,14 @@ Jibu kwa maneno mafupi yanayofaa simu (si zaidi ya mistari 8).
 ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 400,
-          'messages': [
-            {'role': 'user', 'content': prompt},
-          ],
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['content'][0]['text'] as String;
-      }
+      final data = await _invoke({
+        'model': _model,
+        'max_tokens': 400,
+        'messages': [
+          {'role': 'user', 'content': prompt},
+        ],
+      });
+      return data['content'][0]['text'] as String;
     } catch (_) {}
 
     return 'Mwagilia $cropName asubuhi (6am–8am) ili kupunguza uvukizi.\n'
@@ -670,50 +554,31 @@ Jibu kwa maneno mafupi yanayofaa simu (si zaidi ya mistari 8).
         'Dalili za kukosa maji: majani kunyauka mchana.';
   }
 
-  // Ask Claude a farming question in Swahili — used in the Expert Forum
   static Future<String> askFarmingQuestion({
     required String question,
     required String cropContext,
     required String regionContext,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 512,
-          'system':
-              'You are a helpful agricultural advisor for smallholder farmers in Tanzania. '
-              'Always respond in simple Swahili. '
-              'The farmer grows $cropContext in $regionContext. '
-              'Give practical, affordable advice. '
-              'Only recommend products available in Tanzania.',
-          'messages': [
-            {
-              'role': 'user',
-              'content': question,
-            },
-          ],
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['content'][0]['text'] as String;
-      } else {
-        return 'Samahani, kuna hitilafu. Jaribu tena baadaye.';
-      }
+      final data = await _invoke({
+        'model': _model,
+        'max_tokens': 512,
+        'system':
+            'You are a helpful agricultural advisor for smallholder farmers in Tanzania. '
+            'Always respond in simple Swahili. '
+            'The farmer grows $cropContext in $regionContext. '
+            'Give practical, affordable advice. '
+            'Only recommend products available in Tanzania.',
+        'messages': [
+          {'role': 'user', 'content': question},
+        ],
+      });
+      return data['content'][0]['text'] as String;
     } catch (e) {
-      return 'Hitilafu ya mtandao: ${e.toString()}';
+      return 'Samahani, kuna hitilafu. Jaribu tena baadaye.';
     }
   }
 
-  // Generate full crop advisory from soil data — used in Soil screen
   static Future<String> getCropAdvisory({
     required double ph,
     required String texture,
@@ -723,8 +588,12 @@ Jibu kwa maneno mafupi yanayofaa simu (si zaidi ya mistari 8).
     required double lat,
     required double lng,
   }) async {
-    final nText  = nitrogen     != null ? '${nitrogen.toStringAsFixed(2)} g/kg' : 'haijapimwa';
-    final socText = organicCarbon != null ? '${organicCarbon.toStringAsFixed(1)} g/kg' : 'haijapimwa';
+    final nText = nitrogen != null
+        ? '${nitrogen.toStringAsFixed(2)} g/kg'
+        : 'haijapimwa';
+    final socText = organicCarbon != null
+        ? '${organicCarbon.toStringAsFixed(1)} g/kg'
+        : 'haijapimwa';
 
     final prompt = '''
 Mkulima kutoka eneo la $region (GPS: $lat, $lng) ana data hii ya udongo:
@@ -746,34 +615,21 @@ Jibu liwe fupi, la vitendo, na linafaa kwa mkulima mdogo wa Tanzania.
 ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'max_tokens': 1200,
-          'system':
-              'Wewe ni mtaalamu wa kilimo wa Tanzania mwenye uzoefu wa miaka 20. '
-              'Unajua hali ya hewa, udongo, na mazao ya kila mkoa wa Tanzania. '
-              'Daima jibu kwa Kiswahili rahisi kinachoeleweka kwa mkulima wa kawaida. '
-              'Toa ushauri wa vitendo unaoweza kutekelezwa na mkulima mdogo.',
-          'messages': [
-            {'role': 'user', 'content': prompt},
-          ],
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['content'][0]['text'] as String;
-      }
-      return 'Samahani, kuna hitilafu ya kupata ushauri. Jaribu tena.';
+      final data = await _invoke({
+        'model': _model,
+        'max_tokens': 1200,
+        'system':
+            'Wewe ni mtaalamu wa kilimo wa Tanzania mwenye uzoefu wa miaka 20. '
+            'Unajua hali ya hewa, udongo, na mazao ya kila mkoa wa Tanzania. '
+            'Daima jibu kwa Kiswahili rahisi kinachoeleweka kwa mkulima wa kawaida. '
+            'Toa ushauri wa vitendo unaoweza kutekelezwa na mkulima mdogo.',
+        'messages': [
+          {'role': 'user', 'content': prompt},
+        ],
+      });
+      return data['content'][0]['text'] as String;
     } catch (e) {
-      return 'Hitilafu ya mtandao: ${e.toString()}';
+      return 'Samahani, kuna hitilafu ya kupata ushauri. Jaribu tena.';
     }
   }
 }
