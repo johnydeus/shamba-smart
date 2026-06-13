@@ -49,6 +49,7 @@ class _ViuatiliziState extends State<ViuatiliziScreen>
   List<Map<String, dynamic>> _agrovets = [];
 
   bool _loading = true;
+  bool _loadError = false;
   String _searchQuery = '';
   final _searchCtrl = TextEditingController();
 
@@ -103,9 +104,11 @@ class _ViuatiliziState extends State<ViuatiliziScreen>
     List<Map<String, dynamic>> pests = [];
     List<Map<String, dynamic>> agros = [];
 
+    bool hadError = false;
     try {
       pests = await PesticideService.getAllPesticides();
     } catch (e) {
+      hadError = true;
       debugPrint('viuatilifu load pesticides error: $e');
     }
 
@@ -117,6 +120,7 @@ class _ViuatiliziState extends State<ViuatiliziScreen>
           .limit(50);
       agros = (r as List).cast<Map<String, dynamic>>();
     } catch (e) {
+      hadError = true;
       debugPrint('viuatilifu load agrovets error: $e');
     }
 
@@ -124,6 +128,7 @@ class _ViuatiliziState extends State<ViuatiliziScreen>
       _livePesticides = pests;
       _agrovets       = agros;
       _loading        = false;
+      _loadError      = hadError;
     });
   }
 
@@ -231,6 +236,24 @@ class _ViuatiliziState extends State<ViuatiliziScreen>
 
       body: Column(
         children: [
+          if (_loadError)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: const Color(0xFFFFF3E0),
+              child: Row(
+                children: const [
+                  Icon(Icons.wifi_off, color: Color(0xFFE65100), size: 14),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Hakuna mtandao — data inaweza kuwa si kamili.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFFE65100)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // Source banner
           Container(
             width: double.infinity,

@@ -351,8 +351,6 @@ class _FindOfficerScreenState extends State<FindOfficerScreen> {
     final specs = ((o['specialisation'] as List?)?.cast<String>() ?? [])
         .take(3)
         .toList();
-    final rating = (o['average_rating'] as num?)?.toDouble() ?? 0.0;
-    final ratingCount = (o['total_ratings'] as int?) ?? 0;
     final responseHours = (o['response_time_hours'] as num?)?.toDouble() ?? 24;
 
     return Card(

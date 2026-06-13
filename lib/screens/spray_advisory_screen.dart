@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 
@@ -17,7 +16,6 @@ class _SprayAdvisoryScreenState extends State<SprayAdvisoryScreen> {
   bool _loading = false;
   Map<String, dynamic>? _current;
   List<Map<String, dynamic>> _daily = [];
-  String? _error;
   double? _lat;
   double? _lng;
 
@@ -28,7 +26,7 @@ class _SprayAdvisoryScreenState extends State<SprayAdvisoryScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() => _loading = true);
     try {
       final pos = await LocationService.getCurrentLocation();
       _lat = pos.latitude;
@@ -146,7 +144,6 @@ class _SprayAdvisoryScreenState extends State<SprayAdvisoryScreen> {
   String _dayNameSw(String dateStr) {
     final date = DateTime.tryParse(dateStr);
     if (date == null) return '';
-    const days = ['Ju', 'Jt', 'Jn', 'Al', 'Ij', 'Ij2', 'Jm'];
     const fullDays = ['Jumapili', 'Jumatatu', 'Jumanne', 'Jumatano',
                       'Alhamisi', 'Ijumaa', 'Jumamosi'];
     return fullDays[date.weekday % 7];
@@ -299,11 +296,6 @@ class _SprayAdvisoryScreenState extends State<SprayAdvisoryScreen> {
   }
 
   Widget _buildBestWindow() {
-    final now = DateTime.now();
-    final hour = now.hour;
-    bool isMorning = hour < 9;
-    bool isAfternoon = hour >= 16 && hour < 18;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

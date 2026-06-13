@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/claude_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
-import '../services/local_data.dart';
 import 'package:provider/provider.dart';
 
 class MarketIntelligenceScreen extends StatefulWidget {
@@ -25,7 +24,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen>
   final _alertPriceCtrl = TextEditingController();
   String _alertType = 'above';
   String _selectedMarket = 'Kariakoo';
-  List<Map<String, dynamic>> _prices = [];
   List<Map<String, dynamic>> _alerts = [];
 
   static const _markets = ['Kariakoo', 'Tandale', 'Arusha', 'Mbeya', 'Dodoma'];
@@ -48,7 +46,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen>
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
-    _prices = LocalData.marketPrices;
     _selectedCrop = 'Mahindi';
     _loadAlerts();
   }

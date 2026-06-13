@@ -1,7 +1,6 @@
 import 'dart:io';
 import '../../../config/api_keys.dart';
 import '../../../core/network/connectivity_service.dart';
-import '../../../services/mkulima_service.dart';
 import '../domain/scan_request.dart';
 import '../domain/scan_result.dart';
 import 'claude_api_bridge.dart';

@@ -7,8 +7,6 @@ import '../models/user_model.dart';
 
 class ChatProvider extends ChangeNotifier {
   String? _myId;
-  String? _myName;
-  String? _myRole;
 
   final MessageRepository _repo = MessageRepository();
   final Map<String, ConversationModel> _conversations = {};
@@ -28,8 +26,6 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> init(String userId, String userName, String userRole) async {
     _myId = userId;
-    _myName = userName;
-    _myRole = userRole;
     _conversations.clear();
 
     _repo.configure(ownerId: userId, myName: userName, myRole: userRole);
@@ -46,8 +42,6 @@ class ChatProvider extends ChangeNotifier {
     _channel?.unsubscribe();
     _channel = null;
     _myId = null;
-    _myName = null;
-    _myRole = null;
     _repo.clear();
     _conversations.clear();
     notifyListeners();

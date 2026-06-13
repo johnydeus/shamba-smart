@@ -444,7 +444,8 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                   Navigator.pop(ctx);
                   final user = context.read<AuthProvider>().currentUser;
                   if (user != null) {
-                    await PrivacyService.deleteAccount(user.id);
+                    final userId = user.id;
+                    await PrivacyService.deleteAccount(userId);
                     if (context.mounted) {
                       await context.read<AuthProvider>().logout();
                     }

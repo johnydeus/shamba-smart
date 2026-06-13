@@ -972,16 +972,10 @@ class _NoSensorsView extends StatelessWidget {
                   '  "value": {"moisture": 65},\n'
                   '  "device_id": "arduino-01"\n'
                   '}',
-                  style: GoogleFonts.sourceCodePro != null
-                      ? GoogleFonts.dmSans(
-                          color: Colors.greenAccent,
-                          fontSize: 11,
-                          height: 1.6)
-                      : const TextStyle(
-                          color: Colors.greenAccent,
-                          fontSize: 11,
-                          fontFamily: 'monospace',
-                          height: 1.6),
+                  style: GoogleFonts.dmSans(
+                      color: Colors.greenAccent,
+                      fontSize: 11,
+                      height: 1.6),
                 ),
               ],
             ),

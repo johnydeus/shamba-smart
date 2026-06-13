@@ -5,18 +5,16 @@
     <!-- Camera — needed to take leaf photos -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- Read photos from gallery -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-    <!-- GPS location — fine required for high-accuracy soil data -->
+    <!-- GPS location — foreground only; fine required for high-accuracy soil data -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
-    <!-- File access for sharing PDFs and documents -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+    <!-- File access for sharing PDFs -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
 
     <application
-        android:label="shamba_smart"
+        android:label="Shamba Smart"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
