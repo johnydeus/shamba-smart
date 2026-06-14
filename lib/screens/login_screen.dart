@@ -1,8 +1,18 @@
+import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'register_screen.dart';
+
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const _kGold        = Color(0xFFEAB308);   // yellow-500
+const _kGoldBright  = Color(0xFFFACC15);   // yellow-400
+const _kDark        = Color(0xFF111827);   // dark overlay base
+const _kBgUrl       =
+    'https://images.unsplash.com/photo-1625246333195-78d9c38ad449'
+    '?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,12 +21,17 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  // ── State (unchanged from original) ────────────────────────────────────────
   final _emailCtrl    = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _loading         = false;
   bool _passwordVisible = false;
   String _errorMessage  = '';
+
+  // ── Button press animation ──────────────────────────────────────────────────
+  bool _buttonPressed = false;
 
   @override
   void dispose() {
@@ -25,6 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  // ── Auth logic (100% unchanged from original) ───────────────────────────────
   Future<void> _login() async {
     if (_emailCtrl.text.trim().isEmpty) {
       setState(() => _errorMessage = 'Weka barua pepe yako.');
@@ -46,209 +62,426 @@ class _LoginScreenState extends State<LoginScreen> {
     if (error != null) {
       setState(() => _errorMessage = error);
     }
-    // On success, AuthGate in main.dart watches auth.isLoggedIn and automatically
-    // swaps LoginScreen → MainShell. No manual Navigator push needed.
+    // On success, AuthGate in main.dart watches auth.isLoggedIn and
+    // automatically swaps LoginScreen → MainShell. No Navigator push needed.
   }
 
+  // ── Build ───────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1E1108), Color(0xFF4A2C0E)],
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ── Layer 1: full-screen background image ──────────────────────────
+          CachedNetworkImage(
+            imageUrl: _kBgUrl,
+            fit: BoxFit.cover,
+            // Dark green fallback while image loads or on error
+            placeholder: (_, _) => const ColoredBox(color: Color(0xFF0D1F0F)),
+            errorWidget:  (_, _, _) => const ColoredBox(color: Color(0xFF0D1F0F)),
           ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFC8860A).withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFC8860A), width: 2),
-                    ),
-                    child: const Center(
-                      child: Text('🌿', style: TextStyle(fontSize: 36)),
+
+          // ── Dark overlay on top of image ───────────────────────────────────
+          Container(color: _kDark.withValues(alpha: 0.60)),
+
+          // ── Scrollable content ─────────────────────────────────────────────
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 32),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _LogoSection(),
+                        const SizedBox(height: 36),
+                        _GlassCard(
+                          errorMessage: _errorMessage,
+                          loading: _loading,
+                          passwordVisible: _passwordVisible,
+                          buttonPressed: _buttonPressed,
+                          emailCtrl: _emailCtrl,
+                          passwordCtrl: _passwordCtrl,
+                          onTogglePassword: () => setState(
+                              () => _passwordVisible = !_passwordVisible),
+                          onLogin: _login,
+                          onButtonPressStart: () =>
+                              setState(() => _buttonPressed = true),
+                          onButtonPressEnd: () =>
+                              setState(() => _buttonPressed = false),
+                          onRegister: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const RegisterScreen()),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Text('Shamba Smart',
-                      style: GoogleFonts.playfairDisplay(
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      )),
-                  const SizedBox(height: 6),
-                  Text('Daktari wa Shamba Lako',
-                      style: GoogleFonts.dmSans(
-                          fontSize: 14, color: const Color(0xFFC8860A))),
-                  const SizedBox(height: 40),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-                  // Login card
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white12),
+// ── Logo section ──────────────────────────────────────────────────────────────
+
+class _LogoSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Gold glowing circle with sprout icon
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _kGold.withValues(alpha: 0.20),
+            border: Border.all(
+              color: _kGold.withValues(alpha: 0.50),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _kGold.withValues(alpha: 0.30),
+                blurRadius: 30,
+                spreadRadius: 0,
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.energy_savings_leaf,
+            size: 48,
+            color: _kGoldBright,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // "Shamba Smart" in PlayfairDisplay serif
+        Text(
+          'Shamba Smart',
+          style: GoogleFonts.playfairDisplay(
+            fontSize: 36,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            shadows: const [
+              Shadow(
+                color: Colors.black54,
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        // "DAKTARI WA SHAMBA LAKO" in gold caps
+        Text(
+          'DAKTARI WA SHAMBA LAKO',
+          style: GoogleFonts.dmSans(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: _kGoldBright,
+            letterSpacing: 2.0,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Glassmorphism card ────────────────────────────────────────────────────────
+
+class _GlassCard extends StatelessWidget {
+  final String errorMessage;
+  final bool loading;
+  final bool passwordVisible;
+  final bool buttonPressed;
+  final TextEditingController emailCtrl;
+  final TextEditingController passwordCtrl;
+  final VoidCallback onTogglePassword;
+  final VoidCallback onLogin;
+  final VoidCallback onButtonPressStart;
+  final VoidCallback onButtonPressEnd;
+  final VoidCallback onRegister;
+
+  const _GlassCard({
+    required this.errorMessage,
+    required this.loading,
+    required this.passwordVisible,
+    required this.buttonPressed,
+    required this.emailCtrl,
+    required this.passwordCtrl,
+    required this.onTogglePassword,
+    required this.onLogin,
+    required this.onButtonPressStart,
+    required this.onButtonPressEnd,
+    required this.onRegister,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(32),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.20),
+              width: 1,
+            ),
+          ),
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Card title
+              Text(
+                'Ingia',
+                style: GoogleFonts.dmSans(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+
+              // Email field
+              _GlassTextField(
+                controller: emailCtrl,
+                placeholder: 'Barua Pepe',
+                prefixIcon: Icons.mail_outline,
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 16),
+
+              // Password field
+              _GlassTextField(
+                controller: passwordCtrl,
+                placeholder: 'Nywila',
+                prefixIcon: Icons.lock_outline,
+                obscureText: !passwordVisible,
+                onSubmitted: (_) => onLogin(),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    passwordVisible
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    color: Colors.white.withValues(alpha: 0.70),
+                    size: 20,
+                  ),
+                  onPressed: onTogglePassword,
+                ),
+              ),
+
+              // Error message
+              if (errorMessage.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.35)),
+                  ),
+                  child: Text(
+                    errorMessage,
+                    style: GoogleFonts.dmSans(
+                      color: const Color(0xFFFF8A80),
+                      fontSize: 13,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text('Ingia',
-                            style: GoogleFonts.playfairDisplay(
-                              fontSize: 22,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center),
-                        const SizedBox(height: 24),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
 
-                        // ── Email field ─────────────────────────────────────
-                        TextField(
-                          controller: _emailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _decor(
-                            'Barua Pepe',
-                            'mfano@gmail.com',
-                            Icons.email_outlined,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
+              const SizedBox(height: 24),
 
-                        // ── Password field ──────────────────────────────────
-                        TextField(
-                          controller: _passwordCtrl,
-                          obscureText: !_passwordVisible,
-                          style: const TextStyle(color: Colors.white),
-                          onSubmitted: (_) => _login(),
-                          decoration: _decor(
-                            'Nywila',
-                            '••••••',
-                            Icons.lock_outline,
-                          ).copyWith(
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _passwordVisible
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                                color: Colors.white38,
-                              ),
-                              onPressed: () => setState(
-                                  () => _passwordVisible = !_passwordVisible),
-                            ),
-                          ),
-                        ),
-
-                        // Error
-                        if (_errorMessage.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(_errorMessage,
-                                style: const TextStyle(
-                                    color: Colors.redAccent, fontSize: 13),
-                                textAlign: TextAlign.center),
-                          ),
-                        ],
-
-                        const SizedBox(height: 20),
-
-                        // Login button
-                        ElevatedButton(
-                          onPressed: _loading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFC8860A),
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: _loading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                      color: Colors.white, strokeWidth: 2),
-                                )
-                              : Text('Ingia',
-                                  style: GoogleFonts.dmSans(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  )),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Register link
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('Huna akaunti? ',
-                                style: GoogleFonts.dmSans(
-                                    color: Colors.white54)),
-                            GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const RegisterScreen()),
-                              ),
-                              child: Text(
-                                'Jisajili Sasa',
-                                style: GoogleFonts.dmSans(
-                                  color: const Color(0xFFC8860A),
-                                  fontWeight: FontWeight.bold,
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: const Color(0xFFC8860A),
-                                ),
-                              ),
-                            ),
-                          ],
+              // Gold login button with press animation
+              GestureDetector(
+                onTapDown: (_) => onButtonPressStart(),
+                onTapUp: (_) {
+                  onButtonPressEnd();
+                  if (!loading) onLogin();
+                },
+                onTapCancel: onButtonPressEnd,
+                child: AnimatedScale(
+                  scale: buttonPressed ? 0.98 : 1.0,
+                  duration: const Duration(milliseconds: 80),
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: _kGold,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _kGold.withValues(alpha: 0.40),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
                         ),
                       ],
+                    ),
+                    alignment: Alignment.center,
+                    child: loading
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              color: _kDark,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : Text(
+                            'Ingia',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _kDark,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Register footer
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Huna akaunti? ',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.white.withValues(alpha: 0.80),
+                      fontSize: 14,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: onRegister,
+                    child: Text(
+                      'Jisajili Sasa',
+                      style: GoogleFonts.dmSans(
+                        color: _kGoldBright,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  InputDecoration _decor(String label, String hint, IconData icon) =>
-      InputDecoration(
-        labelText: label,
-        hintText: hint,
-        labelStyle: const TextStyle(color: Colors.white54),
-        hintStyle: const TextStyle(color: Colors.white24),
-        prefixIcon: Icon(icon, color: Colors.white38),
+// ── Custom glass text field ───────────────────────────────────────────────────
+
+class _GlassTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final String placeholder;
+  final IconData prefixIcon;
+  final bool obscureText;
+  final TextInputType keyboardType;
+  final Widget? suffixIcon;
+  final ValueChanged<String>? onSubmitted;
+
+  const _GlassTextField({
+    required this.controller,
+    required this.placeholder,
+    required this.prefixIcon,
+    this.obscureText = false,
+    this.keyboardType = TextInputType.text,
+    this.suffixIcon,
+    this.onSubmitted,
+  });
+
+  @override
+  State<_GlassTextField> createState() => _GlassTextFieldState();
+}
+
+class _GlassTextFieldState extends State<_GlassTextField> {
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: widget.controller,
+      focusNode: _focus,
+      obscureText: widget.obscureText,
+      keyboardType: widget.keyboardType,
+      onSubmitted: widget.onSubmitted,
+      style: GoogleFonts.dmSans(color: Colors.white, fontSize: 15),
+      cursorColor: _kGoldBright,
+      decoration: InputDecoration(
+        hintText: widget.placeholder,
+        hintStyle: GoogleFonts.dmSans(
+          color: Colors.white.withValues(alpha: 0.60),
+          fontSize: 15,
+        ),
+        prefixIcon: Icon(
+          widget.prefixIcon,
+          color: Colors.white.withValues(alpha: 0.70),
+          size: 20,
+        ),
+        suffixIcon: widget.suffixIcon,
         filled: true,
-        fillColor: Colors.white10,
+        fillColor: Colors.black.withValues(alpha: 0.25),
+        contentPadding: const EdgeInsets.symmetric(
+            vertical: 16, horizontal: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(
+            color: Colors.white.withValues(alpha: 0.20),
+            width: 1,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: Colors.white.withValues(alpha: 0.20),
+            width: 1,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: Color(0xFFC8860A), width: 1.5),
+          borderSide: const BorderSide(
+            color: _kGoldBright,
+            width: 1.5,
+          ),
         ),
-      );
+      ),
+    );
+  }
 }
