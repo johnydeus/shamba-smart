@@ -1,8 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/community_post.dart';
 import '../models/user_model.dart';
+
+const _kCachedPosts = 'ss_community_posts_v1';
 
 class CommunityProvider extends ChangeNotifier {
   List<CommunityPost> _posts = [];
@@ -11,7 +15,14 @@ class CommunityProvider extends ChangeNotifier {
 
   List<CommunityPost> get posts => _posts;
 
-  Future<void> init() async => loadPosts();
+  // Offline-first init: load from local cache instantly, then sync in background.
+  Future<void> init() async {
+    await _loadFromCache();
+    // Fire network sync without awaiting — never blocks startup.
+    loadPosts().catchError(
+      (e) => debugPrint('CommunityProvider background sync error: $e'),
+    );
+  }
 
   // ── Load posts from Supabase ────────────────────────────────────────────────
 
@@ -21,18 +32,20 @@ class CommunityProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Load posts
+      // Load posts — 8s timeout so offline never hangs
       final postRows = await Supabase.instance.client
           .from('community_posts')
           .select()
           .order('created_at', ascending: false)
-          .limit(100);
+          .limit(100)
+          .timeout(const Duration(seconds: 8));
 
-      // Load all replies
+      // Load all replies — 8s timeout
       final replyRows = await Supabase.instance.client
           .from('community_replies')
           .select()
-          .order('created_at');
+          .order('created_at')
+          .timeout(const Duration(seconds: 8));
 
       // Group replies by post_id
       final replyMap = <String, List<CommunityReply>>{};
@@ -65,13 +78,44 @@ class CommunityProvider extends ChangeNotifier {
       }).toList();
 
       error = null;
+      _saveToCache();
     } catch (e) {
-      error = 'Hitilafu ya mtandao. Angalia intaneti na ujaribu tena.';
+      error = _posts.isEmpty
+          ? 'Hakuna intaneti. Machapisho ya mwisho yanaonyeshwa.'
+          : null;
       debugPrint('CommunityProvider.loadPosts error: $e');
     }
 
     isLoading = false;
     notifyListeners();
+  }
+
+  // ── Local cache ─────────────────────────────────────────────────────────────
+
+  Future<void> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kCachedPosts);
+      if (raw == null) return;
+      final list = jsonDecode(raw) as List;
+      _posts = list
+          .map((e) => CommunityPost.fromJson(e as Map<String, dynamic>))
+          .toList();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('CommunityProvider._loadFromCache error: $e');
+    }
+  }
+
+  void _saveToCache() {
+    SharedPreferences.getInstance().then((prefs) {
+      try {
+        prefs.setString(_kCachedPosts,
+            jsonEncode(_posts.map((p) => p.toJson()).toList()));
+      } catch (e) {
+        debugPrint('CommunityProvider._saveToCache error: $e');
+      }
+    });
   }
 
   // ── Upload image to Supabase Storage ───────────────────────────────────────

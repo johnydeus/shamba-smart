@@ -51,7 +51,8 @@ class ModelUpdateService {
           .select('version, download_url, checksum')
           .eq('is_active', true)
           .order('created_at', ascending: false)
-          .limit(1);
+          .limit(1)
+          .timeout(const Duration(seconds: 8));
 
       if ((rows as List).isEmpty) return;
 

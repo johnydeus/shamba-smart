@@ -19,7 +19,7 @@ class AuthProvider extends ChangeNotifier {
     final session = _client.auth.currentSession;
     if (session == null) return;
 
-    // Show cached profile instantly while fetching fresh data
+    // Load cached profile instantly — app opens immediately with this.
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kCachedProfile);
     if (raw != null) {
@@ -30,7 +30,11 @@ class AuthProvider extends ChangeNotifier {
       } catch (_) {}
     }
 
-    await _fetchAndCacheProfile(session.user.id);
+    // Refresh profile from network in the background — never blocks startup.
+    // If offline, the cached profile above is sufficient.
+    _fetchAndCacheProfile(session.user.id).catchError(
+      (e) => debugPrint('AuthProvider background profile refresh: $e'),
+    );
   }
 
   // Register new user — creates Supabase auth account + saves profile to DB
@@ -262,7 +266,8 @@ class AuthProvider extends ChangeNotifier {
           .from('profiles')
           .select()
           .eq('id', userId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
       if (data != null) {
         _currentUser = UserModel.fromSupabase(data);
         await _cacheProfile(_currentUser!);
@@ -279,7 +284,8 @@ class AuthProvider extends ChangeNotifier {
           .from('farmers')
           .select()
           .eq('id', userId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
       if (data != null) {
         // Reconstruct UserModel from farmers row
         final profileRaw = data['profile_json'] as String?;

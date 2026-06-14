@@ -18,10 +18,10 @@ class SyncStatusBanner extends StatelessWidget {
 
         final (icon, text, color) = switch (status.state) {
           SyncState.offline => (
-              Icons.cloud_off_outlined,
+              Icons.wifi_off_rounded,
               status.hasPending
-                  ? 'Bila mtandao — ${status.pendingCount} inasubiri kutumwa'
-                  : 'Bila mtandao — data inahifadhiwa ndani',
+                  ? 'Hauna intaneti — ujumbe ${status.pendingCount} utumwe baadaye'
+                  : 'Hauna intaneti. Baadhi ya huduma zinapatikana bila intaneti.',
               AppColors.warning,
             ),
           SyncState.syncing => (

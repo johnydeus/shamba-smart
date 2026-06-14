@@ -13,7 +13,8 @@ class ListingService {
           .select()
           .eq('status', 'active')
           .order('created_at', ascending: false)
-          .limit(100);
+          .limit(100)
+          .timeout(const Duration(seconds: 8));
 
       return (rows as List)
           .map((r) => ListingModel.fromSupabaseJson(r as Map<String, dynamic>))

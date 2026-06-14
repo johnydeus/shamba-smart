@@ -76,7 +76,8 @@ class FarmProvider extends ChangeNotifier {
           .from('farms')
           .select()
           .eq('farmer_id', farmerId)
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .timeout(const Duration(seconds: 8));
 
       if (rows.isEmpty) return;
 

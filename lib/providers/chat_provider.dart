@@ -101,7 +101,8 @@ class ChatProvider extends ChangeNotifier {
           .from('direct_messages')
           .select()
           .or('from_id.eq.$_myId,to_id.eq.$_myId')
-          .order('created_at', ascending: true);
+          .order('created_at', ascending: true)
+          .timeout(const Duration(seconds: 8));
 
       await _repo.cacheFromRemote(rows as List);
       _buildConversationsFromRows(rows.cast<Map<String, dynamic>>());
