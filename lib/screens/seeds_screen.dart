@@ -62,14 +62,14 @@ const List<Map<String, dynamic>> kFilters = [
   {'key': 'high_yield', 'label': 'Tija Nyingi', 'icon': Icons.trending_up},
 ];
 
-class SeedsScreen extends StatefulWidget {
-  const SeedsScreen({super.key});
+class SeedsBody extends StatefulWidget {
+  const SeedsBody({super.key});
 
   @override
-  State<SeedsScreen> createState() => _SeedsScreenState();
+  State<SeedsBody> createState() => _SeedsBodyState();
 }
 
-class _SeedsScreenState extends State<SeedsScreen> {
+class _SeedsBodyState extends State<SeedsBody> {
   String _selectedCategory = 'Nafaka';
   String _selectedCrop = 'Mahindi';
   String _selectedFilter = 'all';
@@ -197,11 +197,9 @@ class _SeedsScreenState extends State<SeedsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mbegu za TOSCI — Tanzania'),
-      ),
-      body: Column(
+    return Stack(
+      children: [
+        Column(
         children: [
           // TOSCI source banner
           Container(
@@ -446,16 +444,35 @@ class _SeedsScreenState extends State<SeedsScreen> {
                       ),
           ),
         ],
-      ),
+        ),
 
-      // Reload FAB
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF1A5C2E),
-        icon: const Icon(Icons.refresh, color: Colors.white),
-        label: const Text('Pakia Tena',
-            style: TextStyle(color: Colors.white)),
-        onPressed: _loadVarieties,
+        // Reload button (kept from the original FAB)
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton.extended(
+            backgroundColor: const Color(0xFF1A5C2E),
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            label: const Text('Pakia Tena',
+                style: TextStyle(color: Colors.white)),
+            onPressed: _loadVarieties,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class SeedsScreen extends StatelessWidget {
+  const SeedsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Mbegu za TOSCI — Tanzania'),
       ),
+      body: const SeedsBody(),
     );
   }
 }

@@ -9,15 +9,15 @@ import 'soil_screen.dart';
 
 // "Mwongozo wa Mbolea" — official fertilizer prescription per crop and farm
 // size, from Ministry of Agriculture Table 9 (2022).
-class MboleaScreen extends StatefulWidget {
+class MboleaBody extends StatefulWidget {
   final String? initialCrop;
-  const MboleaScreen({super.key, this.initialCrop});
+  const MboleaBody({super.key, this.initialCrop});
 
   @override
-  State<MboleaScreen> createState() => _MboleaScreenState();
+  State<MboleaBody> createState() => _MboleaBodyState();
 }
 
-class _MboleaScreenState extends State<MboleaScreen> {
+class _MboleaBodyState extends State<MboleaBody> {
   static const double _acreToHa = 0.4047;
 
   late String _crop;
@@ -76,10 +76,7 @@ class _MboleaScreenState extends State<MboleaScreen> {
     tally(basal);
     tally(top);
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(title: const Text('Mwongozo wa Mbolea')),
-      body: ListView(
+    return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Row(
@@ -291,7 +288,6 @@ class _MboleaScreenState extends State<MboleaScreen> {
           ),
           const GovernmentSourceFooter(),
         ],
-      ),
     );
   }
 
@@ -488,5 +484,19 @@ class _MboleaScreenState extends State<MboleaScreen> {
       if (left > 0 && left % 3 == 0) buf.write(',');
     }
     return buf.toString();
+  }
+}
+
+class MboleaScreen extends StatelessWidget {
+  final String? initialCrop;
+  const MboleaScreen({super.key, this.initialCrop});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(title: const Text('Mwongozo wa Mbolea')),
+      body: MboleaBody(initialCrop: initialCrop),
+    );
   }
 }

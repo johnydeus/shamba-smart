@@ -12,14 +12,13 @@ import 'consultation_screen.dart';
 import 'market_screen.dart';
 import 'forum_screen.dart';
 import 'login_screen.dart';
-import 'seeds_screen.dart';
 import 'messages_screen.dart';
 import 'farms_screen.dart';
 import 'kanda_screen.dart';
 import 'mazao_yanayofaa_screen.dart';
 import 'kalenda_screen.dart';
-import 'mbolea_screen.dart';
 import 'linda_mazao_screen.dart';
+import 'pembejeo_screen.dart';
 import '../routes/fade_slide_route.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -875,7 +874,7 @@ class _QuickActions extends StatelessWidget {
       {'emoji': '📅', 'label': 'Kalenda ya Kilimo', 'color': const Color(0xFF1565C0),
        'onTap': () => nav(const KalendaScreen())},
       {'emoji': '💊', 'label': 'Mwongozo wa Mbolea', 'color': const Color(0xFFEF6C00),
-       'onTap': () => nav(const MboleaScreen())},
+       'onTap': () => nav(const PembejeoScreen(initialIndex: 1))},
       {'emoji': '🤖', 'label': 'Mshauri AI', 'color': _kGreen,
        'onTap': () => nav(const ForumScreen())},
       if (role == UserRole.mkulima)
@@ -1532,7 +1531,7 @@ class _HudumaKuuSection extends StatelessWidget {
                   emoji: '🌱',
                   title: 'Pembejeo',
                   subtitle: 'Mbegu, mbolea & maduka',
-                  onTap: () => go(const SeedsScreen()),
+                  onTap: () => go(const PembejeoScreen()),
                 ),
               ),
             ],

@@ -13,14 +13,14 @@ const List<String> kRegions = [
   'Mwanza', 'Tanga', 'Kagera', 'Mara',
 ];
 
-class AgrovetScreen extends StatefulWidget {
-  const AgrovetScreen({super.key});
+class AgrovetBody extends StatefulWidget {
+  const AgrovetBody({super.key});
 
   @override
-  State<AgrovetScreen> createState() => _AgrovetScreenState();
+  State<AgrovetBody> createState() => _AgrovetBodyState();
 }
 
-class _AgrovetScreenState extends State<AgrovetScreen> {
+class _AgrovetBodyState extends State<AgrovetBody> {
   String _selectedRegion = 'Morogoro';
   List<Map<String, dynamic>> _agrovets = [];
   bool _loading = false;
@@ -45,11 +45,7 @@ class _AgrovetScreenState extends State<AgrovetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Maduka ya Dawa za Kilimo'),
-      ),
-      body: Column(
+    return Column(
         children: [
           // Source banner
           Container(
@@ -335,7 +331,20 @@ class _AgrovetScreenState extends State<AgrovetScreen> {
                       ),
           ),
         ],
+    );
+  }
+}
+
+class AgrovetScreen extends StatelessWidget {
+  const AgrovetScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Maduka ya Dawa za Kilimo'),
       ),
+      body: const AgrovetBody(),
     );
   }
 }
