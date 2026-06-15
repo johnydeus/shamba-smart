@@ -345,14 +345,14 @@ const _kCropsProtection = [
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-class CropProtectionScreen extends StatefulWidget {
-  const CropProtectionScreen({super.key});
+class CropProtectionBody extends StatefulWidget {
+  const CropProtectionBody({super.key});
 
   @override
-  State<CropProtectionScreen> createState() => _CropProtectionScreenState();
+  State<CropProtectionBody> createState() => _CropProtectionBodyState();
 }
 
-class _CropProtectionScreenState extends State<CropProtectionScreen> {
+class _CropProtectionBodyState extends State<CropProtectionBody> {
   // which category section is expanded (null = all collapsed)
   int? _expandedSection;
 
@@ -378,18 +378,9 @@ class _CropProtectionScreenState extends State<CropProtectionScreen> {
       ..._maguguThreats.where((t) => t.isEmergency),
     ];
 
-    return Scaffold(
-      backgroundColor: AppColors.mist,
-      appBar: AppBar(
-        title: Text(
-          'Ulinzi wa Mazao',
-          style: GoogleFonts.playfairDisplay(
-              color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
           // ── Diagnosis action buttons ──────────────────────────────────────
           _buildDiagnosisActions(context),
 
@@ -423,7 +414,6 @@ class _CropProtectionScreenState extends State<CropProtectionScreen> {
 
           const SizedBox(height: 24),
         ],
-      ),
     );
   }
 
@@ -1189,5 +1179,24 @@ class _TextDiagnosisSheetState extends State<_TextDiagnosisSheet> {
         SnackBar(content: Text('Hitilafu: ${e.toString()}')),
       );
     }
+  }
+}
+
+class CropProtectionScreen extends StatelessWidget {
+  const CropProtectionScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.mist,
+      appBar: AppBar(
+        title: Text(
+          'Ulinzi wa Mazao',
+          style: GoogleFonts.playfairDisplay(
+              color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: const CropProtectionBody(),
+    );
   }
 }

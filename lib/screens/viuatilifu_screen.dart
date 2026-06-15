@@ -31,13 +31,13 @@ List<String> _parseCrops(dynamic raw) {
   return [];
 }
 
-class ViuatiliziScreen extends StatefulWidget {
-  const ViuatiliziScreen({super.key});
+class ViuatiliziBody extends StatefulWidget {
+  const ViuatiliziBody({super.key});
   @override
-  State<ViuatiliziScreen> createState() => _ViuatiliziState();
+  State<ViuatiliziBody> createState() => _ViuatiliziBodyState();
 }
 
-class _ViuatiliziState extends State<ViuatiliziScreen>
+class _ViuatiliziBodyState extends State<ViuatiliziBody>
     with SingleTickerProviderStateMixin {
   // 0 = Viuatilifu, 1 = Mbolea
   int _section = 0;
@@ -178,44 +178,41 @@ class _ViuatiliziState extends State<ViuatiliziScreen>
   Widget build(BuildContext context) {
     final items = _section == 0 ? _filteredPesticides : _filteredFertilizers;
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      backgroundColor: const Color(0xFFF4F7F4),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1A5C2E),
-        foregroundColor: Colors.white,
-        title: Text('Viuatilifu & Mbolea',
-            style: GoogleFonts.playfairDisplay(
-                color: Colors.white, fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'Pakia upya',
-              onPressed: _loadAll),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(90),
+    return Column(
+      children: [
+        // ── Green header: section toggle + category tabs + refresh ────────
+        Container(
+          color: const Color(0xFF1A5C2E),
           child: Column(
             children: [
-              // ── Section toggle: Viuatilifu | Mbolea ──────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      _SegBtn('🧪 Viuatilifu', _section == 0,
-                          () => _switchSection(0)),
-                      _SegBtn('🌿 Mbolea', _section == 1,
-                          () => _switchSection(1)),
-                    ],
-                  ),
+                padding: const EdgeInsets.fromLTRB(16, 6, 8, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            _SegBtn('🧪 Viuatilifu', _section == 0,
+                                () => _switchSection(0)),
+                            _SegBtn('🌿 Mbolea', _section == 1,
+                                () => _switchSection(1)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Colors.white),
+                      tooltip: 'Pakia upya',
+                      onPressed: _loadAll,
+                    ),
+                  ],
                 ),
               ),
-              // ── Category tabs ─────────────────────────────────────────────
               TabBar(
                 controller: _tabCtrl,
                 isScrollable: true,
@@ -232,145 +229,162 @@ class _ViuatiliziState extends State<ViuatiliziScreen>
             ],
           ),
         ),
-      ),
 
-      body: Column(
-        children: [
-          if (_loadError)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFFFFF3E0),
-              child: Row(
-                children: const [
-                  Icon(Icons.wifi_off, color: Color(0xFFE65100), size: 14),
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Hakuna mtandao — data inaweza kuwa si kamili.',
-                      style: TextStyle(fontSize: 11, color: Color(0xFFE65100)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          // Source banner
+        // ── Offline banner ────────────────────────────────────────────────
+        if (_loadError)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-            color: const Color(0xFFE8F5E9),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: const Color(0xFFFFF3E0),
             child: Row(
-              children: [
-                const Icon(Icons.verified_user,
-                    color: Color(0xFF1A5C2E), size: 14),
-                const SizedBox(width: 6),
+              children: const [
+                Icon(Icons.wifi_off, color: Color(0xFFE65100), size: 14),
+                SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    _section == 0
-                        ? 'Chanzo: TPRI Tanzania • ${_livePesticides.length} dawa zimesajiliwa'
-                        : 'Chanzo: TFRA Tanzania • Wizara ya Kilimo',
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF1A5C2E)),
+                    'Hakuna mtandao — data inaweza kuwa si kamili.',
+                    style: TextStyle(fontSize: 11, color: Color(0xFFE65100)),
                   ),
                 ),
               ],
             ),
           ),
 
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (v) => setState(() => _searchQuery = v),
-              decoration: InputDecoration(
-                hintText: _section == 0
-                    ? 'Tafuta dawa, kiambato, au registrant...'
-                    : 'Tafuta mbolea, NPK, au zao...',
-                prefixIcon:
-                    const Icon(Icons.search, color: Color(0xFF1A5C2E)),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          setState(() => _searchQuery = '');
-                        })
-                    : null,
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none),
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-              ),
-            ),
-          ),
-
-          // Count row
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-            child: Row(
-              children: [
-                Text(
-                  '${items.length} ${_section == 0 ? "dawa" : "mbolea"} zimepatikana',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+        // ── Source banner ─────────────────────────────────────────────────
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+          color: const Color(0xFFE8F5E9),
+          child: Row(
+            children: [
+              const Icon(Icons.verified_user,
+                  color: Color(0xFF1A5C2E), size: 14),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _section == 0
+                      ? 'Chanzo: TPRI Tanzania • ${_livePesticides.length} dawa zimesajiliwa'
+                      : 'Chanzo: TFRA Tanzania • Wizara ya Kilimo',
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFF1A5C2E)),
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+
+        // ── Search bar ────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _searchQuery = v),
+            decoration: InputDecoration(
+              hintText: _section == 0
+                  ? 'Tafuta dawa, kiambato, au registrant...'
+                  : 'Tafuta mbolea, NPK, au zao...',
+              prefixIcon:
+                  const Icon(Icons.search, color: Color(0xFF1A5C2E)),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _searchQuery = '');
+                      })
+                  : null,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none),
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
             ),
           ),
+        ),
 
-          // Main list
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                            color: Color(0xFF1A5C2E)),
-                        SizedBox(height: 12),
-                        Text('Inapakia kutoka TPRI...',
-                            style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  )
-                : items.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _section == 0
-                                  ? Icons.bug_report_outlined
-                                  : Icons.eco_outlined,
-                              size: 56,
-                              color: Colors.grey.shade300,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Hakuna ${_section == 0 ? "dawa" : "mbolea"} iliyopatikana.',
-                              style: const TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding:
-                            const EdgeInsets.fromLTRB(12, 4, 12, 24),
-                        itemCount: items.length,
-                        itemBuilder: (ctx, i) => _section == 0
-                            ? _PesticideCard(
-                                item: items[i],
-                                agrovets: _agrovets,
-                              )
-                            : _FertilizerCard(item: items[i]),
-                      ),
+        // ── Count row ─────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          child: Row(
+            children: [
+              Text(
+                '${items.length} ${_section == 0 ? "dawa" : "mbolea"} zimepatikana',
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
           ),
-        ],
+        ),
+
+        // ── Main list ─────────────────────────────────────────────────────
+        Expanded(
+          child: _loading
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                          color: Color(0xFF1A5C2E)),
+                      SizedBox(height: 12),
+                      Text('Inapakia kutoka TPRI...',
+                          style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                )
+              : items.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _section == 0
+                                ? Icons.bug_report_outlined
+                                : Icons.eco_outlined,
+                            size: 56,
+                            color: Colors.grey.shade300,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Hakuna ${_section == 0 ? "dawa" : "mbolea"} iliyopatikana.',
+                            style: const TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding:
+                          const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                      itemCount: items.length,
+                      itemBuilder: (ctx, i) => _section == 0
+                          ? _PesticideCard(
+                              item: items[i],
+                              agrovets: _agrovets,
+                            )
+                          : _FertilizerCard(item: items[i]),
+                    ),
+        ),
+      ],
+    );
+  }
+}
+
+class ViuatiliziScreen extends StatelessWidget {
+  const ViuatiliziScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      backgroundColor: const Color(0xFFF4F7F4),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1A5C2E),
+        foregroundColor: Colors.white,
+        title: Text('Viuatilifu & Mbolea',
+            style: GoogleFonts.playfairDisplay(
+                color: Colors.white, fontWeight: FontWeight.bold)),
       ),
+      body: const ViuatiliziBody(),
     );
   }
 }

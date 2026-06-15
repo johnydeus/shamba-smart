@@ -5,14 +5,14 @@ import 'package:http/http.dart' as http;
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 
-class SprayAdvisoryScreen extends StatefulWidget {
-  const SprayAdvisoryScreen({super.key});
+class SprayAdvisoryBody extends StatefulWidget {
+  const SprayAdvisoryBody({super.key});
 
   @override
-  State<SprayAdvisoryScreen> createState() => _SprayAdvisoryScreenState();
+  State<SprayAdvisoryBody> createState() => _SprayAdvisoryBodyState();
 }
 
-class _SprayAdvisoryScreenState extends State<SprayAdvisoryScreen> {
+class _SprayAdvisoryBodyState extends State<SprayAdvisoryBody> {
   bool _loading = false;
   Map<String, dynamic>? _current;
   List<Map<String, dynamic>> _daily = [];
@@ -151,46 +151,38 @@ class _SprayAdvisoryScreenState extends State<SprayAdvisoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Ushauri wa Kupulizia'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Pakia Upya'),
+              onPressed: _loadData,
+            ),
+          ),
+          if (_current != null) _buildTodaySafety(),
+          const SizedBox(height: 20),
+          Text('Kalenda ya Siku 7',
+              style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700, fontSize: 16)),
+          const SizedBox(height: 12),
+          if (_daily.isNotEmpty) _buildWeekCalendar(),
+          const SizedBox(height: 20),
+          _buildBestWindow(),
+          const SizedBox(height: 20),
+          Text('Mwongozo wa TPRI',
+              style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700, fontSize: 16)),
+          const SizedBox(height: 12),
+          _buildGuidelines(),
+          const SizedBox(height: 32),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Today's safety card
-                  if (_current != null) _buildTodaySafety(),
-                  const SizedBox(height: 20),
-                  // 7-day calendar
-                  Text('Kalenda ya Siku 7',
-                      style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w700, fontSize: 16)),
-                  const SizedBox(height: 12),
-                  if (_daily.isNotEmpty) _buildWeekCalendar(),
-                  const SizedBox(height: 20),
-                  // Best window
-                  _buildBestWindow(),
-                  const SizedBox(height: 20),
-                  // TPRI Guidelines
-                  Text('Mwongozo wa TPRI',
-                      style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w700, fontSize: 16)),
-                  const SizedBox(height: 12),
-                  _buildGuidelines(),
-                  const SizedBox(height: 32),
-                ],
-              ),
-            ),
     );
   }
 
@@ -467,6 +459,29 @@ class _GuidelineCardState extends State<_GuidelineCard> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class SprayAdvisoryScreen extends StatelessWidget {
+  const SprayAdvisoryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(
+        title: const Text('Ushauri wa Kupulizia'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      body: const SprayAdvisoryBody(),
     );
   }
 }

@@ -8,14 +8,14 @@ import 'package:provider/provider.dart';
 
 // ── IPM Decision Tree Screen ──────────────────────────────────────────────────
 
-class IpmScreen extends StatefulWidget {
-  const IpmScreen({super.key});
+class IpmBody extends StatefulWidget {
+  const IpmBody({super.key});
 
   @override
-  State<IpmScreen> createState() => _IpmScreenState();
+  State<IpmBody> createState() => _IpmBodyState();
 }
 
-class _IpmScreenState extends State<IpmScreen> {
+class _IpmBodyState extends State<IpmBody> {
   int _step = 0;
   String? _crop;
   String? _pest;
@@ -74,29 +74,20 @@ class _IpmScreenState extends State<IpmScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Mwongozo wa IPM'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Progress indicator
-            _buildProgress(),
-            const SizedBox(height: 20),
-            // Step content
-            _buildStep(),
-          ],
-        ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          _buildProgress(),
+          const SizedBox(height: 20),
+          _buildStep(),
+        ],
       ),
     );
   }
 
   Widget _buildProgress() {
+
     final steps = ['Zao', 'Wadudu', 'Hesabu', 'Uamuzi'];
     return Row(
       children: List.generate(steps.length, (i) {
@@ -537,6 +528,23 @@ class _DetailRow extends StatelessWidget {
               style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600))),
         ],
       ),
+    );
+  }
+}
+
+class IpmScreen extends StatelessWidget {
+  const IpmScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(
+        title: const Text('Mwongozo wa IPM'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: const IpmBody(),
     );
   }
 }

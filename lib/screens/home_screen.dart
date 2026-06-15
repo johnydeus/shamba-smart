@@ -9,30 +9,17 @@ import '../providers/chat_provider.dart';
 import 'scan_screen.dart';
 import 'soil_screen.dart';
 import 'consultation_screen.dart';
-import 'agrovet_screen.dart';
 import 'market_screen.dart';
-import 'market_intelligence_screen.dart';
-import 'irrigation_screen.dart';
 import 'forum_screen.dart';
 import 'login_screen.dart';
-import 'viuatilifu_screen.dart';
 import 'seeds_screen.dart';
-import 'crop_protection_screen.dart';
 import 'messages_screen.dart';
 import 'farms_screen.dart';
-import 'ipm_screen.dart';
-import 'fertiliser_prescription_screen.dart';
-import 'spray_advisory_screen.dart';
-import 'soil_mapping_screen.dart';
-import 'premium_sensor_screen.dart';
-import 'farm_diary_screen.dart';
-import 'kilimo_kivuli_screen.dart';
 import 'kanda_screen.dart';
 import 'mazao_yanayofaa_screen.dart';
 import 'kalenda_screen.dart';
 import 'mbolea_screen.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../theme/app_theme.dart';
+import 'linda_mazao_screen.dart';
 import '../routes/fade_slide_route.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -146,9 +133,9 @@ class _HomeScreenState extends State<HomeScreen>
             child: _BentoGrid(go: go),
           ),
 
-          // ── Huduma section ──────────────────────────────────────────────
+          // ── Huduma Kuu tiles ────────────────────────────────────────────
           SliverToBoxAdapter(
-            child: _ServicesSection(role: role, go: go),
+            child: _HudumaKuuSection(go: go),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -1510,168 +1497,56 @@ class _SparklinePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
-// ── Services Section ──────────────────────────────────────────────────────────
+// ── Huduma Kuu (3-tile section) ───────────────────────────────────────────────
 
-class _SectionHeader extends StatelessWidget {
-  final String emoji;
-  final String title;
-  const _SectionHeader({required this.emoji, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: _kGreenDark.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(emoji, style: const TextStyle(fontSize: 14)),
-        ),
-        const SizedBox(width: 8),
-        Text(title,
-            style: _jakarta(
-                size: 13, weight: FontWeight.w700, color: _kGreenDark)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Container(
-              height: 1, color: _kGreenDark.withValues(alpha: 0.08)),
-        ),
-      ],
-    );
-  }
-}
-
-class _ServiceGrid extends StatelessWidget {
-  final List<_ServiceItem> items;
-  final int startIndex;
-  const _ServiceGrid({required this.items, this.startIndex = 0});
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.5,
-      ),
-      itemCount: items.length,
-      itemBuilder: (_, i) => _ServiceTile(item: items[i])
-          .animate(delay: Duration(milliseconds: (startIndex + i) * 60))
-          .fadeIn(duration: 300.ms)
-          .slideX(begin: 0.05, end: 0),
-    );
-  }
-}
-
-class _ServicesSection extends StatelessWidget {
-  final UserRole role;
+class _HudumaKuuSection extends StatelessWidget {
   final void Function(Widget) go;
-
-  const _ServicesSection({required this.role, required this.go});
+  const _HudumaKuuSection({required this.go});
 
   @override
   Widget build(BuildContext context) {
-    final udongonaShambaItems = [
-      _ServiceItem('💧', 'Umwagiliaji', const Color(0xFF0277BD),
-          () => go(const IrrigationScreen())),
-      if (role == UserRole.mkulima || role == UserRole.afisa)
-        _ServiceItem('🌍', 'Data ya Udongo', const Color(0xFF795548),
-            () => go(const SoilScreen())),
-      _ServiceItem('🗺️', 'Ramani ya Udongo', const Color(0xFF795548),
-          () => go(const SoilMappingScreen())),
-      _ServiceItem('📔', 'Diari ya Shamba', const Color(0xFFE65100),
-          () => go(const FarmDiaryScreen())),
-    ];
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Huduma Zote',
+          Text('Huduma Kuu',
               style: _jakarta(
                   size: 16, weight: FontWeight.w700, color: _kGreenDark)),
           const SizedBox(height: 16),
 
-          // ── 1. Pembejeo na Ulinzi wa Mazao ───────────────────────────
-          const _SectionHeader(
-              emoji: '🌱', title: 'Pembejeo na Ulinzi wa Mazao'),
-          const SizedBox(height: 10),
-          _ServiceGrid(
-            startIndex: 0,
-            items: [
-              _ServiceItem('🌱', 'Mbegu za TOSCI', _kGreenMid,
-                  () => go(const SeedsScreen())),
-              _ServiceItem('🏪', 'Maduka ya Dawa', const Color(0xFF2E8B57),
-                  () => go(const AgrovetScreen())),
-              _ServiceItem('🧪', 'Viuatilifu', const Color(0xFF6A1B9A),
-                  () => go(const ViuatiliziScreen())),
-              _ServiceItem('🛡️', 'Ulinzi wa Mazao', const Color(0xFFE65100),
-                  () => go(const CropProtectionScreen())),
-              _ServiceItem('💊', 'Dawa ya Mbolea', const Color(0xFF6A1B9A),
-                  () => go(const FertiliserPrescriptionScreen())),
+          // ── Row: Linda Mazao + Pembejeo ───────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: _BigTile(
+                  emoji: '🛡️',
+                  title: 'Linda Mazao',
+                  subtitle: 'Viuatilifu, IPM, kupulizia',
+                  onTap: () => go(const LindaMazaoScreen()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _BigTile(
+                  emoji: '🌱',
+                  title: 'Pembejeo',
+                  subtitle: 'Mbegu, mbolea & maduka',
+                  onTap: () => go(const SeedsScreen()),
+                ),
+              ),
             ],
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
-          // ── 2. Afya ya Mazao ─────────────────────────────────────────
-          const _SectionHeader(emoji: '🌿', title: 'Afya ya Mazao'),
-          const SizedBox(height: 10),
-          _ServiceGrid(
-            startIndex: 5,
-            items: [
-              _ServiceItem('🐛', 'IPM — Maamuzi ya Kupulizia',
-                  const Color(0xFF4E342E), () => go(const IpmScreen())),
-              _ServiceItem('☁️', 'Ushauri wa Kupulizia',
-                  const Color(0xFF0277BD),
-                  () => go(const SprayAdvisoryScreen())),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── 3. Soko ──────────────────────────────────────────────────
-          const _SectionHeader(emoji: '📊', title: 'Soko'),
-          const SizedBox(height: 10),
-          _ServiceGrid(
-            startIndex: 7,
-            items: [
-              _ServiceItem('📊', 'Akili za Soko', const Color(0xFFFF6F00),
-                  () => go(const MarketIntelligenceScreen())),
-              _ServiceItem('💹', 'Bei za Soko', const Color(0xFF2E7D32),
-                  () => go(const MarketScreen())),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── 4. Kilimo cha Kisasa ──────────────────────────────────────
-          const _SectionHeader(emoji: '🚀', title: 'Kilimo cha Kisasa'),
-          const SizedBox(height: 10),
-          _ServiceGrid(
-            startIndex: 9,
-            items: [
-              _ServiceItem('🌿', 'Kilimo Kivuli', const Color(0xFF1B5E20),
-                  () => go(const KilimoKivuliScreen())),
-              _ServiceItem('📡', 'Sensor & Premium', const Color(0xFFF57F17),
-                  () => go(const PremiumSensorScreen())),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── 5. Udongo na Shamba ───────────────────────────────────────
-          const _SectionHeader(emoji: '🗺️', title: 'Udongo na Shamba'),
-          const SizedBox(height: 10),
-          _ServiceGrid(
-            startIndex: 11,
-            items: udongonaShambaItems,
+          // ── Full width: Soko ──────────────────────────────────────────
+          _BigTile(
+            emoji: '📊',
+            title: 'Soko',
+            subtitle: 'Bei za mazao leo',
+            showNewChip: true,
+            onTap: () => go(const MarketScreen()),
           ),
         ],
       ),
@@ -1679,55 +1554,93 @@ class _ServicesSection extends StatelessWidget {
   }
 }
 
-class _ServiceItem {
+class _BigTile extends StatefulWidget {
   final String emoji;
-  final String label;
-  final Color color;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
-  const _ServiceItem(this.emoji, this.label, this.color, this.onTap);
+  final bool showNewChip;
+
+  const _BigTile({
+    required this.emoji,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.showNewChip = false,
+  });
+
+  @override
+  State<_BigTile> createState() => _BigTileState();
 }
 
-class _ServiceTile extends StatelessWidget {
-  final _ServiceItem item;
-  const _ServiceTile({required this.item});
+class _BigTileState extends State<_BigTile> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: item.onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: AppShadow.sm,
-          border: Border.all(color: item.color.withValues(alpha: 0.12)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: item.color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 108),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+                color: const Color(0xFFE5E7EB), width: 1),
+          ),
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.emoji,
+                      style: const TextStyle(fontSize: 30)),
+                  const SizedBox(height: 8),
+                  Text(widget.title,
+                      style: _jakarta(
+                          size: 14,
+                          weight: FontWeight.w700,
+                          color: _kGreenDark)),
+                  const SizedBox(height: 2),
+                  Text(widget.subtitle,
+                      style: _jakarta(
+                          size: 10.5,
+                          color: const Color(0xFF6B7280))),
+                ],
               ),
-              child: Center(
-                child: Text(item.emoji,
-                    style: const TextStyle(fontSize: 22)),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(item.label,
-                  style: _jakarta(
-                      size: 12,
-                      weight: FontWeight.w700,
-                      color: _kGreenDark),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
-            ),
-          ],
+              if (widget.showNewChip)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'MPYA',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
