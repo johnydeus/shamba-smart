@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -158,16 +159,29 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _sending = true);
     final chat = context.read<ChatProvider>();
     final userId = context.read<AuthProvider>().currentUser!.id;
-    await chat.sendImage(
-          currentUserId: userId,
-          contactId: widget.contactId,
-          contactName: widget.contactName,
-          contactRole: widget.contactRole,
-          contactColorHex: widget.contactColorHex,
-          imagePath: photo.path,
+    try {
+      await chat.sendImage(
+            currentUserId: userId,
+            contactId: widget.contactId,
+            contactName: widget.contactName,
+            contactRole: widget.contactRole,
+            contactColorHex: widget.contactColorHex,
+            imagePath: photo.path,
+          );
+      _scheduleScrollAfterReply();
+    } catch (_) {
+      // Never fake a "sent" state — tell the user and let them retry.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Imeshindwa kutuma picha. Jaribu tena.'),
+            backgroundColor: Colors.red,
+          ),
         );
-    setState(() => _sending = false);
-    _scheduleScrollAfterReply();
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   // ── Send location ────────────────────────────────────────────────────────────
@@ -809,13 +823,42 @@ class _ImageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final file = File(message.imagePath ?? '');
-    final exists = file.existsSync();
+    final url = message.imageUrl;
+    final localFile = File(message.imagePath ?? '');
+    final hasLocal = (message.imagePath ?? '').isNotEmpty && localFile.existsSync();
+
+    // Prefer the uploaded URL (what the recipient sees); fall back to the local
+    // file for the sender's instant optimistic preview while it uploads.
+    Widget thumb;
+    if (url != null && url.isNotEmpty) {
+      thumb = CachedNetworkImage(
+        imageUrl: url,
+        width: 220,
+        height: 180,
+        fit: BoxFit.cover,
+        placeholder: (_, _) => Container(
+          width: 220,
+          height: 180,
+          color: AppColors.mist,
+          child: const Center(
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: AppColors.leaf),
+          ),
+        ),
+        errorWidget: (_, _, _) => hasLocal
+            ? Image.file(localFile, width: 220, height: 180, fit: BoxFit.cover)
+            : _brokenThumb(),
+      );
+    } else if (hasLocal) {
+      thumb = Image.file(localFile, width: 220, height: 180, fit: BoxFit.cover);
+    } else {
+      thumb = _brokenThumb();
+    }
+
+    final canOpen = (url != null && url.isNotEmpty) || hasLocal;
 
     return GestureDetector(
-      onTap: exists
-          ? () => _showFullImage(context, file)
-          : null,
+      onTap: canOpen ? () => _showFullImage(context) : null,
       child: Container(
         decoration: BoxDecoration(
           color: sent ? AppColors.harvest : Colors.white,
@@ -830,22 +873,9 @@ class _ImageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(14)),
-              child: exists
-                  ? Image.file(file,
-                      width: 220,
-                      height: 180,
-                      fit: BoxFit.cover)
-                  : Container(
-                      width: 220,
-                      height: 140,
-                      color: AppColors.mist,
-                      child: const Center(
-                        child: Icon(Icons.broken_image_outlined,
-                            color: AppColors.mid, size: 40),
-                      ),
-                    ),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(14)),
+              child: thumb,
             ),
             if (message.text.isNotEmpty)
               Padding(
@@ -863,7 +893,36 @@ class _ImageBubble extends StatelessWidget {
     );
   }
 
-  void _showFullImage(BuildContext ctx, File file) {
+  Widget _brokenThumb() => Container(
+        width: 220,
+        height: 140,
+        color: AppColors.mist,
+        child: const Center(
+          child: Icon(Icons.broken_image_outlined,
+              color: AppColors.mid, size: 40),
+        ),
+      );
+
+  void _showFullImage(BuildContext ctx) {
+    final url = message.imageUrl;
+    final localFile = File(message.imagePath ?? '');
+    final hasLocal =
+        (message.imagePath ?? '').isNotEmpty && localFile.existsSync();
+
+    final Widget fullImage = (url != null && url.isNotEmpty)
+        ? CachedNetworkImage(
+            imageUrl: url,
+            fit: BoxFit.contain,
+            placeholder: (_, _) => const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+            errorWidget: (_, _, _) => hasLocal
+                ? Image.file(localFile, fit: BoxFit.contain)
+                : const Icon(Icons.broken_image_outlined,
+                    color: Colors.white54, size: 64),
+          )
+        : Image.file(localFile, fit: BoxFit.contain);
+
     Navigator.push(
       ctx,
       MaterialPageRoute(
@@ -876,7 +935,9 @@ class _ImageBubble extends StatelessWidget {
           ),
           body: Center(
             child: InteractiveViewer(
-              child: Image.file(file, fit: BoxFit.contain),
+              minScale: 0.8,
+              maxScale: 4.0,
+              child: fullImage,
             ),
           ),
         ),

@@ -8,7 +8,7 @@ class AppDatabase {
   AppDatabase._();
 
   static const _dbName = 'shamba_smart.db';
-  static const _dbVersion = 1;
+  static const _dbVersion = 2;
 
   Database? _db;
 
@@ -24,7 +24,16 @@ class AppDatabase {
       path,
       version: _dbVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // v2: store the remote Storage URL for image messages so the recipient
+      // (and the sender after re-sync) can render the actual photo.
+      await db.execute('ALTER TABLE messages ADD COLUMN image_url TEXT');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -57,6 +66,7 @@ class AppDatabase {
         status TEXT NOT NULL DEFAULT 'sent',
         created_at TEXT NOT NULL,
         image_path TEXT,
+        image_url TEXT,
         location_lat REAL,
         location_lng REAL,
         location_name TEXT,

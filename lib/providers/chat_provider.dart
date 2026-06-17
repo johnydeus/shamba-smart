@@ -89,6 +89,8 @@ class ChatProvider extends ChangeNotifier {
         'to_role': row['to_role'],
         'content': row['content'],
         'type': row['type'],
+        'image_url': row['image_url'],
+        'image_path': row['image_path'],
         'is_read': (row['is_read'] as int? ?? 0) == 1,
         'created_at': row['created_at'],
         'status': row['status'],
@@ -160,6 +162,8 @@ class ChatProvider extends ChangeNotifier {
           (s) => s.name == statusStr,
           orElse: () => MessageStatus.sent,
         ),
+        imageUrl: row['image_url'] as String?,
+        imagePath: row['image_path'] as String?,
       ));
 
       if (!isFromMe && !(row['is_read'] as bool? ?? false)) {
@@ -211,16 +215,30 @@ class ChatProvider extends ChangeNotifier {
     required String imagePath,
     String caption = '',
   }) async {
-    final notice =
-        caption.isNotEmpty ? '📷 Picha: $caption' : '📷 Ametuma picha';
-    await sendMessage(
-      currentUserId: currentUserId,
+    if (!isReady) {
+      throw Exception(
+          'Hujaunganika bado. Funga app na uifungue tena kisha jaribu.');
+    }
+
+    // Compress + upload, then queue the message carrying the real image URL.
+    // Throws on failure (offline / upload error) so the UI can show a retry
+    // message — we never add a fake "sent" bubble.
+    final msg = await _repo.sendImageMessage(
       contactId: contactId,
       contactName: contactName,
       contactRole: contactRole,
-      contactColorHex: contactColorHex,
-      text: notice,
+      localPath: imagePath,
+      caption: caption,
     );
+
+    final conv = getConversation(
+      contactId,
+      contactName,
+      contactRole,
+      contactColorHex,
+    );
+    conv.messages.add(msg);
+    notifyListeners();
   }
 
   Future<void> sendLocation({

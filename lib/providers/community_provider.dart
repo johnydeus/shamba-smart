@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/utils/image_upload_helper.dart';
 import '../models/community_post.dart';
 import '../models/user_model.dart';
 
@@ -71,6 +72,7 @@ class CommunityProvider extends ChangeNotifier {
           authorRegion: p['author_region'] as String,
           topic:        p['topic'] as String,
           content:      p['content'] as String,
+          imageUrl:     p['image_url'] as String?,
           createdAt:    DateTime.parse(p['created_at'] as String).toLocal(),
           replies:      replyMap[id] ?? [],
           likedByIds:   (p['liked_by_ids'] as List? ?? []).cast<String>(),
@@ -122,19 +124,13 @@ class CommunityProvider extends ChangeNotifier {
 
   Future<String?> uploadImage(File imageFile) async {
     try {
-      final ext  = imageFile.path.split('.').last.toLowerCase();
-      final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
-      final path = 'posts/${DateTime.now().microsecondsSinceEpoch}.$ext';
-      final bytes = await imageFile.readAsBytes();
-
-      await Supabase.instance.client.storage
-          .from('community-images')
-          .uploadBinary(path, bytes,
-              fileOptions: FileOptions(contentType: mime, upsert: false));
-
-      return Supabase.instance.client.storage
-          .from('community-images')
-          .getPublicUrl(path);
+      // Compress (resize ≤1080px, JPEG ~78%) before upload — critical for
+      // farmers on slow networks; a 5 MB photo becomes ~200–400 KB.
+      return await ImageUploadHelper.compressAndUpload(
+        imageFile,
+        bucket: 'community-images',
+        folder: 'posts',
+      );
     } catch (e) {
       debugPrint('CommunityProvider.uploadImage error: $e');
       return null; // post without image if upload fails
@@ -155,10 +151,15 @@ class CommunityProvider extends ChangeNotifier {
     final id  = DateTime.now().microsecondsSinceEpoch.toString();
     final now = DateTime.now();
 
-    // Upload image first if provided
+    // Upload image first if provided. If the upload fails, stop and surface
+    // the error so the UI can prompt a retry — the user's typed text is kept
+    // (nothing is inserted yet, the compose sheet stays open).
     String? imageUrl;
     if (imageFile != null) {
       imageUrl = await uploadImage(imageFile);
+      if (imageUrl == null) {
+        throw Exception('Imeshindwa kutuma picha. Jaribu tena.');
+      }
     }
 
     // Optimistic update

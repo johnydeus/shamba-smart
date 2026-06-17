@@ -16,7 +16,8 @@ class MessageModel {
   final MessageStatus status;
 
   // ── Image message fields ──────────────────────────────────────────────────
-  final String? imagePath;     // local file path to the image
+  final String? imagePath;     // local file path (optimistic preview before/while upload)
+  final String? imageUrl;      // Supabase Storage public URL (what the recipient sees)
 
   // ── Location message fields ───────────────────────────────────────────────
   final double? locationLat;
@@ -39,6 +40,7 @@ class MessageModel {
     this.type = MessageType.text,
     this.status = MessageStatus.sent,
     this.imagePath,
+    this.imageUrl,
     this.locationLat,
     this.locationLng,
     this.locationName,
@@ -73,6 +75,7 @@ class MessageModel {
           orElse: () => MessageStatus.sent,
         ),
         imagePath: j['imagePath'] as String?,
+        imageUrl: j['imageUrl'] as String?,
         locationLat: (j['locationLat'] as num?)?.toDouble(),
         locationLng: (j['locationLng'] as num?)?.toDouble(),
         locationName: j['locationName'] as String?,
@@ -91,6 +94,7 @@ class MessageModel {
         'type': type.name,
         'status': status.name,
         if (imagePath != null) 'imagePath': imagePath,
+        if (imageUrl != null) 'imageUrl': imageUrl,
         if (locationLat != null) 'locationLat': locationLat,
         if (locationLng != null) 'locationLng': locationLng,
         if (locationName != null) 'locationName': locationName,

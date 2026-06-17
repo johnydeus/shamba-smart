@@ -1,12 +1,20 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/sync/sync_coordinator.dart';
+import '../../../core/utils/image_upload_helper.dart';
 import '../../../models/message_model.dart';
 import '../../../models/user_model.dart';
 import '../domain/message_status.dart';
+
+/// Private chat photos are stored in the existing public `community-images`
+/// bucket under a dedicated `chat/` folder, with random UUID filenames so the
+/// URLs are unguessable (the privacy model chosen for this app).
+const _kChatImageBucket = 'community-images';
+const _kChatImageFolder = 'chat';
 
 /// Offline-first message repository with outbox queue.
 class MessageRepository {
@@ -60,6 +68,7 @@ class MessageRepository {
         'to_role': row['to_role'] as String? ?? 'mkulima',
         'content': row['content'] as String,
         'type': row['type'] as String? ?? 'text',
+        'image_url': row['image_url'] as String?,
         'is_read': (row['is_read'] as bool? ?? false) ? 1 : 0,
         'status': 'sent',
         'created_at': row['created_at'] as String,
@@ -133,11 +142,97 @@ class MessageRepository {
     );
   }
 
+  /// Send a photo message: compress + upload to Storage, then queue the
+  /// message row carrying the resulting public URL. Requires connectivity —
+  /// throws if the upload fails so the UI can show a retry message and never
+  /// fake a "sent" state. [localPath] is kept for an instant optimistic preview.
+  Future<MessageModel> sendImageMessage({
+    required String contactId,
+    required String contactName,
+    required UserRole contactRole,
+    required String localPath,
+    String caption = '',
+  }) async {
+    if (!isReady) {
+      throw Exception('Hujaunganika bado. Jaribu tena.');
+    }
+    if (!_connectivity.isOnline) {
+      throw Exception('Hakuna intaneti. Huwezi kutuma picha bila mtandao.');
+    }
+
+    // 1. Compress + upload (throws on failure → caller shows retry message).
+    final imageUrl = await ImageUploadHelper.compressAndUpload(
+      File(localPath),
+      bucket: _kChatImageBucket,
+      folder: _kChatImageFolder,
+    );
+
+    final clientId = _uuid.v4();
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    final now = DateTime.now().toIso8601String();
+    final content = caption.trim();
+
+    await _db.upsertMessage({
+      'id': id,
+      'client_id': clientId,
+      'owner_id': _ownerId,
+      'from_id': _ownerId,
+      'to_id': contactId,
+      'from_name': _myName ?? 'Mkulima',
+      'to_name': contactName,
+      'from_role': _myRole ?? 'mkulima',
+      'to_role': contactRole.key,
+      'content': content,
+      'type': 'image',
+      'image_path': localPath,
+      'image_url': imageUrl,
+      'is_read': 0,
+      'status': MessageStatus.pending.name,
+      'created_at': now,
+    });
+
+    await _db.enqueueOutbox(
+      id: clientId,
+      type: 'message',
+      payloadJson: jsonEncode({
+        'id': id,
+        'client_id': clientId,
+        'from_id': _ownerId,
+        'from_name': _myName ?? 'Mkulima',
+        'from_role': _myRole ?? 'mkulima',
+        'to_id': contactId,
+        'to_name': contactName,
+        'to_role': contactRole.key,
+        'content': content,
+        'type': 'image',
+        'image_url': imageUrl,
+      }),
+    );
+
+    await SyncCoordinator().refreshStatus();
+    if (_connectivity.isOnline) {
+      await SyncCoordinator().flushAll();
+    }
+
+    return MessageModel(
+      id: id,
+      senderId: _ownerId!,
+      text: content,
+      timestamp: DateTime.parse(now),
+      isFromMe: true,
+      type: MessageType.image,
+      status: MessageStatus.pending,
+      imagePath: localPath,
+      imageUrl: imageUrl,
+    );
+  }
+
   /// Process outbox message item (called by SyncCoordinator).
   Future<bool> processOutboxItem(Map<String, dynamic> item) async {
     final payload =
         jsonDecode(item['payload_json'] as String) as Map<String, dynamic>;
 
+    final imageUrl = payload['image_url'] as String?;
     await Supabase.instance.client.from('direct_messages').insert({
       'id': payload['id'],
       'from_id': payload['from_id'],
@@ -148,6 +243,9 @@ class MessageRepository {
       'to_role': payload['to_role'],
       'content': payload['content'],
       'type': payload['type'] ?? 'text',
+      // Only sent for image messages — keeps text inserts working even if the
+      // direct_messages.image_url column has not been added yet.
+      'image_url': ?imageUrl,
       'is_read': false,
     });
 
@@ -164,6 +262,7 @@ class MessageRepository {
         'to_role': payload['to_role'],
         'content': payload['content'],
         'type': payload['type'] ?? 'text',
+        'image_url': imageUrl,
         'is_read': 0,
         'status': 'sent',
         'created_at': DateTime.now().toIso8601String(),
@@ -194,6 +293,7 @@ class MessageRepository {
         orElse: () => MessageStatus.sent,
       ),
       imagePath: row['image_path'] as String?,
+      imageUrl: row['image_url'] as String?,
     );
   }
 }

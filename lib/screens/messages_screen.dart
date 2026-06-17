@@ -1,5 +1,6 @@
 import "dart:async";
 import "dart:io";
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -433,7 +434,19 @@ class _PostCardState extends State<_PostCard> {
             width: double.infinity,
             height: double.infinity,
             child: InteractiveViewer(
-              child: Image.network(imageUrl, fit: BoxFit.contain),
+              minScale: 0.8,
+              maxScale: 4.0,
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.contain,
+                placeholder: (_, _) => const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+                errorWidget: (_, _, _) => const Icon(
+                    Icons.broken_image_outlined,
+                    color: Colors.white54,
+                    size: 64),
+              ),
             ),
           ),
         ),
@@ -532,21 +545,19 @@ class _PostCardState extends State<_PostCard> {
                 onTap: () => _showFullImage(context, post.imageUrl!),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    post.imageUrl!,
+                  child: CachedNetworkImage(
+                    imageUrl: post.imageUrl!,
                     width: double.infinity,
                     height: 220,
                     fit: BoxFit.cover,
-                    loadingBuilder: (ctx, child, progress) => progress == null
-                        ? child
-                        : Container(
-                            height: 220,
-                            color: AppColors.mint,
-                            child: const Center(
-                                child: CircularProgressIndicator(
-                                    color: AppColors.leaf)),
-                          ),
-                    errorBuilder: (ctx, error, _) => Container(
+                    placeholder: (ctx, _) => Container(
+                      height: 220,
+                      color: AppColors.mint,
+                      child: const Center(
+                          child: CircularProgressIndicator(
+                              color: AppColors.leaf)),
+                    ),
+                    errorWidget: (ctx, _, __) => Container(
                       height: 100,
                       color: AppColors.mint,
                       child: const Center(
