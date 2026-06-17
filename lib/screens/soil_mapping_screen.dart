@@ -36,6 +36,7 @@ class _SoilMappingScreenState extends State<SoilMappingScreen> {
   double? _lng;
   String _selectedCrop = 'Mahindi';
   DateTime? _lastFetch;
+  String? _soilSource; // 'iSDAsoil' or 'SoilGrids' — shown subtly to the user
 
   static const _crops = ['Mahindi', 'Nyanya', 'Maharagwe', 'Pilipili', 'Mchele', 'Muhogo'];
 
@@ -64,49 +65,61 @@ class _SoilMappingScreenState extends State<SoilMappingScreen> {
     }
   }
 
+  // Fallback chain: iSDAsoil (Edge Function) → SoilGrids → friendly message.
+  // Each network step has its own timeout so the screen can never hang.
   Future<void> _fetchSoilData() async {
     if (_lat == null || _lng == null) return;
-    setState(() { _loading = true; _error = null; _soilData = {}; _aiRecommendation = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+      _soilData = {};
+      _soilSource = null;
+      _aiRecommendation = null;
+    });
 
     try {
       await _fetchFromIsdaSoil();
       _lastFetch = DateTime.now();
-    } catch (e) {
-      setState(() { _error = 'Hitilafu ya data ya udongo: $e'; });
+    } catch (_) {
+      // iSDAsoil failed/timed out — fall back to SoilGrids automatically.
+      try {
+        await _fetchFromSoilGrids();
+        _lastFetch = DateTime.now();
+      } catch (_) {
+        if (mounted) {
+          setState(() => _error =
+              'Imeshindwa kupata data ya udongo. Angalia mtandao na ujaribu tena.');
+        }
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _fetchFromIsdaSoil() async {
-    final props = ['ph', 'nitrogen_total', 'phosphorus_extractable',
-                   'potassium_extractable', 'organic_carbon', 'clay',
-                   'sand', 'silt', 'bulk_density', 'cation_exchange_capacity'];
-    final combined = <String, dynamic>{};
-
-    for (final prop in props) {
-      try {
-        final res = await Supabase.instance.client.functions.invoke(
-          'isda-proxy',
+    // ONE call — the Edge Function logs in with a fresh token and returns all
+    // properties at once. 10s timeout so a slow/dead backend never freezes us.
+    final res = await Supabase.instance.client.functions
+        .invoke(
+          'isda-soil',
           body: {
             'lat': _lat!.toStringAsFixed(6),
             'lon': _lng!.toStringAsFixed(6),
-            'property': prop,
             'depth': '0-20',
           },
-        );
-        final json = res.data as Map<String, dynamic>;
-        final val = json['data']?['value'];
-        if (val != null) combined[prop] = val;
-      } catch (e) {
-        // Skip individual property failure, fall through to SoilGrids
-      }
-    }
+        )
+        .timeout(const Duration(seconds: 10));
 
-    if (combined.isEmpty) {
-      await _fetchFromSoilGrids();
-    } else {
-      setState(() => _soilData = combined);
+    final json = res.data as Map<String, dynamic>?;
+    final data = json?['data'] as Map<String, dynamic>?;
+    if (data == null || data.isEmpty) {
+      throw Exception('iSDAsoil returned no data');
+    }
+    if (mounted) {
+      setState(() {
+        _soilData = Map<String, dynamic>.from(data);
+        _soilSource = 'iSDAsoil';
+      });
     }
   }
 
@@ -144,7 +157,13 @@ class _SoilMappingScreenState extends State<SoilMappingScreen> {
           }
         }
       }
-      setState(() => _soilData = data);
+      if (data.isEmpty) {
+        throw Exception('SoilGrids returned no data');
+      }
+      setState(() {
+        _soilData = data;
+        _soilSource = 'SoilGrids';
+      });
     } else {
       throw Exception('Seva ya udongo ilijibu kosa ${resp.statusCode}');
     }
@@ -311,6 +330,12 @@ Jibu kwa Kiswahili. Taja:
                         '${_lat?.toStringAsFixed(4)}°, ${_lng?.toStringAsFixed(4)}°',
                         style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
                       ),
+                      if (_soilSource != null)
+                        Text(
+                          'Chanzo: $_soilSource',
+                          style: GoogleFonts.poppins(
+                              fontSize: 10, color: const Color(0xFF1A5C2E)),
+                        ),
                     ],
                   ),
                 ),
