@@ -18,3 +18,26 @@ alter table public.direct_messages
 --    Confirm `community-images` exists and is public (it already powers
 --    community post photos):
 --      select id, public from storage.buckets where id = 'community-images';
+
+-- 3. Storage RLS — REQUIRED for uploads to work.
+--    Symptom without this: "new row violates row-level security policy"
+--    (photos fail to send in chat AND fail to attach to community posts).
+--    Public read only covers VIEWING; uploading needs an INSERT policy.
+
+-- Let logged-in users upload chat + community photos to the bucket.
+drop policy if exists "shamba community-images insert" on storage.objects;
+create policy "shamba community-images insert"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'community-images');
+
+-- Let logged-in users overwrite/update their uploads (safe to include).
+drop policy if exists "shamba community-images update" on storage.objects;
+create policy "shamba community-images update"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'community-images');
+
+-- Ensure everyone can read the photos (anon viewers in the public feed).
+drop policy if exists "shamba community-images read" on storage.objects;
+create policy "shamba community-images read"
+  on storage.objects for select to public
+  using (bucket_id = 'community-images');
