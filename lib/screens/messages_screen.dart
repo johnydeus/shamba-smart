@@ -82,7 +82,9 @@ class _MessagesScreenState extends State<MessagesScreen>
 
     return Scaffold(
       backgroundColor: AppColors.mist,
-      resizeToAvoidBottomInset: false,
+      // Resize when the keyboard opens so inline inputs (post replies, the
+      // "Watu" search box) lift above it instead of being hidden behind it.
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Text('Mawasiliano',
             style: GoogleFonts.playfairDisplay(
