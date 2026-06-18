@@ -12,8 +12,6 @@
 // Auth: caller must be an authenticated Supabase user (JWT validated) so the
 // iSDAsoil quota can't be abused by randoms.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-
 const ISDA_BASE = 'https://api.isda-africa.com'
 const TOKEN_TTL_MS = 55 * 60 * 1000 // refresh a little before the 60-min expiry
 const ISDA_TIMEOUT_MS = 12_000
@@ -93,13 +91,15 @@ Deno.serve(async (req) => {
   if (!authHeader?.startsWith('Bearer ')) {
     return json({ error: 'Missing authorization' }, 401)
   }
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    { global: { headers: { Authorization: authHeader } } },
-  )
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return json({ error: 'Unauthorized' }, 401)
+  // Validate the caller's JWT directly against GoTrue — no SDK import needed
+  // (keeps the function lightweight and avoids esm.sh boot failures).
+  const userRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/user`, {
+    headers: {
+      apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Authorization: authHeader,
+    },
+  })
+  if (!userRes.ok) return json({ error: 'Unauthorized' }, 401)
 
   // ── Inputs ──
   let payload: any
@@ -126,14 +126,13 @@ Deno.serve(async (req) => {
     return json({ error: `iSDA login error: ${e instanceof Error ? e.message : e}` }, 502)
   }
 
+  // NOTE: iSDA v2 ignores multiple `property` params (returns only the last
+  // one). Omitting `property` entirely makes it return ALL properties in a
+  // single call — so we fetch everything once and pick out what we need.
   const url = new URL(`${ISDA_BASE}/isdasoil/v2/soilproperty`)
   url.searchParams.set('lat', String(lat))
   url.searchParams.set('lon', String(lon))
   url.searchParams.set('depth', depth)
-  for (const key of requested) {
-    const slug = PROPERTY_MAP[key] ?? key
-    url.searchParams.append('property', slug)
-  }
 
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), ISDA_TIMEOUT_MS)
