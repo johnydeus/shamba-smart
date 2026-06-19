@@ -101,6 +101,22 @@ Future<void> main() async {
   );
 }
 
+/// App-wide scroll behavior: clamping physics (no iOS-style bounce) and no
+/// overscroll glow/stretch — prevents the white gap appearing above colored
+/// headers when a screen is scrolled or over-scrolled.
+class _NoBounceScrollBehavior extends MaterialScrollBehavior {
+  const _NoBounceScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const ClampingScrollPhysics();
+
+  @override
+  Widget buildOverscrollIndicator(
+          BuildContext context, Widget child, ScrollableDetails details) =>
+      child; // no glow / stretch
+}
+
 class ShambaSmart extends StatefulWidget {
   const ShambaSmart({super.key});
 
@@ -135,6 +151,9 @@ class _ShambaSmartState extends State<ShambaSmart>
       title: 'Shamba Smart',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      // App-wide: no over-scroll bounce / stretch, so no white gap ever shows
+      // above colored headers when scrolling (fixes it on every screen at once).
+      scrollBehavior: const _NoBounceScrollBehavior(),
       home: const AuthGate(),
       routes: {
         '/kanda': (_) => const KandaScreen(),

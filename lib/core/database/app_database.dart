@@ -8,7 +8,7 @@ class AppDatabase {
   AppDatabase._();
 
   static const _dbName = 'shamba_smart.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 3;
 
   Database? _db;
 
@@ -33,6 +33,12 @@ class AppDatabase {
       // v2: store the remote Storage URL for image messages so the recipient
       // (and the sender after re-sync) can render the actual photo.
       await db.execute('ALTER TABLE messages ADD COLUMN image_url TEXT');
+    }
+    if (oldVersion < 3) {
+      // v3: wipe the cached messages once so any rows mis-attributed by the old
+      // sender logic are dropped and re-pulled fresh from Supabase (correct
+      // from_id). Outbox is untouched, so unsent messages still send.
+      await db.delete('messages');
     }
   }
 

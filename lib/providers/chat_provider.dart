@@ -8,6 +8,13 @@ import '../models/user_model.dart';
 class ChatProvider extends ChangeNotifier {
   String? _myId;
 
+  // Single source of truth for "who am I": the live Supabase auth uid. This is
+  // exactly the value stamped as from_id when sending, so mine-vs-theirs is
+  // always correct regardless of cached/profile id state.
+  String? get _authUid => Supabase.instance.client.auth.currentUser?.id;
+  String? get _effectiveId =>
+      (_authUid != null && _authUid!.isNotEmpty) ? _authUid : _myId;
+
   final MessageRepository _repo = MessageRepository();
   final Map<String, ConversationModel> _conversations = {};
   Map<String, ConversationModel> get conversations => _conversations;
@@ -25,10 +32,12 @@ class ChatProvider extends ChangeNotifier {
   RealtimeChannel? _channel;
 
   Future<void> init(String userId, String userName, String userRole) async {
-    _myId = userId;
+    // Prefer the auth uid so the id used to STAMP from_id and the id used to
+    // COMPARE (isFromMe) are guaranteed identical.
+    _myId = _authUid ?? userId;
     _conversations.clear();
 
-    _repo.configure(ownerId: userId, myName: userName, myRole: userRole);
+    _repo.configure(ownerId: _myId!, myName: userName, myRole: userRole);
 
     // Offline-first: load local cache immediately.
     await _loadFromLocal();
@@ -121,12 +130,13 @@ class ChatProvider extends ChangeNotifier {
 
     for (final row in rows) {
       final fromId = row['from_id'] as String;
+      final myId = _effectiveId;
       final toId = row['to_id'] as String;
       final fromName = row['from_name'] as String;
       final toName = row['to_name'] as String;
       final fromRole = row['from_role'] as String? ?? 'mkulima';
       final toRole = row['to_role'] as String? ?? 'mkulima';
-      final isFromMe = fromId == _myId;
+      final isFromMe = fromId == myId;
 
       final partnerId = isFromMe ? toId : fromId;
       final partnerName = isFromMe ? toName : fromName;
