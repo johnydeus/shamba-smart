@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/agrovet_model.dart';
 import '../providers/auth_provider.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 import 'package:provider/provider.dart';
+import 'find_agrovets_screen.dart';
 
 // ── IPM Decision Tree Screen ──────────────────────────────────────────────────
 
@@ -21,8 +24,12 @@ class _IpmBodyState extends State<IpmBody> {
   String? _pest;
   double? _count;
   String? _decision;
-  String? _recommendation;
   bool _saving = false;
+
+  // AI advice (constrained to currently-approved Tanzania pesticides via the
+  // ipm-advisor Edge Function). We NEVER show the old hardcoded pesticide names.
+  bool _adviceLoading = false;
+  String? _aiAdvice;
 
   static const _crops = ['Mahindi', 'Nyanya', 'Maharagwe', 'Pilipili', 'Ndizi', 'Mchele', 'Muhogo'];
 
@@ -240,8 +247,9 @@ class _IpmBodyState extends State<IpmBody> {
     final key = '${_pest}_$_crop';
     final t = _thresholds[key];
     final threshold = (t?['threshold'] as double?) ?? 5.0;
-    final recommendation = t?['recommendation'] as String? ??
-        'Wasiliana na mshauri wa kilimo wa wilaya yako.';
+    // NOTE: we deliberately no longer read t['recommendation'] — those legacy
+    // strings contained hardcoded pesticide names that may now be banned. The
+    // chemical recommendation comes only from the constrained ipm-advisor.
 
     final count = _count ?? 0;
     String decision;
@@ -256,9 +264,46 @@ class _IpmBodyState extends State<IpmBody> {
 
     setState(() {
       _decision = decision;
-      _recommendation = recommendation;
+      _aiAdvice = null;
       _step = 3;
     });
+
+    // Only fetch a chemical recommendation past the economic threshold, and
+    // always via the constrained advisor (never the hardcoded names).
+    if (decision == 'spray') _fetchAdvice();
+  }
+
+  // Calls the ipm-advisor Edge Function, which injects ONLY currently-approved
+  // Tanzania pesticides into the AI prompt. Falls back to a safe, non-chemical
+  // message on any error — never invents or shows a banned pesticide.
+  Future<void> _fetchAdvice() async {
+    setState(() => _adviceLoading = true);
+    try {
+      final res = await Supabase.instance.client.functions
+          .invoke('ipm-advisor', body: {
+            'crop': _crop,
+            'pest': _pest,
+            'severity': 'juu',
+          })
+          .timeout(const Duration(seconds: 20));
+      final data = res.data as Map<String, dynamic>?;
+      final advice = data?['advice'] as String?;
+      if (advice != null && advice.trim().isNotEmpty) {
+        if (mounted) setState(() => _aiAdvice = advice.trim());
+      } else {
+        throw Exception('empty advice');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _aiAdvice =
+            'Wadudu wamevuka kikomo. Tumia njia za kilimo na kibaiolojia kwanza. '
+            'Kwa dawa iliyothibitishwa, tafadhali shauriana na Afisa Kilimo au '
+            'duka la pembejeo lililothibitishwa karibu nawe — hatuwezi kupendekeza '
+            'dawa bila kuthibitisha usalama wake.');
+      }
+    } finally {
+      if (mounted) setState(() => _adviceLoading = false);
+    }
   }
 
   Widget _buildDecisionStep() {
@@ -325,12 +370,51 @@ class _IpmBodyState extends State<IpmBody> {
               _DetailRow(label: 'Hesabu', value: '${_count ?? 0} ${_getUnit()}'),
               const Divider(height: 20),
               if (isSpray) ...[
-                Text('💊 Dawa Inayopendekezwa:',
+                Text('🌿 Ushauri wa IPM:',
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700, fontSize: 13)),
                 const SizedBox(height: 8),
-                Text(_recommendation ?? '',
-                    style: GoogleFonts.poppins(fontSize: 13, height: 1.5)),
+                if (_adviceLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                            width: 18, height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
+                        SizedBox(width: 10),
+                        Text('Inaandaa ushauri salama...'),
+                      ],
+                    ),
+                  )
+                else
+                  Text(_aiAdvice ?? '',
+                      style: GoogleFonts.poppins(fontSize: 13, height: 1.5)),
+                const SizedBox(height: 12),
+                // Link approved-pesticide buyers to the verified agrovet directory.
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const FindAgrovetsScreen(
+                            initialCategory: AgrovetCategory.pesticides),
+                      ),
+                    ),
+                    icon: const Icon(Icons.storefront, size: 18),
+                    label: const Text('Maduka ya dawa karibu nawe'),
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary)),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Dawa zinazopendekezwa ni zilizothibitishwa na TPHPA pekee.',
+                  style: GoogleFonts.poppins(
+                      fontSize: 10, color: AppColors.textTertiary),
+                ),
               ] else if (isMonitor) ...[
                 Text('📅 Angalia tena baada ya siku 3',
                     style: GoogleFonts.poppins(
@@ -397,7 +481,7 @@ class _IpmBodyState extends State<IpmBody> {
         'pest_observed': _pest,
         'pest_count': _count,
         'decision': _decision,
-        'action_taken': _recommendation,
+        'action_taken': _aiAdvice, // constrained IPM advice (null if non-spray)
         'gps_lat': lat,
         'gps_lng': lng,
         'observed_at': DateTime.now().toIso8601String(),

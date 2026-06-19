@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'seeds_screen.dart';
 import 'mbolea_screen.dart';
-import 'agrovet_screen.dart';
+import 'find_agrovets_screen.dart';
 
 class PembejeoScreen extends StatelessWidget {
   /// Initial tab: 0 = Mbegu, 1 = Mbolea, 2 = Maduka
@@ -59,7 +59,7 @@ class PembejeoScreen extends StatelessWidget {
           children: [
             SeedsBody(),
             MboleaBody(),
-            AgrovetBody(),
+            FindAgrovetsScreen(embedded: true),
           ],
         ),
       ),

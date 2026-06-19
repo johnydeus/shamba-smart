@@ -165,44 +165,44 @@ All description_sw and safety_sw must be in Swahili.
 
   // ─── AGROVETS ─────────────────────────────────────────────────────────────
 
-  // Ask Claude for verified agrovet shops in Tanzania regions
+  // Swahili labels for category keys stored in agrovets.categories[]
+  static const Map<String, String> _categorySw = {
+    'fertilizer': 'Mbolea',
+    'seeds': 'Mbegu',
+    'pesticides': 'Viuatilifu',
+    'crop_buying': 'Kununua Mazao',
+    'equipment': 'Vifaa',
+    'veterinary': 'Mifugo',
+    'advisory': 'Ushauri',
+  };
+
+  // Fetch REAL verified agrovets from the database (replaces the previous
+  // AI-generated list, which invented shops and phone numbers). Returns empty
+  // if none are loaded yet — we never fabricate entries.
   static Future<List<Map<String, dynamic>>> fetchAgrovets(
       String region) async {
-    final prompt = '''
-You are a Tanzania agricultural supply chain expert.
-
-List verified agrovet shops and agricultural input dealers in $region region, Tanzania.
-Return ONLY valid JSON array:
-
-[
-  {
-    "shop_name": "Kilimo Bora Agrovet",
-    "region": "$region",
-    "area": "Mjini",
-    "phone": "+255712345678",
-    "products": "Mbegu, Mbolea, Dawa za wadudu",
-    "verified": true,
-    "opening_hours": "7am - 6pm"
-  }
-]
-
-Include 5-8 real or typical agrovets for $region.
-Phone numbers in +255 format.
-''';
-
     try {
-      final data = await _invokeClaude({
-        'model': _model,
-        'max_tokens': 1024,
-        'messages': [
-          {'role': 'user', 'content': prompt}
-        ],
-      });
-      final content = data['content'][0]['text'] as String;
-      final clean =
-          content.replaceAll('```json', '').replaceAll('```', '').trim();
-      final list = jsonDecode(clean) as List;
-      return list.cast<Map<String, dynamic>>();
+      final rows = await _db
+          .from('agrovets')
+          .select()
+          .eq('is_verified', true)
+          .eq('region', region)
+          .order('name')
+          .timeout(const Duration(seconds: 8));
+
+      return (rows as List).map((r) {
+        final cats = (r['categories'] as List?)?.cast<String>() ?? const [];
+        final products =
+            cats.map((c) => _categorySw[c] ?? c).join(', ');
+        return <String, dynamic>{
+          'shop_name': r['name'],
+          'region': r['region'],
+          'area': r['ward'] ?? r['district'] ?? '',
+          'phone': r['phone'] ?? '',
+          'products': products,
+          'verified': r['is_verified'] == true,
+        };
+      }).toList();
     } catch (e) {
       debugPrint('DataSyncService agrovets error: $e');
     }
