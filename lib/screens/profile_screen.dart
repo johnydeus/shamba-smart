@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../core/app_info.dart';
+import '../widgets/feedback_dialog.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/farm_provider.dart';
@@ -11,7 +14,6 @@ import 'login_screen.dart';
 import 'market_screen.dart';
 import 'forum_screen.dart';
 import 'farms_screen.dart';
-import 'irrigation_screen.dart';
 import 'soil_screen.dart';
 import 'marketplace_screen.dart';
 import 'consultation_screen.dart';
@@ -272,22 +274,6 @@ class ProfileScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const MarketplaceScreen())),
           ),
           _MenuItem(
-            icon: Icons.trending_up,
-            title: 'Bei za Soko',
-            subtitle: 'Bei za mazao Tanzania leo',
-            color: color,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const MarketScreen())),
-          ),
-          _MenuItem(
-            icon: Icons.water_drop_outlined,
-            title: 'Hali ya Hewa & Umwagiliaji',
-            subtitle: 'Utabiri wa hewa na mpango wa umwagiliaji',
-            color: color,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const IrrigationScreen())),
-          ),
-          _MenuItem(
             icon: Icons.psychology_outlined,
             title: 'Mshauri wa AI',
             subtitle: 'Uliza maswali ya kilimo kwa Claude',
@@ -295,21 +281,7 @@ class ProfileScreen extends StatelessWidget {
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
-          _MenuItem(
-            icon: Icons.lock_outline,
-            title: 'Mipangilio ya Faragha',
-            subtitle: 'Simamia data yako na faragha yako',
-            color: AppColors.mid,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen())),
-          ),
-          _MenuItem(
-            icon: Icons.settings_outlined,
-            title: 'Mipangilio',
-            subtitle: 'Badilisha taarifa za akaunti yako',
-            color: AppColors.mid,
-            onTap: () => _showSettingsDialog(context, user),
-          ),
+          ..._commonTail(context, user),
         ],
       UserRole.duka => [
           _MenuItem(
@@ -321,14 +293,6 @@ class ProfileScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const MarketScreen())),
           ),
           _MenuItem(
-            icon: Icons.trending_up,
-            title: 'Bei za Soko',
-            subtitle: 'Bei za mazao Tanzania leo',
-            color: color,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const MarketScreen())),
-          ),
-          _MenuItem(
             icon: Icons.psychology_outlined,
             title: 'Mshauri wa AI',
             subtitle: 'Uliza maswali ya kilimo kwa Claude',
@@ -336,31 +300,9 @@ class ProfileScreen extends StatelessWidget {
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
-          _MenuItem(
-            icon: Icons.lock_outline,
-            title: 'Mipangilio ya Faragha',
-            subtitle: 'Simamia data yako na faragha yako',
-            color: AppColors.mid,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen())),
-          ),
-          _MenuItem(
-            icon: Icons.settings_outlined,
-            title: 'Mipangilio',
-            subtitle: 'Badilisha taarifa za akaunti yako',
-            color: AppColors.mid,
-            onTap: () => _showSettingsDialog(context, user),
-          ),
+          ..._commonTail(context, user),
         ],
       UserRole.muuzaji => [
-          _MenuItem(
-            icon: Icons.storefront_outlined,
-            title: 'Bei za Soko',
-            subtitle: 'Fuatilia bei za mazao Tanzania',
-            color: color,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const MarketScreen())),
-          ),
           _MenuItem(
             icon: Icons.psychology_outlined,
             title: 'Mshauri wa AI',
@@ -369,21 +311,7 @@ class ProfileScreen extends StatelessWidget {
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
-          _MenuItem(
-            icon: Icons.lock_outline,
-            title: 'Mipangilio ya Faragha',
-            subtitle: 'Simamia data yako na faragha yako',
-            color: AppColors.mid,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen())),
-          ),
-          _MenuItem(
-            icon: Icons.settings_outlined,
-            title: 'Mipangilio',
-            subtitle: 'Badilisha taarifa za akaunti yako',
-            color: AppColors.mid,
-            onTap: () => _showSettingsDialog(context, user),
-          ),
+          ..._commonTail(context, user),
         ],
       UserRole.afisa => [
           _MenuItem(
@@ -420,14 +348,6 @@ class ProfileScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const SoilScreen())),
           ),
           _MenuItem(
-            icon: Icons.satellite_alt_outlined,
-            title: 'Bei za Soko',
-            subtitle: 'Bei za mazao Tanzania leo',
-            color: color,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const MarketScreen())),
-          ),
-          _MenuItem(
             icon: Icons.psychology_outlined,
             title: 'Mshauri wa AI',
             subtitle: 'Uliza maswali ya kilimo kwa Claude',
@@ -435,32 +355,9 @@ class ProfileScreen extends StatelessWidget {
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
-          _MenuItem(
-            icon: Icons.lock_outline,
-            title: 'Mipangilio ya Faragha',
-            subtitle: 'Simamia data yako na faragha yako',
-            color: AppColors.mid,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(
-                    builder: (_) => const PrivacySettingsScreen())),
-          ),
-          _MenuItem(
-            icon: Icons.settings_outlined,
-            title: 'Mipangilio',
-            subtitle: 'Taarifa za akaunti yako',
-            color: AppColors.mid,
-            onTap: () => _showSettingsDialog(context, user),
-          ),
+          ..._commonTail(context, user),
         ],
       UserRole.mwekezaji => [
-          _MenuItem(
-            icon: Icons.trending_up,
-            title: 'Bei za Soko',
-            subtitle: 'Fuatilia bei za mazao Tanzania',
-            color: color,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const MarketScreen())),
-          ),
           _MenuItem(
             icon: Icons.psychology_outlined,
             title: 'Mshauri wa AI',
@@ -469,21 +366,7 @@ class ProfileScreen extends StatelessWidget {
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
           ),
-          _MenuItem(
-            icon: Icons.lock_outline,
-            title: 'Mipangilio ya Faragha',
-            subtitle: 'Simamia data yako na faragha yako',
-            color: AppColors.mid,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen())),
-          ),
-          _MenuItem(
-            icon: Icons.settings_outlined,
-            title: 'Mipangilio',
-            subtitle: 'Badilisha taarifa za akaunti yako',
-            color: AppColors.mid,
-            onTap: () => _showSettingsDialog(context, user),
-          ),
+          ..._commonTail(context, user),
         ],
     };
 
@@ -494,6 +377,42 @@ class ProfileScreen extends StatelessWidget {
             ))
         .toList();
   }
+
+  // Shared tail for every role: settings grouped with privacy, then feedback
+  // and invite. (Weather/irrigation and Bei za Soko were removed from this
+  // menu — those features remain reachable from Huduma / home.)
+  List<_MenuItem> _commonTail(BuildContext context, UserModel user) => [
+        _MenuItem(
+          icon: Icons.lock_outline,
+          title: 'Mipangilio ya Faragha',
+          subtitle: 'Simamia data yako na faragha yako',
+          color: AppColors.mid,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const PrivacySettingsScreen())),
+        ),
+        _MenuItem(
+          icon: Icons.settings_outlined,
+          title: 'Mipangilio',
+          subtitle: 'Badilisha taarifa za akaunti yako',
+          color: AppColors.mid,
+          onTap: () => _showSettingsDialog(context, user),
+        ),
+        _MenuItem(
+          icon: Icons.star_outline,
+          title: 'Toa Maoni',
+          subtitle: 'Tuambie unavyoiona Shamba Smart',
+          color: AppColors.warning,
+          onTap: () => showDialog(
+              context: context, builder: (_) => const FeedbackDialog()),
+        ),
+        _MenuItem(
+          icon: Icons.share_outlined,
+          title: 'Mwalike Rafiki',
+          subtitle: 'Shiriki Shamba Smart na wakulima wenzako',
+          color: AppColors.primary,
+          onTap: () => Share.share(AppInfo.inviteMessage),
+        ),
+      ];
 
   void _showAfisaProfileEditor(BuildContext context, UserModel user) {
     showModalBottomSheet(

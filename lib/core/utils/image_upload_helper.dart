@@ -49,6 +49,25 @@ class ImageUploadHelper {
 
     return Supabase.instance.client.storage.from(bucket).getPublicUrl(path);
   }
+
+  /// Delete an uploaded image given its public URL. Derives the storage path
+  /// from the URL (everything after `/object/public/<bucket>/`). Fails soft.
+  static Future<void> deleteByUrl(String? publicUrl, {required String bucket}) async {
+    if (publicUrl == null || publicUrl.isEmpty) return;
+    try {
+      final marker = '/object/public/$bucket/';
+      final idx = publicUrl.indexOf(marker);
+      if (idx == -1) return;
+      var path = publicUrl.substring(idx + marker.length);
+      // Strip any query string (e.g. cache-busting params).
+      final q = path.indexOf('?');
+      if (q != -1) path = path.substring(0, q);
+      if (path.isEmpty) return;
+      await Supabase.instance.client.storage.from(bucket).remove([path]);
+    } catch (e) {
+      debugPrint('ImageUploadHelper.deleteByUrl error: $e');
+    }
+  }
 }
 
 class _CompressArgs {

@@ -14,6 +14,7 @@ class MessageModel {
   final bool isRead;
   final MessageType type;
   final MessageStatus status;
+  final bool edited;
 
   // ── Image message fields ──────────────────────────────────────────────────
   final String? imagePath;     // local file path (optimistic preview before/while upload)
@@ -39,6 +40,7 @@ class MessageModel {
     this.isRead = false,
     this.type = MessageType.text,
     this.status = MessageStatus.sent,
+    this.edited = false,
     this.imagePath,
     this.imageUrl,
     this.locationLat,
@@ -74,6 +76,7 @@ class MessageModel {
           (s) => s.name == (j['status'] as String? ?? 'sent'),
           orElse: () => MessageStatus.sent,
         ),
+        edited: j['edited'] as bool? ?? false,
         imagePath: j['imagePath'] as String?,
         imageUrl: j['imageUrl'] as String?,
         locationLat: (j['locationLat'] as num?)?.toDouble(),
@@ -93,6 +96,7 @@ class MessageModel {
         'isFromMe': isFromMe,
         'type': type.name,
         'status': status.name,
+        'edited': edited,
         if (imagePath != null) 'imagePath': imagePath,
         if (imageUrl != null) 'imageUrl': imageUrl,
         if (locationLat != null) 'locationLat': locationLat,

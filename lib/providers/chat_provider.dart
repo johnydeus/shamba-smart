@@ -100,6 +100,7 @@ class ChatProvider extends ChangeNotifier {
         'type': row['type'],
         'image_url': row['image_url'],
         'image_path': row['image_path'],
+        'edited': (row['edited'] as int? ?? 0) == 1,
         'is_read': (row['is_read'] as int? ?? 0) == 1,
         'created_at': row['created_at'],
         'status': row['status'],
@@ -172,6 +173,7 @@ class ChatProvider extends ChangeNotifier {
           (s) => s.name == statusStr,
           orElse: () => MessageStatus.sent,
         ),
+        edited: row['edited'] as bool? ?? false,
         imageUrl: row['image_url'] as String?,
         imagePath: row['image_path'] as String?,
       ));
@@ -249,6 +251,44 @@ class ChatProvider extends ChangeNotifier {
     );
     conv.messages.add(msg);
     notifyListeners();
+  }
+
+  // ── Edit / delete own messages (owner enforced by RLS) ──────────────────────
+
+  Future<void> editMessage(String contactId, MessageModel message, String newText) async {
+    final trimmed = newText.trim();
+    if (trimmed.isEmpty || trimmed == message.text) return;
+    await _repo.editMessage(message.id, trimmed);
+
+    final conv = _conversations[contactId];
+    if (conv == null) return;
+    final i = conv.messages.indexWhere((m) => m.id == message.id);
+    if (i != -1) {
+      final m = conv.messages[i];
+      conv.messages[i] = MessageModel(
+        id: m.id,
+        senderId: m.senderId,
+        text: trimmed,
+        timestamp: m.timestamp,
+        isFromMe: m.isFromMe,
+        isRead: m.isRead,
+        type: m.type,
+        status: m.status,
+        edited: true,
+        imagePath: m.imagePath,
+        imageUrl: m.imageUrl,
+      );
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteMessage(String contactId, MessageModel message) async {
+    await _repo.deleteMessage(message.id, imageUrl: message.imageUrl);
+    final conv = _conversations[contactId];
+    if (conv != null) {
+      conv.messages.removeWhere((m) => m.id == message.id);
+      notifyListeners();
+    }
   }
 
   Future<void> sendLocation({

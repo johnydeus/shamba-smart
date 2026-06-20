@@ -69,6 +69,7 @@ class MessageRepository {
         'content': row['content'] as String,
         'type': row['type'] as String? ?? 'text',
         'image_url': row['image_url'] as String?,
+        'edited': (row['edited'] as bool? ?? false) ? 1 : 0,
         'is_read': (row['is_read'] as bool? ?? false) ? 1 : 0,
         'status': 'sent',
         'created_at': row['created_at'] as String,
@@ -292,8 +293,33 @@ class MessageRepository {
         (s) => s.name == statusStr,
         orElse: () => MessageStatus.sent,
       ),
+      edited: (row['edited'] as int? ?? 0) == 1,
       imagePath: row['image_path'] as String?,
       imageUrl: row['image_url'] as String?,
     );
+  }
+
+  /// Edit a text message the user sent (owner enforced by RLS). Sets edited=true.
+  Future<void> editMessage(String messageId, String newText) async {
+    await Supabase.instance.client
+        .from('direct_messages')
+        .update({'content': newText, 'edited': true})
+        .eq('id', messageId)
+        .timeout(const Duration(seconds: 8));
+    await _db.updateMessageContent(messageId, newText);
+  }
+
+  /// Delete a message the user sent (owner enforced by RLS). Also removes its
+  /// Storage image if it was an image message.
+  Future<void> deleteMessage(String messageId, {String? imageUrl}) async {
+    await Supabase.instance.client
+        .from('direct_messages')
+        .delete()
+        .eq('id', messageId)
+        .timeout(const Duration(seconds: 8));
+    await _db.deleteMessageById(messageId);
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      await ImageUploadHelper.deleteByUrl(imageUrl, bucket: _kChatImageBucket);
+    }
   }
 }

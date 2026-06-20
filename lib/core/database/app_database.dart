@@ -8,7 +8,7 @@ class AppDatabase {
   AppDatabase._();
 
   static const _dbName = 'shamba_smart.db';
-  static const _dbVersion = 3;
+  static const _dbVersion = 4;
 
   Database? _db;
 
@@ -39,6 +39,10 @@ class AppDatabase {
       // sender logic are dropped and re-pulled fresh from Supabase (correct
       // from_id). Outbox is untouched, so unsent messages still send.
       await db.delete('messages');
+    }
+    if (oldVersion < 4) {
+      // v4: track whether a message was edited (for the "(imehaririwa)" label).
+      await db.execute('ALTER TABLE messages ADD COLUMN edited INTEGER NOT NULL DEFAULT 0');
     }
   }
 
@@ -71,6 +75,7 @@ class AppDatabase {
         is_read INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'sent',
         created_at TEXT NOT NULL,
+        edited INTEGER NOT NULL DEFAULT 0,
         image_path TEXT,
         image_url TEXT,
         location_lat REAL,
@@ -181,5 +186,20 @@ class AppDatabase {
   Future<void> clearMessagesForOwner(String ownerId) async {
     final db = await database;
     await db.delete('messages', where: 'owner_id = ?', whereArgs: [ownerId]);
+  }
+
+  Future<void> deleteMessageById(String id) async {
+    final db = await database;
+    await db.delete('messages', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateMessageContent(String id, String content) async {
+    final db = await database;
+    await db.update(
+      'messages',
+      {'content': content, 'edited': 1},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

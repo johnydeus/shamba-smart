@@ -196,6 +196,84 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
+  // ── Edit a post (owner only — enforced by RLS) ──────────────────────────────
+  // Optionally change the text, attach a new image, or remove the image.
+  Future<void> editPost({
+    required String postId,
+    required String content,
+    File? newImageFile,   // a freshly picked image to replace the current one
+    bool removeImage = false,
+  }) async {
+    final idx = _posts.indexWhere((p) => p.id == postId);
+    if (idx == -1) return;
+    final old = _posts[idx];
+
+    String? imageUrl = old.imageUrl;
+    if (newImageFile != null) {
+      final uploaded = await uploadImage(newImageFile);
+      if (uploaded == null) {
+        throw Exception('Imeshindwa kupakia picha. Jaribu tena.');
+      }
+      await ImageUploadHelper.deleteByUrl(old.imageUrl, bucket: 'community-images');
+      imageUrl = uploaded;
+    } else if (removeImage) {
+      await ImageUploadHelper.deleteByUrl(old.imageUrl, bucket: 'community-images');
+      imageUrl = null;
+    }
+
+    await Supabase.instance.client.from('community_posts').update({
+      'content': content,
+      'image_url': imageUrl,
+    }).eq('id', postId);
+
+    _posts[idx] = CommunityPost(
+      id: old.id,
+      authorId: old.authorId,
+      authorName: old.authorName,
+      authorRoleKey: old.authorRoleKey,
+      authorRegion: old.authorRegion,
+      topic: old.topic,
+      content: content,
+      imageUrl: imageUrl,
+      createdAt: old.createdAt,
+      replies: old.replies,
+      likedByIds: old.likedByIds,
+    );
+    notifyListeners();
+    _saveToCache();
+  }
+
+  // ── Delete a post (owner only — enforced by RLS) ────────────────────────────
+  Future<void> deletePost(String postId) async {
+    final idx = _posts.indexWhere((p) => p.id == postId);
+    final removed = idx != -1 ? _posts[idx] : null;
+    if (idx != -1) {
+      _posts.removeAt(idx);
+      notifyListeners();
+    }
+    try {
+      // Replies first (FK / cleanliness), then the post, then its image.
+      await Supabase.instance.client
+          .from('community_replies')
+          .delete()
+          .eq('post_id', postId);
+      await Supabase.instance.client
+          .from('community_posts')
+          .delete()
+          .eq('id', postId);
+      await ImageUploadHelper.deleteByUrl(removed?.imageUrl, bucket: 'community-images');
+      _saveToCache();
+    } catch (e) {
+      // Roll back the optimistic removal on failure.
+      if (removed != null && idx != -1) {
+        _posts.insert(idx, removed);
+        notifyListeners();
+      }
+      debugPrint('CommunityProvider.deletePost error: $e');
+      rethrow;
+    }
+  }
+
   // ── Add a reply ─────────────────────────────────────────────────────────────
 
   Future<void> addReply({

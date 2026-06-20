@@ -527,6 +527,40 @@ class _PostCardState extends State<_PostCard> {
                         fontWeight: FontWeight.bold),
                   ),
                 ),
+                // Owner-only edit/delete menu
+                if (user != null && post.authorId == user.id)
+                  SizedBox(
+                    width: 28,
+                    child: PopupMenuButton<String>(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.more_vert,
+                          size: 18, color: Colors.grey),
+                      onSelected: (v) {
+                        if (v == 'edit') {
+                          _showPostSheet(context, user, editing: post);
+                        } else if (v == 'delete') {
+                          _confirmDeletePost(context, community, post.id);
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                            value: 'edit',
+                            child: Row(children: [
+                              Icon(Icons.edit_outlined, size: 18),
+                              SizedBox(width: 8),
+                              Text('Hariri'),
+                            ])),
+                        PopupMenuItem(
+                            value: 'delete',
+                            child: Row(children: [
+                              Icon(Icons.delete_outline,
+                                  size: 18, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Futa', style: TextStyle(color: Colors.red)),
+                            ])),
+                      ],
+                    ),
+                  ),
               ],
             ),
 
@@ -1329,20 +1363,55 @@ class _ExpertCard extends StatelessWidget {
   }
 }
 
+// ── Post owner actions ────────────────────────────────────────────────────────
+
+Future<void> _confirmDeletePost(
+    BuildContext context, CommunityProvider community, String postId) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Futa chapisho'),
+      content: const Text('Una uhakika unataka kufuta? Hatua hii haiwezi kutenduliwa.'),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hapana')),
+        TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Futa', style: TextStyle(color: Colors.red))),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  try {
+    await community.deletePost(postId);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Chapisho limefutwa.')));
+    }
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Imeshindwa kufuta. Jaribu tena.')));
+    }
+  }
+}
+
 // ── Post sheet (new post) ─────────────────────────────────────────────────────
 
-void _showPostSheet(BuildContext context, UserModel user) {
+void _showPostSheet(BuildContext context, UserModel user, {CommunityPost? editing}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _PostSheet(user: user),
+    builder: (_) => _PostSheet(user: user, editing: editing),
   );
 }
 
 class _PostSheet extends StatefulWidget {
   final UserModel user;
-  const _PostSheet({required this.user});
+  final CommunityPost? editing;
+  const _PostSheet({required this.user, this.editing});
 
   @override
   State<_PostSheet> createState() => _PostSheetState();
@@ -1351,9 +1420,24 @@ class _PostSheet extends StatefulWidget {
 class _PostSheetState extends State<_PostSheet> {
   String _topic = 'mazao';
   final _ctrl = TextEditingController();
-  File? _imageFile;
+  File? _imageFile;            // newly picked replacement image
+  String? _existingImageUrl;   // current remote image when editing
+  bool _removeImage = false;   // user removed the existing image
   bool _posting = false;
   final _picker = ImagePicker();
+
+  bool get _isEditing => widget.editing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.editing;
+    if (e != null) {
+      _topic = e.topic;
+      _ctrl.text = e.content == '📷' ? '' : e.content;
+      _existingImageUrl = e.imageUrl;
+    }
+  }
 
   @override
   void dispose() {
@@ -1391,12 +1475,15 @@ class _PostSheetState extends State<_PostSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            Text('Chapisho Jipya',
+            Text(_isEditing ? 'Hariri Chapisho' : 'Chapisho Jipya',
                 style: GoogleFonts.playfairDisplay(
                     fontSize: 18, fontWeight: FontWeight.bold,
                     color: AppColors.soil)),
             const SizedBox(height: 4),
-            Text('Shiriki habari, swali, picha au tangazo na jamii.',
+            Text(
+                _isEditing
+                    ? 'Badilisha maandishi au picha ya chapisho lako.'
+                    : 'Shiriki habari, swali, picha au tangazo na jamii.',
                 style: GoogleFonts.dmSans(color: Colors.grey, fontSize: 13)),
 
             const SizedBox(height: 16),
@@ -1489,6 +1576,38 @@ class _PostSheetState extends State<_PostSheet> {
                 label: const Text('Ondoa picha', style: TextStyle(fontSize: 12)),
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
               ),
+            ] else if (_existingImageUrl != null && !_removeImage) ...[
+              // Editing: show the current uploaded image with options.
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: _existingImageUrl!,
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.cover,
+                  placeholder: (_, _) => Container(
+                      height: 180, color: AppColors.mint),
+                  errorWidget: (_, _, _) => Container(
+                      height: 100, color: AppColors.mint,
+                      child: const Icon(Icons.broken_image, color: Colors.grey)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () => setState(() => _removeImage = true),
+                    icon: const Icon(Icons.delete_outline, size: 16),
+                    label: const Text('Ondoa picha', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _pickImage(ImageSource.gallery),
+                    icon: const Icon(Icons.swap_horiz, size: 16),
+                    label: const Text('Badilisha', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
             ] else ...[
               Row(
                 children: [
@@ -1543,8 +1662,8 @@ class _PostSheetState extends State<_PostSheet> {
                     : const Icon(Icons.send),
                 label: Text(
                   _posting
-                      ? (_imageFile != null ? 'Inapakia picha...' : 'Inachapisha...')
-                      : 'Chapisha',
+                      ? (_imageFile != null ? 'Inapakia picha...' : 'Inahifadhi...')
+                      : (_isEditing ? 'Hifadhi' : 'Chapisha'),
                   style: GoogleFonts.dmSans(
                       fontSize: 15, fontWeight: FontWeight.bold),
                 ),
@@ -1552,7 +1671,9 @@ class _PostSheetState extends State<_PostSheet> {
                     ? null
                     : () async {
                         final text = _ctrl.text.trim();
-                        if (text.length < 3 && _imageFile == null) {
+                        final hasAnyImage = _imageFile != null ||
+                            (_existingImageUrl != null && !_removeImage);
+                        if (text.length < 3 && !hasAnyImage) {
                           ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                   content: Text(
@@ -1561,7 +1682,16 @@ class _PostSheetState extends State<_PostSheet> {
                         }
                         setState(() => _posting = true);
                         try {
-                          await context.read<CommunityProvider>().addPost(
+                          final provider = context.read<CommunityProvider>();
+                          if (_isEditing) {
+                            await provider.editPost(
+                              postId: widget.editing!.id,
+                              content: text.isNotEmpty ? text : '📷',
+                              newImageFile: _imageFile,
+                              removeImage: _removeImage,
+                            );
+                          } else {
+                            await provider.addPost(
                                 authorId: widget.user.id,
                                 authorName: widget.user.displayName,
                                 authorRole: widget.user.role,
@@ -1571,6 +1701,7 @@ class _PostSheetState extends State<_PostSheet> {
                                     text.isNotEmpty ? text : '📷',
                                 imageFile: _imageFile,
                               );
+                          }
                           if (context.mounted) Navigator.pop(context);
                         } catch (e) {
                           if (context.mounted) {

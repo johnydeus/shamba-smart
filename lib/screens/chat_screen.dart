@@ -184,6 +184,94 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // ── Edit / delete my own messages ──────────────────────────────────────────
+
+  void _showMessageActions(MessageModel msg) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (msg.type == MessageType.text)
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Hariri'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editMessage(msg);
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Futa', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _deleteMessage(msg);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editMessage(MessageModel msg) async {
+    final ctrl = TextEditingController(text: msg.text);
+    final newText = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Hariri ujumbe'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: null,
+          decoration: const InputDecoration(hintText: 'Andika ujumbe...'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Ghairi')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+              child: const Text('Hifadhi')),
+        ],
+      ),
+    );
+    if (newText == null || newText.isEmpty || newText == msg.text) return;
+    try {
+      await context
+          .read<ChatProvider>()
+          .editMessage(widget.contactId, msg, newText);
+    } catch (_) {
+      if (mounted) _showError('Imeshindwa kuhariri. Jaribu tena.');
+    }
+  }
+
+  Future<void> _deleteMessage(MessageModel msg) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Futa ujumbe'),
+        content: const Text('Una uhakika unataka kufuta ujumbe huu?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hapana')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Futa', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await context.read<ChatProvider>().deleteMessage(widget.contactId, msg);
+    } catch (_) {
+      if (mounted) _showError('Imeshindwa kufuta. Jaribu tena.');
+    }
+  }
+
   // ── Send location ────────────────────────────────────────────────────────────
 
   Future<void> _sendLocation() async {
@@ -520,6 +608,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         contactName: widget.contactName,
                         contactRole: widget.contactRole,
                         contactColor: contactColor,
+                        onLongPress: msg.isFromMe
+                            ? () => _showMessageActions(msg)
+                            : null,
                       );
                     },
                   ),
@@ -684,6 +775,7 @@ class _MessageBubble extends StatelessWidget {
   final String contactName;
   final UserRole contactRole;
   final Color contactColor;
+  final VoidCallback? onLongPress;
 
   const _MessageBubble({
     required this.message,
@@ -691,6 +783,7 @@ class _MessageBubble extends StatelessWidget {
     required this.contactName,
     required this.contactRole,
     required this.contactColor,
+    this.onLongPress,
   });
 
   @override
@@ -723,18 +816,21 @@ class _MessageBubble extends StatelessWidget {
             crossAxisAlignment:
                 sent ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
-              // Route to correct bubble type
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth:
-                      MediaQuery.of(context).size.width * 0.72,
+              // Route to correct bubble type (long-press = owner edit/delete)
+              GestureDetector(
+                onLongPress: onLongPress,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth:
+                        MediaQuery.of(context).size.width * 0.72,
+                  ),
+                  child: switch (message.type) {
+                    MessageType.image    => _ImageBubble(message: message, sent: sent),
+                    MessageType.location => _LocationBubble(message: message, sent: sent),
+                    MessageType.file     => _FileBubble(message: message, sent: sent),
+                    MessageType.text     => _TextBubble(message: message, sent: sent),
+                  },
                 ),
-                child: switch (message.type) {
-                  MessageType.image    => _ImageBubble(message: message, sent: sent),
-                  MessageType.location => _LocationBubble(message: message, sent: sent),
-                  MessageType.file     => _FileBubble(message: message, sent: sent),
-                  MessageType.text     => _TextBubble(message: message, sent: sent),
-                },
               ),
               const SizedBox(height: 3),
               Row(
@@ -743,6 +839,14 @@ class _MessageBubble extends StatelessWidget {
                   Text(_bubbleTime(message.timestamp),
                       style: GoogleFonts.dmSans(
                           fontSize: 10, color: AppColors.mid)),
+                  if (message.edited) ...[
+                    const SizedBox(width: 4),
+                    Text('(imehaririwa)',
+                        style: GoogleFonts.dmSans(
+                            fontSize: 9,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.mid)),
+                  ],
                   if (sent) ...[
                     const SizedBox(width: 4),
                     Icon(
