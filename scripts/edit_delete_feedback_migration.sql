@@ -5,30 +5,33 @@
 alter table public.direct_messages
   add column if not exists edited boolean not null default false;
 
+-- NOTE: from_id / author_id are TEXT columns (they store the uuid as a string),
+-- while auth.uid() returns uuid — so we cast auth.uid()::text in comparisons.
+
 -- Sender may edit their own messages.
 drop policy if exists "dm update own" on public.direct_messages;
 create policy "dm update own"
   on public.direct_messages for update to authenticated
-  using (from_id = auth.uid())
-  with check (from_id = auth.uid());
+  using (from_id = auth.uid()::text)
+  with check (from_id = auth.uid()::text);
 
 -- Sender may delete their own messages.
 drop policy if exists "dm delete own" on public.direct_messages;
 create policy "dm delete own"
   on public.direct_messages for delete to authenticated
-  using (from_id = auth.uid());
+  using (from_id = auth.uid()::text);
 
 -- ── 2. Community: author update/delete RLS ──────────────────────────────────
 drop policy if exists "posts update own" on public.community_posts;
 create policy "posts update own"
   on public.community_posts for update to authenticated
-  using (author_id = auth.uid())
-  with check (author_id = auth.uid());
+  using (author_id = auth.uid()::text)
+  with check (author_id = auth.uid()::text);
 
 drop policy if exists "posts delete own" on public.community_posts;
 create policy "posts delete own"
   on public.community_posts for delete to authenticated
-  using (author_id = auth.uid());
+  using (author_id = auth.uid()::text);
 
 -- Allow deleting replies belonging to a post the user is removing (their own
 -- replies, and replies under their own posts).
@@ -36,8 +39,8 @@ drop policy if exists "replies delete own" on public.community_replies;
 create policy "replies delete own"
   on public.community_replies for delete to authenticated
   using (
-    author_id = auth.uid()
-    or post_id in (select id from public.community_posts where author_id = auth.uid())
+    author_id = auth.uid()::text
+    or post_id in (select id from public.community_posts where author_id = auth.uid()::text)
   );
 
 -- ── 3. App feedback ─────────────────────────────────────────────────────────
