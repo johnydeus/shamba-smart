@@ -21,6 +21,7 @@ import '../widgets/soil/soil_profile_summary_card.dart';
 import 'expert_profile_screen.dart' show kSpecializations;
 import 'find_officer_screen.dart';
 import 'officer_dashboard_screen.dart';
+import 'register_officer_screen.dart';
 import 'privacy_settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -325,10 +326,11 @@ class ProfileScreen extends StatelessWidget {
           ),
           _MenuItem(
             icon: Icons.workspace_premium_outlined,
-            title: 'Simamia Profaili ya Mtaalamu',
-            subtitle: 'Weka utaalamu wako, bio, na upatikanaji wako',
+            title: 'Wasifu wangu wa Mtaalamu',
+            subtitle: 'Jisajili/hariri ili wakulima wakupate',
             color: color,
-            onTap: () => _showAfisaProfileEditor(context, user),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const RegisterOfficerScreen())),
           ),
           _MenuItem(
             icon: Icons.people,

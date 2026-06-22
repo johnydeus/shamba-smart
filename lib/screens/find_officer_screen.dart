@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/location_service.dart';
 import '../services/officer_service.dart';
+import '../services/field_officer_service.dart';
+import '../models/field_officer.dart';
 import '../theme/app_colors.dart';
-import 'officer_profile_screen.dart';
+import 'officer_profile_detail_screen.dart';
 import 'chat_screen.dart';
 import '../models/user_model.dart';
 
@@ -41,14 +43,28 @@ class _FindOfficerScreenState extends State<FindOfficerScreen> {
         user?.region.isNotEmpty == true ? user!.region : 'Morogoro';
     _region = region;
 
-    final (lat, lng) = await LocationService.getLocationOrDefault();
-
-    final officers = await OfficerService.findOfficersForFarmer(
-      farmerLat: lat,
-      farmerLng: lng,
-      farmerRegion: region,
-      cropSpeciality: _filterCrop.isEmpty ? null : _filterCrop,
-    );
+    // Real, self-registered field officers (approved + pending) from Supabase
+    // `field_officers`, offline-cached. Mapped to the keys the card already
+    // reads, with the model stashed under '_model' for the Wasifu screen.
+    final liveOfficers = await FieldOfficerService.directory();
+    final officers = liveOfficers
+        .map((o) => <String, dynamic>{
+              'id': o.userId, // chat opens with the officer's user_id
+              'user_id': o.userId,
+              'full_name': o.fullName,
+              'title': o.title,
+              'primary_region': o.region,
+              'is_verified': o.verified,
+              'average_rating': o.rating,
+              'total_ratings': o.ratingCount,
+              'farmers_served': o.farmersServed,
+              'response_time_hours': o.avgResponseHours,
+              'farm_visit_available': o.visitFeeTzs != null,
+              'farm_visit_cost_tzs': o.visitFeeTzs,
+              'specialisation': o.crops,
+              '_model': o,
+            })
+        .toList();
 
     final broadcasts =
         await OfficerService.getRegionalBroadcasts(region: region);
@@ -351,7 +367,11 @@ class _FindOfficerScreenState extends State<FindOfficerScreen> {
     final specs = ((o['specialisation'] as List?)?.cast<String>() ?? [])
         .take(3)
         .toList();
-    final responseHours = (o['response_time_hours'] as num?)?.toDouble() ?? 24;
+    final responseHours = (o['response_time_hours'] as num?)?.toDouble();
+    final farmersServed = (o['farmers_served'] as num?)?.toInt() ?? 0;
+    // New officers have no track record yet — render gracefully.
+    final isNew = ((o['total_ratings'] as num?)?.toInt() ?? 0) == 0 &&
+        farmersServed == 0;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -383,6 +403,20 @@ class _FindOfficerScreenState extends State<FindOfficerScreen> {
                             message: 'Imethibitishwa',
                             child: Icon(Icons.verified,
                                 color: Color(0xFF1565C0), size: 18),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text('Inasubiri uthibitisho',
+                                style: TextStyle(
+                                    fontSize: 9.5,
+                                    color: Colors.grey.shade700,
+                                    fontWeight: FontWeight.w600)),
                           ),
                       ]),
                       Text(
@@ -405,9 +439,12 @@ class _FindOfficerScreenState extends State<FindOfficerScreen> {
               runSpacing: 4,
               children: [
                 _statChip(Icons.people_outline,
-                    '${o['farmers_served'] ?? 0} wakulima'),
-                _statChip(Icons.timer_outlined,
-                    'Hujibu ${_formatResponseTime(responseHours)}'),
+                    isNew ? 'Mpya' : '$farmersServed wakulima'),
+                _statChip(
+                    Icons.timer_outlined,
+                    responseHours == null
+                        ? 'Hujibu —'
+                        : 'Hujibu ${_formatResponseTime(responseHours)}'),
                 if (canVisit)
                   _statChip(Icons.directions_walk,
                       'TZS ${_fmt(o['farm_visit_cost_tzs'])} ziara'),
@@ -494,7 +531,18 @@ class _FindOfficerScreenState extends State<FindOfficerScreen> {
 
   Widget _ratingRow(Map<String, dynamic> o) {
     final rating = (o['average_rating'] as num?)?.toDouble() ?? 0.0;
-    final count = (o['total_ratings'] as int?) ?? 0;
+    final count = (o['total_ratings'] as num?)?.toInt() ?? 0;
+    // No ratings yet → show "Mpya" instead of "0.0 (0)".
+    if (count == 0) {
+      return Row(
+        children: [
+          Icon(Icons.fiber_new_outlined, color: AppColors.mid, size: 14),
+          const SizedBox(width: 3),
+          const Text('Mpya',
+              style: TextStyle(fontSize: 12, color: Colors.grey)),
+        ],
+      );
+    }
     return Row(
       children: [
         const Icon(Icons.star, color: Color(0xFFFFB300), size: 14),
@@ -547,10 +595,11 @@ class _FindOfficerScreenState extends State<FindOfficerScreen> {
   }
 
   void _openProfile(Map<String, dynamic> officer) {
+    final model = officer['_model'] as FieldOfficer;
     Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (_) => OfficerProfileScreen(officer: officer)),
+          builder: (_) => OfficerProfileDetailScreen(officer: model)),
     );
   }
 

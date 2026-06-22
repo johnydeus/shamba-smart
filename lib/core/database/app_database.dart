@@ -8,7 +8,7 @@ class AppDatabase {
   AppDatabase._();
 
   static const _dbName = 'shamba_smart.db';
-  static const _dbVersion = 4;
+  static const _dbVersion = 5;
 
   Database? _db;
 
@@ -44,7 +44,19 @@ class AppDatabase {
       // v4: track whether a message was edited (for the "(imehaririwa)" label).
       await db.execute('ALTER TABLE messages ADD COLUMN edited INTEGER NOT NULL DEFAULT 0');
     }
+    if (oldVersion < 5) {
+      // v5: offline cache for the field-officer directory.
+      await db.execute(_createOfficersCacheSql);
+    }
   }
+
+  static const _createOfficersCacheSql = '''
+    CREATE TABLE field_officers_cache (
+      id TEXT PRIMARY KEY,
+      json TEXT NOT NULL,
+      rank INTEGER NOT NULL
+    )
+  ''';
 
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
@@ -92,6 +104,28 @@ class AppDatabase {
         'CREATE INDEX idx_outbox_status ON outbox(status, created_at)');
     await db.execute(
         'CREATE INDEX idx_messages_owner ON messages(owner_id, created_at)');
+
+    await db.execute(_createOfficersCacheSql);
+  }
+
+  // ── Field-officer directory cache (offline-first) ──────────────────────────
+
+  Future<void> cacheOfficers(List<String> jsonRows) async {
+    final db = await database;
+    final batch = db.batch();
+    batch.delete('field_officers_cache');
+    for (var i = 0; i < jsonRows.length; i++) {
+      batch.insert('field_officers_cache',
+          {'id': '$i', 'json': jsonRows[i], 'rank': i});
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<String>> cachedOfficers() async {
+    final db = await database;
+    final rows =
+        await db.query('field_officers_cache', orderBy: 'rank ASC');
+    return rows.map((r) => r['json'] as String).toList();
   }
 
   // ── Outbox ────────────────────────────────────────────────────────────────
