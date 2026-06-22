@@ -1,7 +1,7 @@
 name: shamba_smart
 description: "Shamba Smart - AI Crop Disease Detection for Tanzanian Farmers"
 publish_to: 'none'
-version: 1.0.0+12
+version: 1.0.0+13
 
 environment:
   sdk: ^3.11.4

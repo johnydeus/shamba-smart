@@ -616,44 +616,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
           ),
 
-          // Typing indicator
-          if (_sending)
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 4),
-              child: Row(
-                children: [
-                  UserAvatarCircle(
-                      name: widget.contactName,
-                      role: widget.contactRole,
-                      size: 24),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(4),
-                        topRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _Dot(delay: 0),
-                        const SizedBox(width: 4),
-                        _Dot(delay: 200),
-                        const SizedBox(width: 4),
-                        _Dot(delay: 400),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          // NOTE: removed the contact-avatar "typing…" row that was shown while
+          // _sending. It wrongly painted the other participant (e.g. "PU") as if
+          // they were sending YOUR message. Your own outgoing message already
+          // shows immediately on the right with a pending-clock status, so this
+          // gave correct feedback without the misattribution.
 
           // ── Input bar ──────────────────────────────────────────────────────
           Container(
@@ -1356,47 +1323,4 @@ class _MapGridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ── Animated typing dot ────────────────────────────────────────────────────────
-
-class _Dot extends StatefulWidget {
-  final int delay;
-  const _Dot({required this.delay});
-
-  @override
-  State<_Dot> createState() => _DotState();
-}
-
-class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 600));
-    Future.delayed(
-        Duration(milliseconds: widget.delay),
-        () => _ctrl.repeat(reverse: true));
-    _anim = Tween(begin: 0.3, end: 1.0).animate(_ctrl);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FadeTransition(
-        opacity: _anim,
-        child: Container(
-          width: 7,
-          height: 7,
-          decoration: const BoxDecoration(
-              color: AppColors.mid, shape: BoxShape.circle),
-        ),
-      );
 }
