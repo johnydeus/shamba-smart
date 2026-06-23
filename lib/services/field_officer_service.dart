@@ -58,7 +58,7 @@ class FieldOfficerService {
           .limit(1)
           .timeout(const Duration(seconds: 8));
       if ((rows as List).isEmpty) return null;
-      return FieldOfficer.fromJson(rows.first as Map<String, dynamic>);
+      return FieldOfficer.fromJson(rows.first);
     } catch (e) {
       debugPrint('FieldOfficerService.myProfile error: $e');
       return null;

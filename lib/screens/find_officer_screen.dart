@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../services/location_service.dart';
 import '../services/officer_service.dart';
 import '../services/field_officer_service.dart';
 import '../models/field_officer.dart';
@@ -24,7 +23,6 @@ class _FindOfficerScreenState extends State<FindOfficerScreen> {
   Map<String, dynamic>? _linkedOfficer;
   bool _loading = true;
   String? _region;
-  String _filterCrop = '';
   String _search = '';
   bool _showVerifiedOnly = false;
   bool _showVisitOnly = false;
