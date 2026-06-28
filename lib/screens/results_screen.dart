@@ -57,6 +57,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
   // ── Two-stage verification state ──────────────────────────────────────────
   bool _verifying = false;
+  bool _escalating = false;            // Gemini: true while the Flash retry runs
   Map<String, dynamic>? _verification; // Claude's structured verification result
   String? _verifyError;                // human-readable error if Claude call failed
 
@@ -70,7 +71,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
   Future<void> _runVerification() async {
     if (_verifying) return;
-    setState(() { _verifying = true; _verifyError = null; });
+    setState(() { _verifying = true; _escalating = false; _verifyError = null; });
 
     try {
       final req = widget.scanRequest!;
@@ -142,40 +143,40 @@ class _ResultsScreenState extends State<ResultsScreen> {
     }
 
     final allowed = ScanTaxonomy().allowedLabelsForCrop(crop);
-    var tier = 'flash-lite';
-    var g = await GeminiScanService.classify(
+
+    // Flash-Lite first; auto-escalate to Flash on low-confidence/Unknown/
+    // flagged/poor-but-usable (one retry). "Inathibitisha zaidi..." shows
+    // during the Flash call.
+    final routing = await GeminiScanService.classifyWithRouting(
       imageBase64: base64,
       cropType: crop,
       problemType: 'disease',
       allowedLabels: allowed,
-      modelTier: tier,
+      onEscalate: () {
+        if (mounted) setState(() => _escalating = true);
+      },
     );
-    if (g['error'] == null && g['needs_flash_escalation'] == true) {
-      final g2 = await GeminiScanService.classify(
-        imageBase64: base64,
-        cropType: crop,
-        problemType: 'disease',
-        allowedLabels: allowed,
-        modelTier: 'flash',
-      );
-      if (g2['error'] == null) {
-        tier = 'flash';
-        g = g2;
-      }
-    }
 
-    if (g['error'] != null) {
+    if (routing.state == ScanRoutingState.error) {
       return {'error': true, 'message': 'Uhakiki wa picha umeshindwa. Jaribu tena.'};
     }
+    // Both tiers tried, still not confident -> needs expert review.
+    if (routing.state == ScanRoutingState.needsExpert) {
+      return {'needs_expert': true, 'is_healthy': false, 'image_quality_ok': true};
+    }
 
+    final g = routing.gemini;
     final localized =
         ScanTaxonomy().localizeByEnglish((g['top_prediction'] as String?) ?? '');
-    return GeminiScanTranslator.toVerificationMap(
+    final map = GeminiScanTranslator.toVerificationMap(
       g,
       cropName: crop,
-      tier: tier,
+      tier: routing.tier,
       localized: localized,
     );
+    map['routing_state'] =
+        routing.state == ScanRoutingState.uncertain ? 'uncertain' : 'confident';
+    return map;
   }
 
   Color _severityColor(String severity) {
@@ -233,6 +234,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
     // 'unclear', so the original path is untouched.)
     final geminiUnclear =
         FeatureFlags.useGeminiScan && diagnosis['unclear'] == true;
+    // Phase 4 routing states (Gemini path only).
+    final geminiNeedsExpert =
+        FeatureFlags.useGeminiScan && diagnosis['needs_expert'] == true;
+    final geminiUncertain =
+        FeatureFlags.useGeminiScan && diagnosis['routing_state'] == 'uncertain';
 
     final diseaseSw =
         diagnosis['disease_name_sw'] ?? 'Ugonjwa haujulikani';
@@ -283,7 +289,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
             // ── Claude verification result (two-stage flow) ───────────────
             if (_verifying)
-              _VerifyingBanner(),
+              _VerifyingBanner(escalating: _escalating),
 
             if (!_verifying && _verification != null)
               _VerificationCard(
@@ -395,11 +401,20 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 ),
               ),
 
+            // Both tiers tried, still not confident -> needs expert review.
+            if (!hasError && !isHealthy && geminiNeedsExpert)
+              const _NeedsExpertCard(),
+
             // Gemini Unknown/off-list -> never blank: safe fallback + officer link.
-            if (!hasError && !isHealthy && geminiUnclear)
+            if (!hasError && !isHealthy && !geminiNeedsExpert && geminiUnclear)
               const _UnclearResultCard(),
 
-            if (!hasError && !isHealthy && !geminiUnclear) ...[
+            if (!hasError && !isHealthy && !geminiNeedsExpert && !geminiUnclear) ...[
+              // 0.60–0.79 confidence: show the prediction but flag it uncertain.
+              if (geminiUncertain) ...[
+                const _UncertainBanner(),
+                const SizedBox(height: AppSpacing.md),
+              ],
               _DiseaseGradientBanner(
                 diseaseSw: diseaseSw,
                 diseaseEn: diseaseEn,
@@ -684,6 +699,109 @@ class _UnclearResultCard extends StatelessWidget {
           Text(
             'Jaribu kupiga picha ya jani moja kwa mwanga mzuri (karibu, bila '
             'kivuli), au wasiliana na Afisa Kilimo kwa uchunguzi wa kina.',
+            style: GoogleFonts.poppins(
+                fontSize: 14, height: 1.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00695C),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              icon: const Icon(Icons.person_search_outlined, size: 18),
+              label: Text('Tafuta Afisa Kilimo',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+              onPressed: () => Navigator.push(
+                context,
+                FadeSlideRoute(page: const FindOfficerScreen()),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05, end: 0);
+  }
+}
+
+/// Confidence 0.60–0.79: the prediction is shown, but flagged as not fully sure.
+/// Distinct from _UnclearResultCard (which shows NO prediction).
+class _UncertainBanner extends StatelessWidget {
+  const _UncertainBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: AppColors.warning, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Hii si hakika kabisa — piga picha zaidi au thibitisha na '
+              'Afisa Kilimo.',
+              style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 300.ms);
+  }
+}
+
+/// Both Flash-Lite AND Flash tried, still not confident -> route to an expert.
+class _NeedsExpertCard extends StatelessWidget {
+  const _NeedsExpertCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.critical.withValues(alpha: 0.3)),
+        boxShadow: AppShadow.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🧑‍🌾', style: TextStyle(fontSize: 28)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Inahitaji uhakiki wa kitaalamu',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Tumejaribu kwa kina (Flash-Lite na Flash) lakini hatujapata jibu '
+            'la uhakika. Tafadhali wasiliana na Afisa Kilimo, au piga picha '
+            'nyingine ya wazi ya jani moja kwa mwanga mzuri.',
             style: GoogleFonts.poppins(
                 fontSize: 14, height: 1.5, color: AppColors.textSecondary),
           ),
@@ -1393,6 +1511,8 @@ class _MkulimaCardState extends State<_MkulimaCard> {
 
 /// Spinner banner shown while Claude is verifying.
 class _VerifyingBanner extends StatelessWidget {
+  final bool escalating;
+  const _VerifyingBanner({this.escalating = false});
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1414,7 +1534,9 @@ class _VerifyingBanner extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Mkulima AI inahakiki na mtaalamu wa AI (Claude)...',
+              escalating
+                  ? 'Inathibitisha zaidi...'
+                  : 'Mkulima AI inahakiki picha yako...',
               style: GoogleFonts.poppins(
                   fontSize: 13, color: Colors.white, fontWeight: FontWeight.w500),
             ),
@@ -1475,11 +1597,15 @@ class _VerificationCard extends StatelessWidget {
     final pest2Name = verification['pesticide_2_name'] as String? ?? '';
     final pest2Dose = verification['pesticide_2_dose'] as String? ?? '';
 
-    // Gemini Unknown/off-list (flag-on) -> safe fallback, never an empty card.
-    // Claude path never sets 'unclear', so the flag-off flow is unaffected.
+    // Gemini routing states (flag-on). Claude path never sets these keys, so
+    // the flag-off flow is unaffected.
+    if (verification['needs_expert'] == true) {
+      return const _NeedsExpertCard();
+    }
     if (verification['unclear'] == true) {
       return const _UnclearResultCard();
     }
+    final uncertain = verification['routing_state'] == 'uncertain';
 
     // If Claude says "not a crop plant"
     if (detectedCrop == 'SI_MMEA') {
@@ -1534,7 +1660,7 @@ class _VerificationCard extends StatelessWidget {
 
     final badgeColor = _confidenceBadgeColor(confStr);
 
-    return Container(
+    final card = Container(
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1729,6 +1855,19 @@ class _VerificationCard extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.06, end: 0);
+
+    // 0.60–0.79 confidence: keep the prediction but flag it uncertain.
+    if (uncertain) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _UncertainBanner(),
+          const SizedBox(height: AppSpacing.md),
+          card,
+        ],
+      );
+    }
+    return card;
   }
 }
 

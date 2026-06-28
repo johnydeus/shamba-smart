@@ -108,46 +108,39 @@ class ClaudeApiBridge {
     }
     final allowed = ScanTaxonomy().allowedLabelsForCrop(crop);
 
-    // Flash-Lite default; escalate to Flash once if the model asks.
-    var tier = 'flash-lite';
-    var g = await GeminiScanService.classify(
+    // Flash-Lite first; auto-escalate to Flash on low-confidence/Unknown/
+    // flagged/poor-but-usable (one retry, cost-controlled).
+    final routing = await GeminiScanService.classifyWithRouting(
       imageBase64: base64,
       cropType: crop,
       problemType: problemType,
       allowedLabels: allowed,
-      modelTier: tier,
     );
-    if (g['error'] == null && g['needs_flash_escalation'] == true) {
-      final g2 = await GeminiScanService.classify(
-        imageBase64: base64,
-        cropType: crop,
-        problemType: problemType,
-        allowedLabels: allowed,
-        modelTier: 'flash',
-      );
-      if (g2['error'] == null) {
-        tier = 'flash';
-        g = g2;
-      }
-    }
 
-    if (g['error'] != null) {
+    if (routing.state == ScanRoutingState.error) {
       return {
         'error': true,
         'message': 'Uchunguzi wa picha umeshindwa. Jaribu tena.',
         'is_healthy': false,
       };
     }
+    if (routing.state == ScanRoutingState.needsExpert) {
+      return {'needs_expert': true, 'is_healthy': false};
+    }
 
-    final top = (g['top_prediction'] as String?) ?? '';
-    final localized = ScanTaxonomy().localizeByEnglish(top);
-    return GeminiScanTranslator.toDiagnosisMap(
+    final g = routing.gemini;
+    final localized =
+        ScanTaxonomy().localizeByEnglish((g['top_prediction'] as String?) ?? '');
+    final map = GeminiScanTranslator.toDiagnosisMap(
       g,
       cropName: crop,
       scanType: scanType,
-      tier: tier,
+      tier: routing.tier,
       localized: localized,
     );
+    map['routing_state'] =
+        routing.state == ScanRoutingState.uncertain ? 'uncertain' : 'confident';
+    return map;
   }
 
   Future<void> queueEnrichment({
