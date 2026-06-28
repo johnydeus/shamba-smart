@@ -1,7 +1,7 @@
 /// App-wide constants. Update [shareLink] when the real download URL is ready.
 class AppInfo {
   /// Shown/stored with feedback. Bump alongside pubspec version.
-  static const String version = '1.0.0+15';
+  static const String version = '1.0.0+16';
 
   /// Placeholder download link — replace with the real Play Store / site URL.
   static const String shareLink = 'https://shambasmart.app';
