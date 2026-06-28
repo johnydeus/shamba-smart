@@ -1,11 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 import '../../../config/api_keys.dart';
+import '../../../config/feature_flags.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/image_upload_helper.dart';
 import '../../../services/claude_service.dart';
+import '../../../services/gemini_scan_service.dart';
 import '../../../services/mkulima_service.dart';
 import '../../../services/plant_id_service.dart';
 import '../../../services/supabase_service.dart';
+import 'gemini_scan_translator.dart';
+import 'scan_taxonomy.dart';
 
 /// Online enrichment — Plant.id when keys exist, otherwise Claude vision directly.
 class ClaudeApiBridge {
@@ -27,6 +32,18 @@ class ClaudeApiBridge {
     MkulimaResult? mkulimaResult,
     String? region,
   }) async {
+    // FLAG ON: all image CLASSIFICATION goes to Gemini (gemini-proxy), then is
+    // translated into the existing diagnosis-map keys. Claude/Plant.id are NOT
+    // used for classification. FLAG OFF (default): the original path below runs
+    // byte-for-byte unchanged.
+    if (FeatureFlags.useGeminiScan) {
+      return _classifyWithGemini(
+        imageFile: imageFile,
+        cropName: cropName,
+        scanType: scanType,
+      );
+    }
+
     if (!ApiKeys.hasClaude) {
       return {
         'error': true,
@@ -56,6 +73,66 @@ class ClaudeApiBridge {
     );
     diagnosis['source'] = 'claude_vision';
     return diagnosis;
+  }
+
+  // ── Gemini classification path (only when FeatureFlags.useGeminiScan) ───────
+  static String _problemType(String scanType) => switch (scanType) {
+        'magugu' => 'weed',
+        'wadudu' => 'pest',
+        'lishe' => 'nutrient_deficiency',
+        _ => 'disease',
+      };
+
+  Future<Map<String, dynamic>> _classifyWithGemini({
+    required File imageFile,
+    required String cropName,
+    required String scanType,
+  }) async {
+    await ScanTaxonomy().ensureLoaded();
+    final allowed = ScanTaxonomy().allowedLabelsForCrop(cropName);
+    final base64 = await ImageUploadHelper.optimisedBase64ForScan(imageFile);
+    final problemType = _problemType(scanType);
+
+    // Flash-Lite default; escalate to Flash once if the model asks.
+    var tier = 'flash-lite';
+    var g = await GeminiScanService.classify(
+      imageBase64: base64,
+      cropType: cropName,
+      problemType: problemType,
+      allowedLabels: allowed,
+      modelTier: tier,
+    );
+    if (g['error'] == null && g['needs_flash_escalation'] == true) {
+      final g2 = await GeminiScanService.classify(
+        imageBase64: base64,
+        cropType: cropName,
+        problemType: problemType,
+        allowedLabels: allowed,
+        modelTier: 'flash',
+      );
+      if (g2['error'] == null) {
+        tier = 'flash';
+        g = g2;
+      }
+    }
+
+    if (g['error'] != null) {
+      return {
+        'error': true,
+        'message': 'Uchunguzi wa picha umeshindwa. Jaribu tena.',
+        'is_healthy': false,
+      };
+    }
+
+    final top = (g['top_prediction'] as String?) ?? '';
+    final localized = ScanTaxonomy().localizeByEnglish(top);
+    return GeminiScanTranslator.toDiagnosisMap(
+      g,
+      cropName: cropName,
+      scanType: scanType,
+      tier: tier,
+      localized: localized,
+    );
   }
 
   Future<void> queueEnrichment({

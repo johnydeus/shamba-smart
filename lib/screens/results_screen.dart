@@ -3,10 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../config/feature_flags.dart';
+import '../core/utils/image_upload_helper.dart';
+import '../features/scan/data/gemini_scan_translator.dart';
+import '../features/scan/data/scan_taxonomy.dart';
 import '../features/scan/domain/scan_request.dart';
 import '../routes/fade_slide_route.dart';
 import '../services/audio_service.dart';
 import '../services/claude_service.dart';
+import '../services/gemini_scan_service.dart';
 import '../services/mkulima_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -69,13 +74,22 @@ class _ResultsScreenState extends State<ResultsScreen> {
     try {
       final req = widget.scanRequest!;
       final mkulima = widget.mkulimaResult;
-      final result = await ClaudeService.verifyDiagnosis(
-        imageFile: File(req.imagePath),
-        mkulimaGuess: mkulima?.jinaSw ?? 'Haijulikani',
-        mkulimaConfidence: mkulima?.confidence ?? 0.0,
-        mkulimaWasLowConfidence: mkulima == null,
-        regionContext: req.region,
-      );
+
+      // FLAG ON: Gemini does the CLASSIFICATION/verification, translated into
+      // the existing `_verification` keys. FLAG OFF (default): the original
+      // Claude verifyDiagnosis call runs unchanged.
+      final Map<String, dynamic> result;
+      if (FeatureFlags.useGeminiScan) {
+        result = await _verifyWithGemini(req);
+      } else {
+        result = await ClaudeService.verifyDiagnosis(
+          imageFile: File(req.imagePath),
+          mkulimaGuess: mkulima?.jinaSw ?? 'Haijulikani',
+          mkulimaConfidence: mkulima?.confidence ?? 0.0,
+          mkulimaWasLowConfidence: mkulima == null,
+          regionContext: req.region,
+        );
+      }
 
       if (!mounted) return;
 
@@ -102,6 +116,50 @@ class _ResultsScreenState extends State<ResultsScreen> {
       if (!mounted) return;
       setState(() { _verifying = false; _verifyError = e.toString(); });
     }
+  }
+
+  // Gemini classification path for the two-stage disease verify (flag ON only).
+  // Returns the `_verification` map shape ResultsScreen renders.
+  Future<Map<String, dynamic>> _verifyWithGemini(ScanRequest req) async {
+    await ScanTaxonomy().ensureLoaded();
+    final allowed = ScanTaxonomy().allowedLabelsForCrop(req.cropName);
+    final base64 = await ImageUploadHelper.optimisedBase64ForScan(
+        File(req.imagePath));
+
+    var tier = 'flash-lite';
+    var g = await GeminiScanService.classify(
+      imageBase64: base64,
+      cropType: req.cropName,
+      problemType: 'disease',
+      allowedLabels: allowed,
+      modelTier: tier,
+    );
+    if (g['error'] == null && g['needs_flash_escalation'] == true) {
+      final g2 = await GeminiScanService.classify(
+        imageBase64: base64,
+        cropType: req.cropName,
+        problemType: 'disease',
+        allowedLabels: allowed,
+        modelTier: 'flash',
+      );
+      if (g2['error'] == null) {
+        tier = 'flash';
+        g = g2;
+      }
+    }
+
+    if (g['error'] != null) {
+      return {'error': true, 'message': 'Uhakiki wa picha umeshindwa. Jaribu tena.'};
+    }
+
+    final localized =
+        ScanTaxonomy().localizeByEnglish((g['top_prediction'] as String?) ?? '');
+    return GeminiScanTranslator.toVerificationMap(
+      g,
+      cropName: req.cropName,
+      tier: tier,
+      localized: localized,
+    );
   }
 
   Color _severityColor(String severity) {
