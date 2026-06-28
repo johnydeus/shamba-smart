@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
+/// Sentinel crop value meaning "let the app detect the crop" (auto-detect).
+const String kAutoCrop = 'Auto';
+
 /// Taxonomy + Swahili localization for crop image classification.
 ///
 /// Source of truth = the SAME bundled assets the Mkulima model uses:
@@ -60,6 +63,20 @@ class ScanTaxonomy {
     labels.add('Healthy');
     labels.add('Unknown');
     return labels.toList();
+  }
+
+  /// Distinct Swahili crop names that actually HAVE a disease taxonomy (the
+  /// candidate list for auto-detect). Detecting only these guarantees we can
+  /// then lock disease classification to that crop's diseases.
+  List<String> diseaseCrops() {
+    final crops = <String>{};
+    for (final entry in _diseases.values) {
+      if (entry is Map) {
+        final zao = (entry['zao'] as String?)?.trim() ?? '';
+        if (zao.isNotEmpty) crops.add(zao);
+      }
+    }
+    return crops.toList()..sort();
   }
 
   /// Look up the existing Swahili localization for an English label that Gemini

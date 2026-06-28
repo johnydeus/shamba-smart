@@ -20,6 +20,7 @@ import '../widgets/status_badge.dart';
 import '../widgets/shamba_card.dart';
 import 'home_screen.dart';
 import 'scan_screen.dart';
+import 'find_officer_screen.dart';
 
 class ResultsScreen extends StatefulWidget {
   final Map<String, dynamic> diagnosis;
@@ -122,14 +123,29 @@ class _ResultsScreenState extends State<ResultsScreen> {
   // Returns the `_verification` map shape ResultsScreen renders.
   Future<Map<String, dynamic>> _verifyWithGemini(ScanRequest req) async {
     await ScanTaxonomy().ensureLoaded();
-    final allowed = ScanTaxonomy().allowedLabelsForCrop(req.cropName);
     final base64 = await ImageUploadHelper.optimisedBase64ForScan(
         File(req.imagePath));
 
+    // Auto-detect: identify the crop first, then lock disease classification
+    // to THAT crop's taxonomy. If the crop can't be identified confidently,
+    // return the safe fallback so the farmer is asked to pick manually.
+    var crop = req.cropName;
+    if (crop == kAutoCrop) {
+      final detected = await GeminiScanService.detectCrop(
+        imageBase64: base64,
+        candidates: ScanTaxonomy().diseaseCrops(),
+      );
+      if (detected == null) {
+        return {'unclear': true, 'is_healthy': false, 'image_quality_ok': true};
+      }
+      crop = detected;
+    }
+
+    final allowed = ScanTaxonomy().allowedLabelsForCrop(crop);
     var tier = 'flash-lite';
     var g = await GeminiScanService.classify(
       imageBase64: base64,
-      cropType: req.cropName,
+      cropType: crop,
       problemType: 'disease',
       allowedLabels: allowed,
       modelTier: tier,
@@ -137,7 +153,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     if (g['error'] == null && g['needs_flash_escalation'] == true) {
       final g2 = await GeminiScanService.classify(
         imageBase64: base64,
-        cropType: req.cropName,
+        cropType: crop,
         problemType: 'disease',
         allowedLabels: allowed,
         modelTier: 'flash',
@@ -156,7 +172,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
         ScanTaxonomy().localizeByEnglish((g['top_prediction'] as String?) ?? '');
     return GeminiScanTranslator.toVerificationMap(
       g,
-      cropName: req.cropName,
+      cropName: crop,
       tier: tier,
       localized: localized,
     );
@@ -212,6 +228,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final diagnosis = widget.diagnosis;
     final hasError = diagnosis['error'] == true;
     final isHealthy = diagnosis['is_healthy'] == true;
+    // Gemini path only: when classification is Unknown/off-list, show the safe
+    // fallback card instead of an empty disease banner. (flag-off never sets
+    // 'unclear', so the original path is untouched.)
+    final geminiUnclear =
+        FeatureFlags.useGeminiScan && diagnosis['unclear'] == true;
 
     final diseaseSw =
         diagnosis['disease_name_sw'] ?? 'Ugonjwa haujulikani';
@@ -374,7 +395,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 ),
               ),
 
-            if (!hasError && !isHealthy) ...[
+            // Gemini Unknown/off-list -> never blank: safe fallback + officer link.
+            if (!hasError && !isHealthy && geminiUnclear)
+              const _UnclearResultCard(),
+
+            if (!hasError && !isHealthy && !geminiUnclear) ...[
               _DiseaseGradientBanner(
                 diseaseSw: diseaseSw,
                 diseaseEn: diseaseEn,
@@ -616,6 +641,74 @@ class _ResultsScreenState extends State<ResultsScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Shown when the classifier can't confidently identify a disease/crop
+/// (Unknown, off-list crop, low confidence). Guarantees the result screen is
+/// never blank, and routes the farmer to a real expert.
+class _UnclearResultCard extends StatelessWidget {
+  const _UnclearResultCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+        boxShadow: AppShadow.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🔍', style: TextStyle(fontSize: 28)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Haikuweza kutambua kwa uhakika',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Jaribu kupiga picha ya jani moja kwa mwanga mzuri (karibu, bila '
+            'kivuli), au wasiliana na Afisa Kilimo kwa uchunguzi wa kina.',
+            style: GoogleFonts.poppins(
+                fontSize: 14, height: 1.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00695C),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              icon: const Icon(Icons.person_search_outlined, size: 18),
+              label: Text('Tafuta Afisa Kilimo',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+              onPressed: () => Navigator.push(
+                context,
+                FadeSlideRoute(page: const FindOfficerScreen()),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05, end: 0);
   }
 }
 
@@ -1381,6 +1474,12 @@ class _VerificationCard extends StatelessWidget {
     final pest1Dose = verification['pesticide_1_dose'] as String? ?? '';
     final pest2Name = verification['pesticide_2_name'] as String? ?? '';
     final pest2Dose = verification['pesticide_2_dose'] as String? ?? '';
+
+    // Gemini Unknown/off-list (flag-on) -> safe fallback, never an empty card.
+    // Claude path never sets 'unclear', so the flag-off flow is unaffected.
+    if (verification['unclear'] == true) {
+      return const _UnclearResultCard();
+    }
 
     // If Claude says "not a crop plant"
     if (detectedCrop == 'SI_MMEA') {

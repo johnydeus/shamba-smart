@@ -89,15 +89,30 @@ class ClaudeApiBridge {
     required String scanType,
   }) async {
     await ScanTaxonomy().ensureLoaded();
-    final allowed = ScanTaxonomy().allowedLabelsForCrop(cropName);
     final base64 = await ImageUploadHelper.optimisedBase64ForScan(imageFile);
     final problemType = _problemType(scanType);
+
+    // Auto-detect: resolve the crop first, then lock to its taxonomy. If the
+    // crop can't be identified confidently, return the safe fallback (the
+    // farmer is asked to pick manually — never guessed).
+    var crop = cropName;
+    if (crop == kAutoCrop) {
+      final detected = await GeminiScanService.detectCrop(
+        imageBase64: base64,
+        candidates: ScanTaxonomy().diseaseCrops(),
+      );
+      if (detected == null) {
+        return {'unclear': true, 'is_healthy': false};
+      }
+      crop = detected;
+    }
+    final allowed = ScanTaxonomy().allowedLabelsForCrop(crop);
 
     // Flash-Lite default; escalate to Flash once if the model asks.
     var tier = 'flash-lite';
     var g = await GeminiScanService.classify(
       imageBase64: base64,
-      cropType: cropName,
+      cropType: crop,
       problemType: problemType,
       allowedLabels: allowed,
       modelTier: tier,
@@ -105,7 +120,7 @@ class ClaudeApiBridge {
     if (g['error'] == null && g['needs_flash_escalation'] == true) {
       final g2 = await GeminiScanService.classify(
         imageBase64: base64,
-        cropType: cropName,
+        cropType: crop,
         problemType: problemType,
         allowedLabels: allowed,
         modelTier: 'flash',
@@ -128,7 +143,7 @@ class ClaudeApiBridge {
     final localized = ScanTaxonomy().localizeByEnglish(top);
     return GeminiScanTranslator.toDiagnosisMap(
       g,
-      cropName: cropName,
+      cropName: crop,
       scanType: scanType,
       tier: tier,
       localized: localized,

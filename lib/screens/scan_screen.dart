@@ -5,6 +5,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../config/feature_flags.dart';
+import '../features/scan/data/scan_taxonomy.dart' show kAutoCrop;
 import '../features/scan/domain/scan_request.dart';
 import '../providers/auth_provider.dart';
 import '../providers/scan_provider.dart';
@@ -372,11 +374,17 @@ class _ScanScreenState extends State<ScanScreen>
             const SizedBox(height: 8),
             SizedBox(
               height: 44,
-              child: ListView.builder(
+              child: Builder(builder: (context) {
+                // Auto-detect chip is offered only when the Gemini scan path is
+                // on (flag off => selector identical to before).
+                final showAuto = FeatureFlags.useGeminiScan;
+                final options = showAuto ? [kAutoCrop, ...kCrops] : kCrops;
+                return ListView.builder(
                 scrollDirection: Axis.horizontal,
-                itemCount: kCrops.length,
+                itemCount: options.length,
                 itemBuilder: (context, i) {
-                  final crop = kCrops[i];
+                  final crop = options[i];
+                  final isAuto = crop == kAutoCrop;
                   final selected = crop == _selectedCrop;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
@@ -384,9 +392,9 @@ class _ScanScreenState extends State<ScanScreen>
                       label: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(_cropEmoji(crop)),
+                          Text(isAuto ? '🔎' : _cropEmoji(crop)),
                           const SizedBox(width: 4),
-                          Text(crop),
+                          Text(isAuto ? 'Tambua Mwenyewe' : crop),
                           if (selected) ...[
                             const SizedBox(width: 4),
                             const Icon(Icons.check, size: 14),
@@ -415,7 +423,8 @@ class _ScanScreenState extends State<ScanScreen>
                     ),
                   );
                 },
-              ),
+              );
+              }),
             ),
 
             const SizedBox(height: 20),

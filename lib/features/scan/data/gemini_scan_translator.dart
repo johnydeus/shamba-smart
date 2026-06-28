@@ -24,6 +24,12 @@
 class GeminiScanTranslator {
   GeminiScanTranslator._();
 
+  /// Shown whenever Gemini can't confidently match the taxonomy (Unknown /
+  /// off-list crop). Guarantees the result card always has readable content.
+  static const String unclearMessageSw =
+      'Haikuweza kutambua ugonjwa kwa uhakika. Jaribu kupiga picha ya jani '
+      'moja kwa mwanga mzuri, au wasiliana na Afisa Kilimo.';
+
   static bool _isHealthy(String label) =>
       label.trim().toLowerCase() == 'healthy';
 
@@ -68,21 +74,27 @@ class GeminiScanTranslator {
       };
     }
 
+    final unclear = _isUnknown(topEn);
     final swName = (localized?['jina_swahili'] as String?)?.trim();
     final desc = _descriptionFrom(g);
     final action = (g['recommended_next_action'] as String?)?.trim();
 
     return {
       'is_healthy': false,
-      // Unknown -> pass a safe label through; UI shows "needs review".
-      'disease_name_en': _isUnknown(topEn) ? 'Unknown' : topEn,
+      'unclear': unclear,
+      // Unknown -> pass a safe label through; UI shows the fallback card.
+      'disease_name_en': unclear ? 'Unknown' : topEn,
       'disease_name_sw':
           swName != null && swName.isNotEmpty ? swName : topEn,
       'confidence': conf,
       if (localized?['ukali'] != null)
         'severity': _ukaliToSeverity(localized!['ukali'] as String),
-      if (desc.isNotEmpty) 'description_sw': desc,
-      if (action != null && action.isNotEmpty) 'immediate_action_sw': action,
+      // Always provide readable text so the card is never blank.
+      'description_sw': desc.isNotEmpty ? desc : (unclear ? unclearMessageSw : ''),
+      if (action != null && action.isNotEmpty)
+        'immediate_action_sw': action
+      else if (unclear)
+        'immediate_action_sw': unclearMessageSw,
       if ((localized?['kinga'] as String?)?.trim().isNotEmpty == true)
         'prevention_sw': localized!['kinga'],
       'source': source,
@@ -102,17 +114,19 @@ class GeminiScanTranslator {
     final topEn = (g['top_prediction'] as String?)?.trim() ?? '';
     final conf = (g['confidence'] as num?)?.toDouble();
     final healthy = _isHealthy(topEn);
+    final unclear = !healthy && _isUnknown(topEn);
     final swName = (localized?['jina_swahili'] as String?)?.trim();
     final quality = (g['image_quality'] as String?)?.toLowerCase() ?? '';
+    final desc = _descriptionFrom(g);
+    final action = (g['recommended_next_action'] as String?)?.trim() ?? '';
 
     return {
       'detected_crop': (g['crop'] as String?)?.trim().isNotEmpty == true
           ? g['crop']
           : cropName,
       'agrees_with_mkulima': null, // Gemini is now the classifier, not a judge.
-      'final_diagnosis_en': healthy
-          ? 'Healthy'
-          : (_isUnknown(topEn) ? 'Unknown' : topEn),
+      'unclear': unclear,
+      'final_diagnosis_en': healthy ? 'Healthy' : (unclear ? 'Unknown' : topEn),
       'final_diagnosis_sw': healthy
           ? 'Mmea una afya'
           : (swName != null && swName.isNotEmpty ? swName : topEn),
@@ -121,9 +135,10 @@ class GeminiScanTranslator {
       'image_quality_ok': !(quality.contains('blur') ||
           quality.contains('dark') ||
           quality.contains('far')),
-      'explanation_sw': _descriptionFrom(g),
+      // Always provide readable text so the card is never blank.
+      'explanation_sw': desc.isNotEmpty ? desc : (unclear ? unclearMessageSw : ''),
       'recommended_action_sw':
-          (g['recommended_next_action'] as String?)?.trim() ?? '',
+          action.isNotEmpty ? action : (unclear ? unclearMessageSw : ''),
       'source': 'gemini-$tier',
       'needs_human_confirmation': g['needs_human_confirmation'] ?? true,
       // pesticide_1_*/2_* deliberately OMITTED — never fabricated.
