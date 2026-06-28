@@ -20,8 +20,8 @@ const TIMEOUT_MS = 20_000
 // modelTier -> Gemini model id. Flash-Lite is the cheap default; Flash is the
 // escalation for hard cases. Change here if Google revises model ids.
 const MODEL_BY_TIER: Record<string, string> = {
-  'flash-lite': 'gemini-2.0-flash-lite',
-  'flash': 'gemini-2.0-flash',
+  'flash-lite': 'gemini-2.5-flash-lite',
+  'flash': 'gemini-2.5-flash',
 }
 
 const json = (body: unknown, status = 200) =>
