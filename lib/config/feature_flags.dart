@@ -17,5 +17,5 @@ class FeatureFlags {
   ///
   /// (A remote override — e.g. a Supabase row — can be layered on later if
   /// needed; a compile-time const is deliberate for now to avoid over-engineering.)
-  static const bool useGeminiScan = false;
+  static const bool useGeminiScan = true;
 }
