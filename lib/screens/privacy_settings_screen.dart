@@ -88,6 +88,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                   _section5Presence(),
                   _section6Notifications(),
                   _section7Rights(),
+                  _sectionAiPolicy(),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -466,6 +467,125 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   }
 
   // ── Helper widgets ─────────────────────────────────────────────────────────
+
+  // ── AI / photo handling policy (expandable, text-only) ─────────────────────
+  Widget _policyHeading(String t) => Padding(
+        padding: const EdgeInsets.only(top: 14, bottom: 4),
+        child: Text(t,
+            style: GoogleFonts.playfairDisplay(
+                fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.soil)),
+      );
+
+  Widget _policySub(String t) => Padding(
+        padding: const EdgeInsets.only(top: 8, bottom: 2),
+        child: Text(t,
+            style: const TextStyle(
+                fontWeight: FontWeight.w700, fontSize: 13)),
+      );
+
+  Widget _policyBody(String t) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Text(t,
+            style: TextStyle(
+                fontSize: 13, height: 1.5, color: Colors.grey.shade800)),
+      );
+
+  Widget _sectionAiPolicy() => Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        elevation: 1,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            title: Text('🌿 Jinsi Tunavyochambua Picha za Mazao Yako',
+                style: GoogleFonts.playfairDisplay(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppColors.soil)),
+            subtitle: Text('Sera ya faragha — picha za mazao na AI',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _policyBody(
+                        'Tunapojaribu kukutambulisha ugonjwa, wadudu, au tatizo '
+                        'kwenye zao lako kwa picha, hatua zifuatazo hutokea:'),
+                    _policySub('1. Kwanza — kwenye simu yako (bila intaneti)'),
+                    _policyBody(
+                        'Mkulima AI, mfumo wetu wa AI uliojengwa ndani ya '
+                        'programu, huchambua picha yako moja kwa moja kwenye simu '
+                        'yako. Hatua hii haihitaji intaneti na hakuna taarifa '
+                        'inayotumwa popote.'),
+                    _policySub(
+                        '2. Ikiwa Mkulima AI hana uhakika — picha hutumwa mtandaoni'),
+                    _policyBody(
+                        'Wakati Mkulima AI haina uhakika wa kutosha (mfano picha '
+                        'si wazi, au tatizo ni geni), nakala ya picha yako '
+                        '(iliyopunguzwa ukubwa) hutumwa mtandaoni kwa uchambuzi wa '
+                        'pili kutoka:'),
+                    _policyBody(
+                        '• Google Gemini — hutumika kutambua ugonjwa, wadudu, au '
+                        'tatizo kwenye picha.\n'
+                        '• Anthropic Claude — hutumika kuandaa maelezo na ushauri '
+                        'kwa Kiswahili rahisi.'),
+                    _policyBody(
+                        'Makampuni haya ni washirika wetu wa kiteknolojia (third-'
+                        'party processors) — hawatumii picha zako kwa kusudi '
+                        'lingine lolote zaidi ya kukupatia jibu lako.'),
+                    _policySub('3. Eneo (GPS) huondolewa kabla ya kutuma mtandaoni'),
+                    _policyBody(
+                        'Kabla ya picha kutumwa kwa Google Gemini, taarifa za eneo '
+                        '(GPS) na maelezo ya kiufundi ya picha (EXIF) huondolewa '
+                        'kabisa. Google haipokei kamwe eneo halisi la shamba lako.'),
+                    _policySub('4. Picha asili huhifadhiwa kwenye seva zetu (Supabase)'),
+                    _policyBody(
+                        'Nakala ya picha yako ya awali huhifadhiwa kwenye '
+                        'hifadhidata yetu salama (Supabase), iliyolindwa na sheria '
+                        'za ufikiaji (RLS) — wewe peke yako na mfumo wetu mnaoweza '
+                        'kuifikia. Hutumika kuboresha Mkulima AI ili siku zijazo '
+                        'itambue magonjwa kwa usahihi zaidi bila kuhitaji intaneti '
+                        '— faida ya moja kwa moja kwako na kwa wakulima wenzako.'),
+                    _policyHeading('Usalama wa Ushauri wa Dawa'),
+                    _policyBody(
+                        'Shamba Smart HAIPENDEKEZI KAMWE dawa kutoka kwa AI peke '
+                        'yake. Kila ushauri wa dawa hupitishwa kwanza kwenye orodha '
+                        'ya dawa zilizoidhinishwa rasmi na TPHPA. Ikiwa dawa '
+                        'haijaidhinishwa au orodha bado haijapakiwa, mfumo '
+                        'utakushauri kuwasiliana na Afisa Kilimo badala ya kukupa '
+                        'jibu lisilo salama.'),
+                    _policyHeading('Haki Zako'),
+                    _policyBody(
+                        '• Unaweza kuomba taarifa zako (ikiwemo picha) zifutwe '
+                        'wakati wowote, kupitia Akaunti → Toa Maoni au kwa '
+                        'kuwasiliana nasi.\n'
+                        '• Hatuuzi wala kushiriki picha zako kwa madhumuni ya '
+                        'matangazo.\n'
+                        '• Taarifa zako binafsi (jina, namba ya simu, eneo la '
+                        'shamba) hazitumwi kwa Google au Anthropic — ni picha pekee '
+                        '(bila GPS) inayotumwa, na hiyo tu Mkulima AI inapohitaji '
+                        'msaada wa pili.'),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Sehemu hii inasasishwa kuonyesha jinsi Shamba Smart '
+                      'inavyotumia AI ya mtandaoni (Google Gemini na Anthropic '
+                      'Claude) pamoja na Mkulima AI yetu ya ndani.',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
 
   Widget _sectionCard({
     required String title,
