@@ -58,6 +58,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
   // ── Two-stage verification state ──────────────────────────────────────────
   bool _verifying = false;
   bool _escalating = false;            // Gemini: true while the Flash retry runs
+  String? _savedDiagnosisId;           // diagnoses row id, for human confirmation
   Map<String, dynamic>? _verification; // Claude's structured verification result
   String? _verifyError;                // human-readable error if Claude call failed
 
@@ -103,8 +104,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
         return;
       }
 
-      // Save full result to Supabase (fire-and-forget)
-      SupabaseService.saveDiagnosis(
+      // Save full result to Supabase; capture the row id for the human
+      // confirmation write-back (Mkulima feedback -> label_source='human').
+      final savedId = await SupabaseService.saveDiagnosis(
         cropName: req.cropName,
         claudeResponse: result,
         photoPath: req.imagePath,
@@ -112,8 +114,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
         gpsLng: req.gpsLng,
         mkulimaResult: mkulima,
       );
-
-      setState(() { _verifying = false; _verification = result; });
+      if (!mounted) return;
+      setState(() {
+        _verifying = false;
+        _verification = result;
+        _savedDiagnosisId = savedId;
+      });
+      return;
     } catch (e) {
       if (!mounted) return;
       setState(() { _verifying = false; _verifyError = e.toString(); });
@@ -161,8 +168,16 @@ class _ResultsScreenState extends State<ResultsScreen> {
       return {'error': true, 'message': 'Uhakiki wa picha umeshindwa. Jaribu tena.'};
     }
     // Both tiers tried, still not confident -> needs expert review.
+    // (Still saved as a row — failed/uncertain cases are valuable training data.)
     if (routing.state == ScanRoutingState.needsExpert) {
-      return {'needs_expert': true, 'is_healthy': false, 'image_quality_ok': true};
+      return {
+        'needs_expert': true,
+        'is_healthy': false,
+        'image_quality_ok': true,
+        'source': 'gemini-${routing.tier}',
+        'final_label': 'Unknown',
+        'escalation_reason': routing.escalationReason,
+      };
     }
 
     final g = routing.gemini;
@@ -176,6 +191,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
     map['routing_state'] =
         routing.state == ScanRoutingState.uncertain ? 'uncertain' : 'confident';
+    map['escalation_reason'] = routing.escalationReason;
     return map;
   }
 
@@ -322,6 +338,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
               _MkulimaCard(
                 result: widget.mkulimaResult!,
                 imagePath: widget.imagePath,
+                diagnosisId: _savedDiagnosisId,
               ),
 
             if (widget.mkulimaResult != null)
@@ -1023,7 +1040,9 @@ const _kMkulimaRed = Color(0xFFB71C1C);
 class _MkulimaCard extends StatefulWidget {
   final MkulimaResult result;
   final String imagePath;
-  const _MkulimaCard({required this.result, required this.imagePath});
+  final String? diagnosisId; // for the human-confirmation write-back
+  const _MkulimaCard(
+      {required this.result, required this.imagePath, this.diagnosisId});
 
   @override
   State<_MkulimaCard> createState() => _MkulimaCardState();
@@ -1385,6 +1404,15 @@ class _MkulimaCardState extends State<_MkulimaCard> {
                                           ? widget.result.zao
                                           : null,
                                     );
+                                    // Human confirmed -> stamp the diagnoses row.
+                                    if (widget.diagnosisId != null) {
+                                      SupabaseService.confirmDiagnosisLabel(
+                                        diagnosisId: widget.diagnosisId!,
+                                        finalLabel: widget.result.jinaEn.isNotEmpty
+                                            ? widget.result.jinaEn
+                                            : widget.result.jinaSw,
+                                      );
+                                    }
                                   },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),

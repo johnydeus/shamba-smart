@@ -125,7 +125,13 @@ class ClaudeApiBridge {
       };
     }
     if (routing.state == ScanRoutingState.needsExpert) {
-      return {'needs_expert': true, 'is_healthy': false};
+      return {
+        'needs_expert': true,
+        'is_healthy': false,
+        'source': 'gemini-${routing.tier}',
+        'final_label': 'Unknown',
+        'escalation_reason': routing.escalationReason,
+      };
     }
 
     final g = routing.gemini;
@@ -140,6 +146,7 @@ class ClaudeApiBridge {
     );
     map['routing_state'] =
         routing.state == ScanRoutingState.uncertain ? 'uncertain' : 'confident';
+    map['escalation_reason'] = routing.escalationReason;
     return map;
   }
 

@@ -7,7 +7,9 @@ class GeminiRoutingResult {
   final Map<String, dynamic> gemini; // final raw gemini-proxy JSON
   final String tier; // 'flash-lite' or 'flash'
   final ScanRoutingState state;
-  const GeminiRoutingResult(this.gemini, this.tier, this.state);
+  final String? escalationReason; // why Flash was tried; null if never escalated
+  const GeminiRoutingResult(this.gemini, this.tier, this.state,
+      {this.escalationReason});
 }
 
 /// Calls the `gemini-proxy` edge function for crop image CLASSIFICATION.
@@ -84,10 +86,17 @@ class GeminiScanService {
 
     final conf1 = (g1['confidence'] as num?)?.toDouble() ?? 0;
     final unknown1 = _isUnknownLabel(g1['top_prediction'] as String?);
-    final mustEscalate = conf1 < _uncertainMin ||
-        unknown1 ||
-        g1['needs_flash_escalation'] == true ||
-        _poorButUsable(g1);
+    // Reason recorded for retraining (and to drive the one escalation).
+    final reason = unknown1
+        ? 'unknown'
+        : conf1 < _uncertainMin
+            ? 'low_confidence'
+            : g1['needs_flash_escalation'] == true
+                ? 'flagged'
+                : _poorButUsable(g1)
+                    ? 'poor_image'
+                    : null;
+    final mustEscalate = reason != null;
     // TODO Phase 4b: also escalate on multi-image disagreement or by user role
     // (Afisa/paid/NGO/government) once those signals are available at scan time.
 
@@ -111,8 +120,9 @@ class GeminiScanService {
     if (g2['error'] != null) {
       // Flash failed — judge by the Flash-Lite result we already have.
       final ok = conf1 >= _uncertainMin && !unknown1;
-      return GeminiRoutingResult(
-          g1, 'flash-lite', ok ? ScanRoutingState.uncertain : ScanRoutingState.needsExpert);
+      return GeminiRoutingResult(g1, 'flash-lite',
+          ok ? ScanRoutingState.uncertain : ScanRoutingState.needsExpert,
+          escalationReason: reason);
     }
 
     final conf2 = (g2['confidence'] as num?)?.toDouble() ?? 0;
@@ -121,10 +131,11 @@ class GeminiScanService {
       final state = conf2 >= _confidentMin
           ? ScanRoutingState.confident
           : ScanRoutingState.uncertain;
-      return GeminiRoutingResult(g2, 'flash', state);
+      return GeminiRoutingResult(g2, 'flash', state, escalationReason: reason);
     }
     // Both tiers tried, still not confident -> needs expert review.
-    return GeminiRoutingResult(g2, 'flash', ScanRoutingState.needsExpert);
+    return GeminiRoutingResult(g2, 'flash', ScanRoutingState.needsExpert,
+        escalationReason: reason);
   }
 
   /// Step 1 of auto-detect: identify the CROP from a fixed candidate list.

@@ -7,8 +7,10 @@ class SupabaseService {
   // Get the Supabase client instance
   static SupabaseClient get _client => Supabase.instance.client;
 
-  // Save a diagnosis result to the diagnoses table
-  static Future<void> saveDiagnosis({
+  // Save a diagnosis result to the diagnoses table.
+  // Returns the inserted row id (used by the human-confirmation write-back),
+  // or null on failure. Fire-and-forget callers may ignore it.
+  static Future<String?> saveDiagnosis({
     required String cropName,
     required Map<String, dynamic> claudeResponse,
     required String photoPath,
@@ -48,10 +50,79 @@ class SupabaseService {
         row.addAll(mkulimaResult.toSupabaseRow());
       }
 
-      await _client.from('diagnoses').insert(row);
+      // ── Retraining capture (Phase 5): describe EVERY scan's true origin ──
+      // Derived from the shown result map, AFTER the Mkulima addAll above so the
+      // legacy `source`/`model_version` columns are untouched.
+      row.addAll(_retrainingMeta(claudeResponse));
+
+      final inserted =
+          await _client.from('diagnoses').insert(row).select('id').limit(1);
+      if (inserted.isNotEmpty) return inserted.first['id']?.toString();
+      return null;
     } catch (e) {
       // Print error but don't crash the app — diagnosis still shows on screen
       debugPrint('Error saving diagnosis: $e');
+      return null;
+    }
+  }
+
+  // Map the shown result -> {model_used, final_label, label_source,
+  // escalation_reason}. Honest for every path: Mkulima, Gemini flash-lite/flash,
+  // needs-expert, and the flag-off Claude path.
+  static Map<String, dynamic> _retrainingMeta(Map<String, dynamic> resp) {
+    final src = (resp['source'] as String?) ?? '';
+    final needsExpert = resp['needs_expert'] == true;
+    final healthy = resp['is_healthy'] == true;
+
+    String modelUsed;
+    String labelSource;
+    if (src == 'gemini-flash') {
+      modelUsed = 'gemini-flash';
+      labelSource = 'flash';
+    } else if (src == 'gemini-flash-lite') {
+      modelUsed = 'gemini-flash-lite';
+      labelSource = 'flash-lite';
+    } else if (src.startsWith('mkulima')) {
+      modelUsed = 'mkulima_v2';
+      labelSource = 'mobilenet';
+    } else {
+      // claude_vision (single-stage) OR the flag-off Claude verify (no source).
+      modelUsed = 'claude';
+      labelSource = 'claude';
+    }
+
+    String? finalLabel;
+    if (healthy) {
+      finalLabel = 'Healthy';
+    } else {
+      finalLabel = (resp['final_label'] ??
+              resp['final_diagnosis_en'] ??
+              resp['disease_name_en']) as String? ??
+          (needsExpert ? 'Unknown' : null);
+    }
+
+    return {
+      'model_used': modelUsed,
+      'final_label': finalLabel,
+      'label_source': labelSource,
+      'escalation_reason':
+          resp['escalation_reason'] as String? ?? (needsExpert ? 'needs_expert' : null),
+    };
+  }
+
+  // Human confirmation/correction write-back: a farmer/agronomist confirmed (or
+  // corrected) the shown label. Updates the SAME diagnoses row.
+  static Future<void> confirmDiagnosisLabel({
+    required String diagnosisId,
+    required String finalLabel,
+  }) async {
+    try {
+      await _client.from('diagnoses').update({
+        'final_label': finalLabel,
+        'label_source': 'human',
+      }).eq('id', diagnosisId);
+    } catch (e) {
+      debugPrint('confirmDiagnosisLabel error: $e');
     }
   }
 
