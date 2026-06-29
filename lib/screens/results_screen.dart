@@ -847,6 +847,57 @@ class _NeedsExpertCard extends StatelessWidget {
   }
 }
 
+/// Bottom sheet to pick the correct label after "Hapana, Si Hilo".
+/// [options] = (englishCanonicalLabel, swahiliDisplay) for this crop's taxonomy.
+/// Returns the chosen English label, or null if dismissed.
+class _CorrectionSheet extends StatelessWidget {
+  final List<MapEntry<String, String>> options;
+  const _CorrectionSheet({required this.options});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Ni ugonjwa gani sahihi?',
+                style: GoogleFonts.poppins(
+                    fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('Chagua jibu sahihi (au funga kama hujui).',
+                style: GoogleFonts.poppins(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: options
+                  .map((o) => ActionChip(
+                        label: Text(o.value,
+                            style: const TextStyle(fontSize: 13)),
+                        backgroundColor: AppColors.primarySoft,
+                        onPressed: () => Navigator.pop(context, o.key),
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Funga'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DiseaseGradientBanner extends StatelessWidget {
   final String diseaseSw;
   final String diseaseEn;
@@ -1078,6 +1129,46 @@ class _MkulimaCardState extends State<_MkulimaCard> {
         return _kMkulimaOrange;
       default:
         return _kMkulimaGreen;
+    }
+  }
+
+  // "Hapana, Si Hilo": always record the rejection for the training loop (as
+  // before), then let the farmer pick the correct label from this crop's
+  // taxonomy in one tap. Picking -> human-corrected row (label_source='human').
+  // Skipping -> current behavior (AI label kept).
+  Future<void> _handleReject() async {
+    setState(() {
+      _feedbackPositive = false;
+      _feedbackSubmitted = true;
+    });
+    SupabaseService.submitTrainingFeedback(
+      diseaseKey: widget.result.diseaseKey,
+      isCorrect: false,
+      imagePath: widget.imagePath,
+      cropName: widget.result.zao.isNotEmpty ? widget.result.zao : null,
+    );
+
+    // Only offer correction when we have a saved row to update.
+    if (widget.diagnosisId == null) return;
+
+    await ScanTaxonomy().ensureLoaded();
+    final english = ScanTaxonomy().allowedLabelsForCrop(widget.result.zao);
+    final options = english
+        .where((e) => e != 'Unknown')
+        .map((e) => MapEntry(
+            e, ScanTaxonomy().localizeByEnglish(e)?['jina_swahili'] as String? ?? e))
+        .toList();
+    if (!mounted || options.isEmpty) return;
+
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (_) => _CorrectionSheet(options: options),
+    );
+    if (picked != null && widget.diagnosisId != null) {
+      await SupabaseService.confirmDiagnosisLabel(
+        diagnosisId: widget.diagnosisId!,
+        finalLabel: picked,
+      );
     }
   }
 
@@ -1454,22 +1545,7 @@ class _MkulimaCardState extends State<_MkulimaCard> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: GestureDetector(
-                            onTap: _feedbackSubmitted
-                                ? null
-                                : () {
-                                    setState(() {
-                                      _feedbackPositive = false;
-                                      _feedbackSubmitted = true;
-                                    });
-                                    SupabaseService.submitTrainingFeedback(
-                                      diseaseKey: widget.result.diseaseKey,
-                                      isCorrect: false,
-                                      imagePath: widget.imagePath,
-                                      cropName: widget.result.zao.isNotEmpty
-                                          ? widget.result.zao
-                                          : null,
-                                    );
-                                  },
+                            onTap: _feedbackSubmitted ? null : _handleReject,
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.symmetric(
