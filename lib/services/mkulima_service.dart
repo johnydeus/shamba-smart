@@ -128,7 +128,8 @@ class MkulimaService {
     }
   }
 
-  Future<MkulimaResult?> analyze(File imageFile) async {
+  Future<MkulimaResult?> analyze(File imageFile,
+      {bool bypassPlantGate = false}) async {
     if (!_initialized) await initialize();
     if (_interpreter == null || _classNames.isEmpty) return null;
 
@@ -141,7 +142,9 @@ class MkulimaService {
           img.copyResize(rawImage, width: _inputSize, height: _inputSize);
 
       // Gate 1: plant check — reject if < 15% of pixels are green-dominant.
-      if (_greenPixelRatio(resized) < 0.15) {
+      // Skipped when the farmer has confirmed a valid non-leaf photo
+      // (cob/fruit/stem) via the warning dialog. Threshold unchanged.
+      if (!bypassPlantGate && _greenPixelRatio(resized) < 0.15) {
         return MkulimaResult(
           diseaseKey: 'rejected_no_plant',
           confidence: 0,

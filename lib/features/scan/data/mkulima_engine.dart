@@ -11,7 +11,8 @@ class MkulimaEngine {
 
   Future<void> ensureReady() => _service.initialize();
 
-  Future<MkulimaResult?> analyze(File imageFile) => _service.analyze(imageFile);
+  Future<MkulimaResult?> analyze(File imageFile, {bool bypassPlantGate = false}) =>
+      _service.analyze(imageFile, bypassPlantGate: bypassPlantGate);
 
   /// Build a diagnosis map from on-device results when cloud is unavailable.
   Map<String, dynamic> diagnosisFromMkulima(

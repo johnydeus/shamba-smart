@@ -143,6 +143,30 @@ class _ScanScreenState extends State<ScanScreen>
     if (photo != null) setState(() => _selectedImage = File(photo.path));
   }
 
+  // Gate 1 warning: green-pixel ratio is low, but the farmer may have shot a
+  // non-leaf part on purpose. Returns true = "Endelea", false/null = retake.
+  Future<bool?> _showPlantGateDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Picha hii haionekani kama jani la kawaida'),
+        content: const Text(
+            'Ukiwa unapiga picha ya gunzi, tunda, au shina (si jani), hii ni '
+            'sawa. Je, uendelee na uchunguzi?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Badilisha Picha'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Endelea'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _analysePhoto() async {
     if (_selectedImage == null) return;
     HapticFeedback.mediumImpact();
@@ -178,7 +202,28 @@ class _ScanScreenState extends State<ScanScreen>
 
     // ── Disease scans: two-stage flow (Mkulima fast → Claude verify) ──────────
     if (_selectedScanType == 'ugonjwa') {
-      final preliminary = await scanProvider.mkulimaOnlyAnalyze(request);
+      var preliminary = await scanProvider.mkulimaOnlyAnalyze(request);
+
+      // Gate 1 (green-pixel): warn instead of hard-block. Only the farmer knows
+      // if they intentionally shot a cob/fruit/stem. Ask; on "Endelea" re-run
+      // bypassing Gate 1 (Gate 2 / low-confidence handling stays intact).
+      if (preliminary != null &&
+          preliminary.diagnosis['gate1_no_plant'] == true) {
+        if (!mounted) return;
+        setState(() { _analysing = false; _statusMessage = ''; });
+        _bracketCtrl.repeat(reverse: true);
+
+        final proceed = await _showPlantGateDialog();
+        if (proceed != true) return; // "Badilisha Picha" -> retake
+
+        setState(() {
+          _analysing = true;
+          _statusMessage = 'Mkulima AI inachunguza picha...';
+        });
+        _bracketCtrl.stop();
+        preliminary =
+            await scanProvider.mkulimaOnlyAnalyze(request, bypassPlantGate: true);
+      }
 
       if (!mounted) return;
       setState(() { _analysing = false; _statusMessage = ''; });

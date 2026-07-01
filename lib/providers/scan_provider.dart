@@ -25,14 +25,16 @@ class ScanProvider extends ChangeNotifier {
 
   /// Mkulima-only fast path for the two-stage disease scan flow.
   /// Returns a preliminary [ScanResult] (or error) in < 500 ms.
-  Future<ScanResult?> mkulimaOnlyAnalyze(ScanRequest request) async {
+  Future<ScanResult?> mkulimaOnlyAnalyze(ScanRequest request,
+      {bool bypassPlantGate = false}) async {
     _phase = ScanPhase.mkulima;
     _statusMessage = 'Mkulima AI inachunguza picha...';
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final result = await _service.mkulimaOnlyAnalyze(request);
+      final result = await _service.mkulimaOnlyAnalyze(request,
+          bypassPlantGate: bypassPlantGate);
 
       if (result == null || result.hasError) {
         _phase = ScanPhase.error;

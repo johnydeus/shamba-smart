@@ -27,10 +27,12 @@ class ScanAnalysisService {
   /// - `ScanResult` with `mkulimaResult` populated on success
   /// - `ScanResult` with `error: true` when the image is not a plant
   /// - `null` when the model is unavailable
-  Future<ScanResult?> mkulimaOnlyAnalyze(ScanRequest request) async {
+  Future<ScanResult?> mkulimaOnlyAnalyze(ScanRequest request,
+      {bool bypassPlantGate = false}) async {
     final imageFile = File(request.imagePath);
 
-    final mkulimaResult = await _mkulima.analyze(imageFile);
+    final mkulimaResult =
+        await _mkulima.analyze(imageFile, bypassPlantGate: bypassPlantGate);
 
     // Model not loaded (first launch race / init failure)
     if (mkulimaResult == null) {
@@ -49,12 +51,14 @@ class ScanAnalysisService {
       );
     }
 
-    // Gate 1: not a plant — stop entirely, don't send to Claude.
+    // Gate 1: not a plant. Tagged so scan_screen can ASK the farmer (they may
+    // have intentionally photographed a cob/fruit/stem) instead of hard-blocking.
     if (mkulimaResult.isRejected &&
         mkulimaResult.diseaseKey == 'rejected_no_plant') {
       return ScanResult(
         diagnosis: {
           'error': true,
+          'gate1_no_plant': true,
           'message': mkulimaResult.rejectionReason ??
               'Hii haionekani kama mmea wa kilimo. '
                   'Piga picha ya jani la zao lako.',
