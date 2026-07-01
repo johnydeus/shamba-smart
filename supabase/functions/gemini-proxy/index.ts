@@ -35,21 +35,31 @@ function buildPrompt(
   problemType: string,
   allowedLabels: string[],
 ): string {
-  const labelList = allowedLabels.length
-    ? allowedLabels.map((l) => `- ${l}`).join('\n')
-    : '(no labels provided)'
+  const isPestOrWeed = problemType === 'pest' || problemType === 'weed'
+
+  // OPEN detection for pests/weeds with no closed list — identify the real
+  // species from the model's own knowledge, same honesty rule (no inventing;
+  // "Unknown" if unsure). Disease (and any call WITH labels) stays LOCKED.
+  const identificationRule = (isPestOrWeed && allowedLabels.length === 0)
+    ? `OPEN IDENTIFICATION — identify the actual ${problemType} in the image by
+its real, known species or common name (English), using your own knowledge of
+Tanzanian agriculture. You are NOT restricted to a fixed list. RULES: only
+return a real, established ${problemType} name — NEVER invent one. If you cannot
+identify it with reasonable confidence, set "top_prediction" to "Unknown" and
+"needs_human_confirmation" to true.`
+    : `TAXONOMY LOCK — you may ONLY choose "top_prediction" and any
+"alternative_predictions[].label" from this exact allowed list:
+${allowedLabels.length ? allowedLabels.map((l) => `- ${l}`).join('\n') : '(no labels provided)'}
+
+If the image does not clearly match ANY label in the list, you MUST set
+"top_prediction" to "Unknown" and "needs_human_confirmation" to true. NEVER
+invent a disease/pest/weed name that is not in the list.`
 
   return `You are an agricultural image classifier for Tanzanian crops.
 Crop: ${cropType || 'unknown'}
 Problem type to assess: ${problemType || 'disease'}
 
-TAXONOMY LOCK — you may ONLY choose "top_prediction" and any
-"alternative_predictions[].label" from this exact allowed list:
-${labelList}
-
-If the image does not clearly match ANY label in the list, you MUST set
-"top_prediction" to "Unknown" and "needs_human_confirmation" to true. NEVER
-invent a disease/pest/weed name that is not in the list.
+${identificationRule}
 
 Assess image quality (blurry, too dark, too far, leaf not centered, fine).
 Set "needs_flash_escalation" to true if the image is hard/ambiguous and a

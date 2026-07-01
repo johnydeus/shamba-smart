@@ -106,7 +106,13 @@ class ClaudeApiBridge {
       }
       crop = detected;
     }
-    final allowed = ScanTaxonomy().allowedLabelsForCrop(crop);
+    // Diseases stay taxonomy-locked (closed list). Pests/weeds use OPEN
+    // detection: an empty list tells gemini-proxy to identify the real
+    // species from its own knowledge (same "never invent / Unknown if unsure"
+    // rule) instead of being forced to pick a disease name.
+    final allowed = problemType == 'disease'
+        ? ScanTaxonomy().allowedLabelsForCrop(crop)
+        : const <String>[];
 
     // Flash-Lite first; auto-escalate to Flash on low-confidence/Unknown/
     // flagged/poor-but-usable (one retry, cost-controlled).

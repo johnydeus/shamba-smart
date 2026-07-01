@@ -45,7 +45,12 @@ class ScanResult {
       return 'Mkulima AI — Bila Mtandao';
     }
     final cloudSource = diagnosis['source'] as String?;
+    // Reflect the REAL engine when Gemini ran (flag-on). Checked first so a
+    // Gemini result is never mislabelled as "Plant.id + Claude".
+    if (cloudSource == 'gemini-flash-lite') return 'Gemini Flash-Lite';
+    if (cloudSource == 'gemini-flash') return 'Gemini Flash';
     if (cloudSource == 'claude_vision') return 'Claude Vision';
+    // Legacy flag-off fallback — unchanged.
     return switch (source) {
       ScanSource.mkulimaOnly => 'Mkulima AI',
       ScanSource.cloud => 'Plant.id + Claude',
