@@ -96,7 +96,9 @@ class _FindAgrovetsScreenState extends State<FindAgrovetsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final role = context.watch<AuthProvider>().currentUser?.role;
+    final user = context.watch<AuthProvider>().currentUser;
+    final isDuka = user?.role == UserRole.biashara &&
+        user?.biasharaType == BiasharaType.duka;
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: widget.embedded
@@ -108,7 +110,7 @@ class _FindAgrovetsScreenState extends State<FindAgrovetsScreen> {
                   style: GoogleFonts.playfairDisplay(
                       color: Colors.white, fontWeight: FontWeight.bold)),
             ),
-      floatingActionButton: role == UserRole.duka
+      floatingActionButton: isDuka
           ? FloatingActionButton.extended(
               backgroundColor: AppColors.primary,
               icon: const Icon(Icons.add_business, color: Colors.white),

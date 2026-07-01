@@ -24,6 +24,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Step 1 = pick role, Step 2 = fill form
   int _step = 1;
   UserRole? _selectedRole;
+  BiasharaType? _biasharaType; // sub-type chosen when role == biashara
   bool _loading = false;
   bool _passwordVisible = false;
   String _errorMessage = '';
@@ -81,24 +82,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'color': const Color(0xFF2E7D32),
         },
         {
-          'role': UserRole.duka,
-          'emoji': '🏪',
-          'title': 'Duka la Dawa',
-          'subtitle': 'Nauza pembejeo za kilimo',
-          'color': const Color(0xFF1565C0),
-        },
-        {
-          'role': UserRole.muuzaji,
-          'emoji': '📈',
-          'title': 'Muuzaji/Dalali',
-          'subtitle': 'Ninunua na kuuza mazao',
-          'color': const Color(0xFF6A1B9A),
-        },
-        {
-          'role': UserRole.mwekezaji,
+          'role': UserRole.biashara,
           'emoji': '💼',
-          'title': 'Mwekezaji',
-          'subtitle': 'Nawekeza katika kilimo',
+          'title': 'Biashara',
+          'subtitle': 'Duka la dawa, muuzaji/dalali au mwekezaji',
           'color': const Color(0xFFC8860A),
         },
         {
@@ -111,12 +98,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ];
 
   Future<void> _submit() async {
+    // Biashara accounts must choose an "Aina ya Biashara" first.
+    if (_selectedRole == UserRole.biashara && _biasharaType == null) {
+      setState(() => _errorMessage = 'Chagua aina ya biashara.');
+      return;
+    }
+
     setState(() {
       _loading = true;
       _errorMessage = '';
     });
 
     final auth = context.read<AuthProvider>();
+    final isBiashara = _selectedRole == UserRole.biashara;
 
     final error = await auth.register(
       firstName: _firstNameCtrl.text,
@@ -125,6 +119,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       password: _passwordCtrl.text,
       region: _region,
       role: _selectedRole!,
+      biasharaType: isBiashara ? _biasharaType : null,
       organization: _selectedRole == UserRole.afisa
           ? _organizationCtrl.text.trim()
           : null,
@@ -133,18 +128,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
           : null,
       district:
           _selectedRole == UserRole.afisa ? _afikasDistrict : null,
-      shopName: _selectedRole == UserRole.duka
+      shopName: _biasharaType == BiasharaType.duka
           ? _shopNameCtrl.text.trim()
           : null,
       productType:
-          _selectedRole == UserRole.duka ? _productType : null,
-      businessName: _selectedRole == UserRole.muuzaji
+          _biasharaType == BiasharaType.duka ? _productType : null,
+      businessName: _biasharaType == BiasharaType.muuzajiDalali
           ? _businessNameCtrl.text.trim()
           : null,
-      cropsTraded: _selectedRole == UserRole.muuzaji
+      cropsTraded: _biasharaType == BiasharaType.muuzajiDalali
           ? _cropsTradedCtrl.text.trim()
           : null,
-      investmentType: _selectedRole == UserRole.mwekezaji
+      investmentType: _biasharaType == BiasharaType.mwekezaji
           ? _investmentType
           : null,
     );
@@ -188,6 +183,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           setState(() {
                             _step = 1;
                             _selectedRole = null;
+                            _biasharaType = null;
                           });
                         } else {
                           Navigator.pop(context);
@@ -419,10 +415,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           // ── Role-specific fields ───────────────────────────────────
           // Note: mkulima farm data is collected after registration
           // via FarmsScreen to support multiple farms per farmer
-          if (_selectedRole == UserRole.duka) ..._dukaFields(),
+          if (_selectedRole == UserRole.biashara) ..._biasharaTypePicker(),
+          if (_biasharaType == BiasharaType.duka) ..._dukaFields(),
+          if (_biasharaType == BiasharaType.muuzajiDalali) ..._muuzajiFields(),
+          if (_biasharaType == BiasharaType.mwekezaji) ..._mwekezajiFields(),
           if (_selectedRole == UserRole.afisa) ..._afisaFields(),
-          if (_selectedRole == UserRole.muuzaji) ..._muuzajiFields(),
-          if (_selectedRole == UserRole.mwekezaji) ..._mwekezajiFields(),
 
           // Error message
           if (_errorMessage.isNotEmpty) ...[
@@ -478,6 +475,60 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // ── Role-specific field groups ─────────────────────────────────────────────
 
+  // Aina ya Biashara selector — shown for the merged Biashara role. Choosing a
+  // type reveals the matching detail fields below.
+  List<Widget> _biasharaTypePicker() {
+    const options = [
+      (BiasharaType.duka, '🏪', 'Duka la Dawa'),
+      (BiasharaType.muuzajiDalali, '📈', 'Muuzaji/Dalali'),
+      (BiasharaType.mwekezaji, '💰', 'Mwekezaji'),
+    ];
+    return [
+      Text('Aina ya Biashara',
+          style: GoogleFonts.dmSans(
+              color: Colors.white70, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: options.map((o) {
+          final selected = _biasharaType == o.$1;
+          return GestureDetector(
+            onTap: () => setState(() => _biasharaType = o.$1),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: selected
+                    ? const Color(0xFFC8860A)
+                    : Colors.white10,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: selected
+                        ? const Color(0xFFC8860A)
+                        : Colors.white24,
+                    width: selected ? 2 : 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(o.$2, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
+                  Text(o.$3,
+                      style: TextStyle(
+                          color: selected ? Colors.white : Colors.white70,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13)),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 16),
+    ];
+  }
 
   List<Widget> _dukaFields() => [
         Text('Taarifa za Duka',

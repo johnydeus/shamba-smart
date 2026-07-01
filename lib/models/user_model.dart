@@ -1,5 +1,11 @@
-// User roles supported by Shamba Smart
-enum UserRole { mkulima, duka, muuzaji, mwekezaji, afisa }
+// User roles supported by Shamba Smart.
+// The former separate `duka`, `muuzaji` and `mwekezaji` roles are now merged
+// into a single `biashara` role with an internal [BiasharaType] sub-type.
+enum UserRole { mkulima, biashara, afisa }
+
+// Sub-type of a Biashara account. Preserves the Duka (agrovet directory) and
+// Mwekezaji / Muuzaji-Dalali distinctions without needing separate roles.
+enum BiasharaType { duka, mwekezaji, muuzajiDalali }
 
 enum ProductType { pesticides, fertilizers, seeds, tools, all }
 enum InvestmentType { landLease, projectFunding, bulkPurchase, infrastructure }
@@ -8,32 +14,57 @@ extension UserRoleX on UserRole {
   String get key => name;
 
   String get label => switch (this) {
-        UserRole.mkulima   => 'Mkulima',
-        UserRole.duka      => 'Duka la Dawa',
-        UserRole.muuzaji   => 'Muuzaji/Dalali',
-        UserRole.mwekezaji => 'Mwekezaji',
-        UserRole.afisa     => 'Afisa Kilimo',
+        UserRole.mkulima  => 'Mkulima',
+        UserRole.biashara => 'Biashara',
+        UserRole.afisa    => 'Afisa Kilimo',
       };
 
   String get shortLabel => switch (this) {
-        UserRole.mkulima   => 'Mkulima',
-        UserRole.duka      => 'Duka',
-        UserRole.muuzaji   => 'Muuzaji',
-        UserRole.mwekezaji => 'Mwekezaji',
-        UserRole.afisa     => 'Afisa',
+        UserRole.mkulima  => 'Mkulima',
+        UserRole.biashara => 'Biashara',
+        UserRole.afisa    => 'Afisa',
       };
 
   String get colorHex => switch (this) {
-        UserRole.mkulima   => '#2E7D32',
-        UserRole.duka      => '#1565C0',
-        UserRole.muuzaji   => '#6A1B9A',
-        UserRole.mwekezaji => '#C8860A',
-        UserRole.afisa     => '#00695C',
+        UserRole.mkulima  => '#2E7D32',
+        UserRole.biashara => '#C8860A',
+        UserRole.afisa    => '#00695C',
       };
 
-  static UserRole fromKey(String key) =>
-      UserRole.values.firstWhere((r) => r.key == key,
-          orElse: () => UserRole.mkulima);
+  // Legacy-tolerant: pre-merge accounts stored role='duka'/'muuzaji'/'mwekezaji'
+  // in the DB and in cached profiles. Map those to `biashara` so old rows and
+  // stale caches never crash or fall back to the wrong role.
+  static UserRole fromKey(String key) {
+    if (key == 'duka' || key == 'muuzaji' || key == 'mwekezaji') {
+      return UserRole.biashara;
+    }
+    return UserRole.values.firstWhere((r) => r.key == key,
+        orElse: () => UserRole.mkulima);
+  }
+}
+
+extension BiasharaTypeX on BiasharaType {
+  String get key => switch (this) {
+        BiasharaType.duka          => 'duka',
+        BiasharaType.mwekezaji     => 'mwekezaji',
+        BiasharaType.muuzajiDalali => 'muuzaji_dalali',
+      };
+
+  String get label => switch (this) {
+        BiasharaType.duka          => 'Duka la Dawa',
+        BiasharaType.mwekezaji     => 'Mwekezaji',
+        BiasharaType.muuzajiDalali => 'Muuzaji/Dalali',
+      };
+
+  // Accepts the new `biashara_type` values AND the legacy role keys, so a
+  // sub-type can be reconstructed from either column during/after migration.
+  static BiasharaType? fromKey(String? key) => switch (key) {
+        'duka'           => BiasharaType.duka,
+        'mwekezaji'      => BiasharaType.mwekezaji,
+        'muuzaji_dalali' => BiasharaType.muuzajiDalali,
+        'muuzaji'        => BiasharaType.muuzajiDalali,
+        _                => null,
+      };
 }
 
 class UserModel {
@@ -51,6 +82,9 @@ class UserModel {
   // Mkulima fields
   final double? farmSize;
   final String? mainCrops;
+
+  // Biashara sub-type (duka / mwekezaji / muuzaji_dalali). Null for non-biashara.
+  final BiasharaType? biasharaType;
 
   // Duka fields
   final String? shopName;
@@ -84,6 +118,7 @@ class UserModel {
     this.salesCount = 0,
     this.farmSize,
     this.mainCrops,
+    this.biasharaType,
     this.shopName,
     this.productType,
     this.businessName,
@@ -115,6 +150,10 @@ class UserModel {
         salesCount: (j['sales_count'] as int?) ?? 0,
         farmSize: (j['farm_size'] as num?)?.toDouble(),
         mainCrops: j['main_crops'] as String?,
+        // Prefer the explicit biashara_type column; fall back to the (possibly
+        // legacy) role key so rows read before the backfill still resolve.
+        biasharaType: BiasharaTypeX.fromKey(j['biashara_type'] as String?) ??
+            BiasharaTypeX.fromKey(j['role'] as String?),
         shopName: j['shop_name'] as String?,
         productType: j['product_type'] as String?,
         businessName: j['business_name'] as String?,
@@ -123,8 +162,11 @@ class UserModel {
         organization: j['organization'] as String?,
         badgeNumber: j['badge_number'] as String?,
         district: j['district'] as String?,
+        // De-duplicate: legacy arrays may hold several business keys
+        // (duka/muuzaji/mwekezaji) that all collapse to `biashara`.
         allRoles: (j['all_roles'] as List?)
             ?.map((r) => UserRoleX.fromKey(r as String))
+            .toSet()
             .toList(),
       );
 
@@ -142,6 +184,8 @@ class UserModel {
         salesCount: (j['salesCount'] as int?) ?? 0,
         farmSize: (j['farmSize'] as num?)?.toDouble(),
         mainCrops: j['mainCrops'] as String?,
+        biasharaType: BiasharaTypeX.fromKey(j['biasharaType'] as String?) ??
+            BiasharaTypeX.fromKey(j['role'] as String?),
         shopName: j['shopName'] as String?,
         productType: j['productType'] as String?,
         businessName: j['businessName'] as String?,
@@ -150,9 +194,11 @@ class UserModel {
         organization: j['organization'] as String?,
         badgeNumber: j['badgeNumber'] as String?,
         district: j['district'] as String?,
-        // Backward compat: existing users without allRoles default to [role]
+        // Backward compat: existing users without allRoles default to [role].
+        // De-duplicate so legacy business keys collapse to a single `biashara`.
         allRoles: (j['allRoles'] as List?)
             ?.map((r) => UserRoleX.fromKey(r as String))
+            .toSet()
             .toList(),
       );
 
@@ -169,6 +215,7 @@ class UserModel {
         'salesCount': salesCount,
         if (farmSize != null) 'farmSize': farmSize,
         if (mainCrops != null) 'mainCrops': mainCrops,
+        if (biasharaType != null) 'biasharaType': biasharaType!.key,
         if (shopName != null) 'shopName': shopName,
         if (productType != null) 'productType': productType,
         if (businessName != null) 'businessName': businessName,

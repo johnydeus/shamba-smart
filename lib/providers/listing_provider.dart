@@ -145,7 +145,7 @@ class ListingProvider extends ChangeNotifier {
           seller: const SellerInfo(
             id: 'seller_002',
             name: 'AgriPlus Morogoro',
-            role: UserRole.duka,
+            role: UserRole.biashara,
             colorHex: '#1565C0',
           ),
           badgeText: 'TPRI ✓',
@@ -168,7 +168,7 @@ class ListingProvider extends ChangeNotifier {
           seller: const SellerInfo(
             id: 'seller_003',
             name: 'SeedPro Tanzania',
-            role: UserRole.duka,
+            role: UserRole.biashara,
             colorHex: '#1565C0',
           ),
           badgeText: 'TOSCI ✓',
@@ -192,7 +192,7 @@ class ListingProvider extends ChangeNotifier {
           seller: const SellerInfo(
             id: 'seller_004',
             name: 'Musa Komba',
-            role: UserRole.mwekezaji,
+            role: UserRole.biashara,
             colorHex: '#C8860A',
           ),
           badgeText: 'Inapatikana',
@@ -240,7 +240,7 @@ class ListingProvider extends ChangeNotifier {
           seller: const SellerInfo(
             id: 'seller_006',
             name: 'AgroTech DSM',
-            role: UserRole.duka,
+            role: UserRole.biashara,
             colorHex: '#1565C0',
           ),
           badgeText: 'Hali Nzuri',
@@ -264,7 +264,7 @@ class ListingProvider extends ChangeNotifier {
           seller: const SellerInfo(
             id: 'seller_007',
             name: 'Mbogamboga Logistics',
-            role: UserRole.muuzaji,
+            role: UserRole.biashara,
             colorHex: '#6A1B9A',
           ),
           badgeText: 'Kila Wiki',
@@ -288,7 +288,7 @@ class ListingProvider extends ChangeNotifier {
           seller: const SellerInfo(
             id: 'seller_002',
             name: 'AgriPlus Morogoro',
-            role: UserRole.duka,
+            role: UserRole.biashara,
             colorHex: '#1565C0',
           ),
           badgeText: 'Bei ya Jumla',

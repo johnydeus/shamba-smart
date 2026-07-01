@@ -45,6 +45,7 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     required String region,
     required UserRole role,
+    BiasharaType? biasharaType,
     double? farmSize,
     String? mainCrops,
     String? shopName,
@@ -85,6 +86,7 @@ class AuthProvider extends ChangeNotifier {
           'email': cleanEmail,
           'region': region,
           'role': role.key,
+          'biashara_type': biasharaType?.key,
           'joined_at': now.toIso8601String(),
           'listing_count': 0,
           'sales_count': 0,
@@ -133,6 +135,7 @@ class AuthProvider extends ChangeNotifier {
         joinedAt: now,
         farmSize: farmSize,
         mainCrops: mainCrops,
+        biasharaType: biasharaType,
         shopName: shopName,
         productType: productType,
         businessName: businessName,
@@ -206,6 +209,7 @@ class AuthProvider extends ChangeNotifier {
   // Add a new role to the current user's account
   Future<String?> addRole({
     required UserRole role,
+    BiasharaType? biasharaType,
     String? shopName,
     String? productType,
     String? businessName,
@@ -224,6 +228,7 @@ class AuthProvider extends ChangeNotifier {
     _currentUser = _rebuildUser(
       _currentUser!,
       allRoles: updatedRoles,
+      biasharaType: biasharaType ?? _currentUser!.biasharaType,
       shopName: shopName ?? _currentUser!.shopName,
       productType: productType ?? _currentUser!.productType,
       businessName: businessName ?? _currentUser!.businessName,
@@ -236,6 +241,7 @@ class AuthProvider extends ChangeNotifier {
 
     await _updateProfile({
       'all_roles': updatedRoles.map((r) => r.key).toList(),
+      if (biasharaType != null) 'biashara_type': biasharaType.key,
       'shop_name': shopName,
       'product_type': productType,
       'business_name': businessName,
@@ -360,6 +366,7 @@ class AuthProvider extends ChangeNotifier {
     UserModel u, {
     UserRole? activeRole,
     List<UserRole>? allRoles,
+    BiasharaType? biasharaType,
     String? shopName,
     String? productType,
     String? businessName,
@@ -382,6 +389,7 @@ class AuthProvider extends ChangeNotifier {
         salesCount: u.salesCount,
         farmSize: u.farmSize,
         mainCrops: u.mainCrops,
+        biasharaType: biasharaType ?? u.biasharaType,
         shopName: shopName ?? u.shopName,
         productType: productType ?? u.productType,
         businessName: businessName ?? u.businessName,

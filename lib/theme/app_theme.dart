@@ -61,9 +61,7 @@ class AppColors {
 
   static Color roleColor(UserRole role) => switch (role) {
         UserRole.mkulima => const Color(0xFF2E7D32),
-        UserRole.duka => const Color(0xFF1565C0),
-        UserRole.muuzaji => const Color(0xFF6A1B9A),
-        UserRole.mwekezaji => const Color(0xFFC8860A),
+        UserRole.biashara => const Color(0xFFC8860A),
         UserRole.afisa => const Color(0xFF00695C),
       };
 }

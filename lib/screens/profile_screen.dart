@@ -162,12 +162,13 @@ class ProfileScreen extends StatelessWidget {
                           icon: Icons.landscape_outlined,
                           label: 'Ukubwa wa Shamba',
                           value: '${user.farmSize} Ekari'),
-                    if (user.role == UserRole.duka && user.shopName != null)
+                    if (user.biasharaType == BiasharaType.duka &&
+                        user.shopName != null)
                       _InfoTile(
                           icon: Icons.store_outlined,
                           label: 'Jina la Duka',
                           value: user.shopName!),
-                    if (user.role == UserRole.muuzaji &&
+                    if (user.biasharaType == BiasharaType.muuzajiDalali &&
                         user.businessName != null)
                       _InfoTile(
                           icon: Icons.business_outlined,
@@ -282,26 +283,17 @@ class ProfileScreen extends StatelessWidget {
           ),
           ..._commonTail(context, user),
         ],
-      UserRole.duka => [
-          _MenuItem(
-            icon: Icons.inventory_2_outlined,
-            title: 'Bidhaa Zangu',
-            subtitle: 'Angalia na simamia orodha yako',
-            color: color,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const MarketScreen())),
-          ),
-          _MenuItem(
-            icon: Icons.psychology_outlined,
-            title: 'Mshauri wa AI',
-            subtitle: 'Uliza maswali ya kilimo kwa Claude',
-            color: color,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const ForumScreen())),
-          ),
-          ..._commonTail(context, user),
-        ],
-      UserRole.muuzaji => [
+      UserRole.biashara => [
+          // Duka la Dawa manages an inventory; other biashara types don't.
+          if (user.biasharaType == BiasharaType.duka)
+            _MenuItem(
+              icon: Icons.inventory_2_outlined,
+              title: 'Bidhaa Zangu',
+              subtitle: 'Angalia na simamia orodha yako',
+              color: color,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const MarketScreen())),
+            ),
           _MenuItem(
             icon: Icons.psychology_outlined,
             title: 'Mshauri wa AI',
@@ -351,17 +343,6 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.psychology_outlined,
             title: 'Mshauri wa AI',
             subtitle: 'Uliza maswali ya kilimo kwa Claude',
-            color: color,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const ForumScreen())),
-          ),
-          ..._commonTail(context, user),
-        ],
-      UserRole.mwekezaji => [
-          _MenuItem(
-            icon: Icons.psychology_outlined,
-            title: 'Mshauri wa AI',
-            subtitle: 'Uliza maswali ya uwekezaji kwa Claude',
             color: color,
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const ForumScreen())),
@@ -701,6 +682,7 @@ class _AddRoleSheet extends StatefulWidget {
 
 class _AddRoleSheetState extends State<_AddRoleSheet> {
   UserRole? _selected;
+  BiasharaType? _biasharaType; // chosen when _selected == biashara
   final _shopNameCtrl = TextEditingController();
   final _businessCtrl = TextEditingController();
   final _orgCtrl = TextEditingController();
@@ -709,11 +691,9 @@ class _AddRoleSheetState extends State<_AddRoleSheet> {
   String? _error;
 
   static const Map<UserRole, Map<String, dynamic>> _roleMeta = {
-    UserRole.mkulima:   {'emoji': '🌿', 'color': Color(0xFF2E7D32)},
-    UserRole.duka:      {'emoji': '🏪', 'color': Color(0xFF1565C0)},
-    UserRole.muuzaji:   {'emoji': '📈', 'color': Color(0xFF6A1B9A)},
-    UserRole.mwekezaji: {'emoji': '💼', 'color': Color(0xFFC8860A)},
-    UserRole.afisa:     {'emoji': '🏛️', 'color': Color(0xFF00695C)},
+    UserRole.mkulima:  {'emoji': '🌿', 'color': Color(0xFF2E7D32)},
+    UserRole.biashara: {'emoji': '💼', 'color': Color(0xFFC8860A)},
+    UserRole.afisa:    {'emoji': '🏛️', 'color': Color(0xFF00695C)},
   };
 
   @override
@@ -727,13 +707,19 @@ class _AddRoleSheetState extends State<_AddRoleSheet> {
 
   Future<void> _save() async {
     if (_selected == null) return;
+    if (_selected == UserRole.biashara && _biasharaType == null) {
+      setState(() => _error = 'Chagua aina ya biashara.');
+      return;
+    }
     setState(() { _saving = true; _error = null; });
 
     final error = await context.read<AuthProvider>().addRole(
       role: _selected!,
-      shopName: _selected == UserRole.duka
+      biasharaType:
+          _selected == UserRole.biashara ? _biasharaType : null,
+      shopName: _biasharaType == BiasharaType.duka
           ? _shopNameCtrl.text.trim() : null,
-      businessName: _selected == UserRole.muuzaji
+      businessName: _biasharaType == BiasharaType.muuzajiDalali
           ? _businessCtrl.text.trim() : null,
       organization: _selected == UserRole.afisa
           ? _orgCtrl.text.trim() : null,
@@ -800,7 +786,10 @@ class _AddRoleSheetState extends State<_AddRoleSheet> {
                 final color = meta['color'] as Color;
                 final isSelected = _selected == role;
                 return GestureDetector(
-                  onTap: () => setState(() => _selected = role),
+                  onTap: () => setState(() {
+                    _selected = role;
+                    if (role != UserRole.biashara) _biasharaType = null;
+                  }),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(
@@ -839,11 +828,12 @@ class _AddRoleSheetState extends State<_AddRoleSheet> {
               const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 12),
-              if (_selected == UserRole.duka) ...[
+              if (_selected == UserRole.biashara) ..._biasharaTypeChips(),
+              if (_biasharaType == BiasharaType.duka) ...[
                 _buildField(_shopNameCtrl, 'Jina la Duka',
                     Icons.store_outlined),
               ],
-              if (_selected == UserRole.muuzaji) ...[
+              if (_biasharaType == BiasharaType.muuzajiDalali) ...[
                 _buildField(_businessCtrl, 'Jina la Biashara',
                     Icons.business_outlined),
               ],
@@ -855,7 +845,7 @@ class _AddRoleSheetState extends State<_AddRoleSheet> {
                     Icons.badge_outlined),
               ],
               if (_selected == UserRole.mkulima ||
-                  _selected == UserRole.mwekezaji)
+                  _biasharaType == BiasharaType.mwekezaji)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Container(
@@ -917,6 +907,57 @@ class _AddRoleSheetState extends State<_AddRoleSheet> {
         ),
       ),
     );
+  }
+
+  // Aina ya Biashara selector for the add-role sheet.
+  List<Widget> _biasharaTypeChips() {
+    const options = [
+      (BiasharaType.duka, '🏪', 'Duka la Dawa'),
+      (BiasharaType.muuzajiDalali, '📈', 'Muuzaji/Dalali'),
+      (BiasharaType.mwekezaji, '💰', 'Mwekezaji'),
+    ];
+    return [
+      Text('Aina ya Biashara',
+          style: GoogleFonts.dmSans(
+              fontWeight: FontWeight.w600, fontSize: 13)),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: options.map((o) {
+          final selected = _biasharaType == o.$1;
+          const color = Color(0xFFC8860A);
+          return GestureDetector(
+            onTap: () => setState(() => _biasharaType = o.$1),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected ? color : color.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: selected ? color : color.withValues(alpha: 0.3),
+                    width: selected ? 2 : 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(o.$2, style: const TextStyle(fontSize: 16)),
+                  const SizedBox(width: 6),
+                  Text(o.$3,
+                      style: TextStyle(
+                          color: selected ? Colors.white : color,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13)),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 16),
+    ];
   }
 
   Widget _buildField(TextEditingController ctrl, String hint, IconData icon) =>
