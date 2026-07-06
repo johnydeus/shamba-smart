@@ -18,7 +18,7 @@ import '../theme/app_theme.dart';
 import '../widgets/shamba_button.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/shamba_card.dart';
-import 'home_screen.dart';
+import 'main_shell.dart';
 import 'scan_screen.dart';
 import 'find_officer_screen.dart';
 
@@ -690,9 +690,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
               variant: ButtonVariant.ghost,
               fullWidth: true,
               onPressed: () {
+                // MainShell, not a bare HomeScreen — pushing HomeScreen
+                // directly drops the bottom nav until app restart.
                 Navigator.pushAndRemoveUntil(
                   context,
-                  FadeSlideRoute(page: const HomeScreen()),
+                  FadeSlideRoute(page: const MainShell()),
                   (route) => false,
                 );
               },

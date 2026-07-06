@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
-import 'home_screen.dart';
+import 'main_shell.dart';
 
 const List<String> kRegions = [
   'Arusha', 'Dar es Salaam', 'Dodoma', 'Geita', 'Iringa',
@@ -148,7 +148,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (error == null && mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        // MainShell, not a bare HomeScreen — pushing HomeScreen directly
+        // drops the bottom nav until app restart.
+        MaterialPageRoute(builder: (_) => const MainShell()),
         (route) => false,
       );
     } else {
