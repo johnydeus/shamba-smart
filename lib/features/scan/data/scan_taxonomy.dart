@@ -37,28 +37,41 @@ class ScanTaxonomy {
 
   String _en(Map e) => (e['jina_kiingereza'] as String?)?.trim() ?? '';
 
+  /// Scan-picker crop names (kCrops) that differ from the taxonomy `zao`
+  /// spelling. Normalised (lowercased) on both sides so the correct closed
+  /// list is used instead of silently falling through to open detection.
+  static const Map<String, String> _cropAliases = {
+    'chungwa': 'machungwa / mindimu',
+    'machungwa': 'machungwa / mindimu',
+    'stroberri': 'strawberry',
+    'straberi': 'strawberry',
+  };
+
   /// Allowed English labels for a Swahili crop name (e.g. "Nyanya").
   /// Always includes "Healthy" and "Unknown" so Gemini can pick a safe exit.
-  /// If the crop isn't found, returns ALL known labels (still taxonomy-locked).
+  ///
+  /// If the crop has NO taxonomy entry, returns an EMPTY list — the caller
+  /// then sends no labels, which tells gemini-proxy to use OPEN identification
+  /// (identify the real disease from the model's own knowledge, "Unknown" if
+  /// unsure) instead of being force-locked to an unrelated crop's diseases.
+  /// This is what makes coffee/cashew/etc. work without a wrong closed list.
   List<String> allowedLabelsForCrop(String cropSw) {
+    final target =
+        (_cropAliases[cropSw.trim().toLowerCase()] ?? cropSw.trim())
+            .toLowerCase();
     final labels = <String>{};
     for (final entry in _diseases.values) {
       if (entry is! Map) continue;
       final zao = (entry['zao'] as String?)?.trim() ?? '';
       final en = _en(entry);
       if (en.isEmpty) continue;
-      if (cropSw.isEmpty || zao.toLowerCase() == cropSw.toLowerCase()) {
+      if (cropSw.isEmpty || zao.toLowerCase() == target) {
         labels.add(en);
       }
     }
     if (labels.isEmpty) {
-      // No crop match — fall back to the full taxonomy.
-      for (final entry in _diseases.values) {
-        if (entry is Map) {
-          final en = _en(entry);
-          if (en.isNotEmpty) labels.add(en);
-        }
-      }
+      // No crop match -> empty list signals OPEN detection to the proxy.
+      return const <String>[];
     }
     labels.add('Healthy');
     labels.add('Unknown');

@@ -235,8 +235,23 @@ class _ResultsScreenState extends State<ResultsScreen> {
       'Hatua: ${d['immediate_action_sw'] ?? '—'}',
     );
     final uri = Uri.parse('https://wa.me/?text=$text');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    // Launch directly (canLaunchUrl can false-negative on Android 11+ even with
+    // <queries> set); fall back to a visible message instead of a silent no-op.
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Imeshindwa kufungua WhatsApp. Hakikisha umeisakinisha.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Imeshindwa kufungua WhatsApp.')),
+        );
+      }
     }
   }
 

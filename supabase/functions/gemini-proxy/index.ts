@@ -35,13 +35,13 @@ function buildPrompt(
   problemType: string,
   allowedLabels: string[],
 ): string {
-  const isPestOrWeed = problemType === 'pest' || problemType === 'weed'
-
-  // OPEN detection for pests/weeds with no closed list — identify the real
+  // OPEN detection whenever no closed list is supplied — identify the real
   // species from the model's own knowledge, same honesty rule (no inventing;
-  // "Unknown" if unsure). Disease (and any call WITH labels) stays LOCKED.
-  const identificationRule = (isPestOrWeed && allowedLabels.length === 0)
-    ? `OPEN IDENTIFICATION — identify the actual ${problemType} in the image by
+  // "Unknown" if unsure). This covers pests/weeds AND diseases on crops with
+  // no bundled taxonomy (e.g. coffee/cashew varieties). Any call WITH labels
+  // stays LOCKED to that list.
+  const identificationRule = (allowedLabels.length === 0)
+    ? `OPEN IDENTIFICATION — identify the actual ${problemType || 'disease'} in the image by
 its real, known species or common name (English), using your own knowledge of
 Tanzanian agriculture. You are NOT restricted to a fixed list. RULES: only
 return a real, established ${problemType} name — NEVER invent one. If you cannot

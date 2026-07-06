@@ -19,6 +19,10 @@ class AudioService {
       await _tts.setSpeechRate(0.8);
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
+      // Make `await _tts.speak(...)` resolve when speech FINISHES (not when it
+      // starts). Without this, callers think playback is done immediately and
+      // re-trigger it, causing the repeat/loop.
+      await _tts.awaitSpeakCompletion(true);
       _tts.setCompletionHandler(() => _speaking = false);
       _tts.setErrorHandler((msg) => _speaking = false);
       _initialised = true;
@@ -83,11 +87,11 @@ class _SpeakerButtonState extends State<SpeakerButton> {
       if (mounted) setState(() => _playing = false);
     } else {
       if (mounted) setState(() => _playing = true);
+      // speak() now resolves only when TTS actually finishes (see
+      // awaitSpeakCompletion), so reset the button then — not after a fixed
+      // 1s timer that flipped mid-utterance and let a re-tap restart audio.
       await AudioService.instance.speak(widget.text);
-      // Give TTS time to finish; reset after a delay
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) setState(() => _playing = false);
-      });
+      if (mounted) setState(() => _playing = false);
     }
   }
 
