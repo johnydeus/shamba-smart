@@ -137,10 +137,18 @@ class _RegisterOfficerScreenState extends State<RegisterOfficerScreen> {
         ),
       );
     } catch (e) {
+      debugPrint('RegisterOfficer submit error: $e');
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Imeshindwa kuhifadhi. Jaribu tena.')));
+      // Include brief detail so a real failure (RLS, timeout) is
+      // distinguishable from a network blip — a bare "jaribu tena" let a
+      // failed registration pass as registered.
+      final detail = e.toString();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 6),
+        content: Text('Imeshindwa kuhifadhi. Jaribu tena.\n'
+            '(${detail.length > 90 ? detail.substring(0, 90) : detail})'),
+      ));
     }
   }
 

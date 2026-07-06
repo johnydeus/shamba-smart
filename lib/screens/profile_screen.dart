@@ -21,6 +21,7 @@ import 'find_officer_screen.dart';
 import 'officer_dashboard_screen.dart';
 import 'register_officer_screen.dart';
 import 'privacy_settings_screen.dart';
+import '../services/field_officer_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -119,6 +120,15 @@ class ProfileScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 4),
+
+              // ── Afisa: nudge until the public Wasifu (field_officers row)
+              //    exists — an afisa ACCOUNT alone is invisible to farmers.
+              if (user.role == UserRole.afisa)
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: _WasifuNudgeBanner(userId: user.id),
+                ),
 
               // ── Role-specific menu ────────────────────────────────────────
               Padding(
@@ -1045,6 +1055,87 @@ class _InfoTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Afisa "Wasifu haujakamilika" nudge ────────────────────────────────────────
+//
+// Shown on the afisa profile until a field_officers row exists for this user.
+// Renders nothing while loading, when the profile exists, or on lookup error
+// (myProfile() returns null for both "no row" and "error" — offline officers
+// briefly seeing the nudge is acceptable; the action is never destructive).
+class _WasifuNudgeBanner extends StatefulWidget {
+  final String userId;
+  const _WasifuNudgeBanner({required this.userId});
+
+  @override
+  State<_WasifuNudgeBanner> createState() => _WasifuNudgeBannerState();
+}
+
+class _WasifuNudgeBannerState extends State<_WasifuNudgeBanner> {
+  bool _checked = false;
+  bool _missing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final profile = await FieldOfficerService.myProfile(widget.userId);
+    if (!mounted) return;
+    setState(() {
+      _checked = true;
+      _missing = profile == null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_checked || !_missing) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warningBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.badge_outlined, color: AppColors.warning, size: 26),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Wasifu wako wa kitaalamu haujakamilika — '
+              'wakulima hawawezi kukuona bado.',
+              style: GoogleFonts.dmSans(fontSize: 12.5, height: 1.35),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const RegisterOfficerScreen()),
+              );
+              // Re-check on return — hides the nudge once the row exists.
+              if (mounted) _check();
+            },
+            style: TextButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              foregroundColor: Colors.white,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            child: const Text('Kamilisha',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          ),
+        ],
       ),
     );
   }
