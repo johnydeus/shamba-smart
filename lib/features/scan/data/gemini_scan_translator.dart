@@ -130,7 +130,11 @@ class GeminiScanTranslator {
       'final_diagnosis_sw': healthy
           ? 'Mmea una afya'
           : (swName != null && swName.isNotEmpty ? swName : topEn),
-      'confidence': conf,
+      // _VerificationCard reads the Claude string contract ('high'/'medium'/
+      // 'low'); a raw double here throws a TypeError and blanks the card.
+      // The numeric value is kept under confidence_value for data capture.
+      'confidence': _confidenceBucket(conf),
+      'confidence_value': conf,
       'is_healthy': healthy,
       'image_quality_ok': !(quality.contains('blur') ||
           quality.contains('dark') ||
@@ -143,6 +147,15 @@ class GeminiScanTranslator {
       'needs_human_confirmation': g['needs_human_confirmation'] ?? true,
       // pesticide_1_*/2_* deliberately OMITTED — never fabricated.
     };
+  }
+
+  // Same thresholds Claude's verify prompt documents: high >80%, medium
+  // 50–80%, low <50%.
+  static String _confidenceBucket(double? conf) {
+    if (conf == null) return 'low';
+    if (conf >= 0.8) return 'high';
+    if (conf >= 0.5) return 'medium';
+    return 'low';
   }
 
   static String _ukaliToSeverity(String ukali) {

@@ -38,7 +38,14 @@ class SupabaseService {
         'crop_name': cropName,
         'disease_name_en': claudeResponse['disease_name_en'],
         'disease_name_sw': claudeResponse['disease_name_sw'],
-        'confidence': claudeResponse['confidence'],
+        // diagnoses.confidence is double precision. Verification maps carry a
+        // string bucket ('high'/'medium'/'low') for the UI card, so prefer the
+        // numeric confidence_value and never pass a non-num to the column
+        // (a string here fails the whole insert and the row is lost).
+        'confidence': claudeResponse['confidence_value'] ??
+            (claudeResponse['confidence'] is num
+                ? claudeResponse['confidence']
+                : null),
         'severity': claudeResponse['severity'],
         'photo_url': photoUrl,
         'claude_response': claudeResponse,
