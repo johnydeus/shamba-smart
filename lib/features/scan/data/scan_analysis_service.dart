@@ -85,8 +85,10 @@ class ScanAnalysisService {
         'disease_name_en': 'Verifying...',
         'confidence': mkulimaResult.confidence,
         'severity': 'low',
+        // Engine-neutral: the verifier may be Gemini (flag on) or Claude
+        // (flag off) — never name one here.
         'description_sw': 'Mkulima AI haikuwa na uhakika wa kutosha. '
-            'Claude anaangalia picha kwa makini zaidi.',
+            'Uchunguzi wa ziada unafanyika kwa makini zaidi.',
         'source': 'mkulima_low_confidence',
       };
     } else {

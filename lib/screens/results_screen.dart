@@ -255,6 +255,15 @@ class _ResultsScreenState extends State<ResultsScreen> {
         FeatureFlags.useGeminiScan && diagnosis['needs_expert'] == true;
     final geminiUncertain =
         FeatureFlags.useGeminiScan && diagnosis['routing_state'] == 'uncertain';
+    // In the two-stage flow, the prelim detail block below is either the
+    // "Inahakikiwa..." placeholder or a duplicate of _MkulimaCard's full
+    // diagnosis (dalili/dawa/kinga). Hide it while verification runs and once
+    // its result renders — if verification FAILS (_verification == null,
+    // error banner shown), it reappears as the offline fallback. Flag OFF and
+    // single-stage scans (isVerifying=false, so _verifying never starts) keep
+    // today's behavior exactly.
+    final hidePrelim = FeatureFlags.useGeminiScan &&
+        (_verifying || _verification != null);
 
     final diseaseSw =
         diagnosis['disease_name_sw'] ?? 'Ugonjwa haujulikani';
@@ -426,7 +435,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
             if (!hasError && !isHealthy && !geminiNeedsExpert && geminiUnclear)
               const _UnclearResultCard(),
 
-            if (!hasError && !isHealthy && !geminiNeedsExpert && !geminiUnclear) ...[
+            if (!hidePrelim &&
+                !hasError &&
+                !isHealthy &&
+                !geminiNeedsExpert &&
+                !geminiUnclear) ...[
               // 0.60–0.79 confidence: show the prediction but flag it uncertain.
               if (geminiUncertain) ...[
                 const _UncertainBanner(),
