@@ -101,7 +101,9 @@ class _FarmDetailScreenState extends State<FarmDetailScreen>
       body: NestedScrollView(
         headerSliverBuilder: (_, _) => [
           SliverAppBar(
-            expandedHeight: 200,
+            // Icon+text tabs make the bottom TabBar ~75px tall; 200 with a
+            // 56px reserve let header content render under the tabs.
+            expandedHeight: 224,
             pinned: true,
             backgroundColor: AppColors.soil,
             foregroundColor: Colors.white,
@@ -171,7 +173,9 @@ class _FarmHeader extends StatelessWidget {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 50, 20, 56),
+          // Bottom reserve must clear the icon+text TabBar (~75px incl.
+          // indicator) that overlays the bottom of the flexible space.
+          padding: const EdgeInsets.fromLTRB(20, 50, 20, 80),
           child: Row(
             children: [
               Container(
@@ -215,23 +219,54 @@ class _FarmHeader extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     if (farm.crops.isNotEmpty)
-                      Wrap(
-                        spacing: 6,
-                        children: farm.crops.take(3).map((c) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.harvest.withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: AppColors.harvest.withValues(alpha: 0.5)),
-                          ),
-                          child: Text(c,
-                              style: GoogleFonts.dmSans(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600)),
-                        )).toList(),
+                      // Single guaranteed line: 2 ellipsised chips + "+N"
+                      // badge. A Wrap here could run to a 2nd line and push
+                      // content under the TabBar.
+                      Row(
+                        children: [
+                          for (final c in farm.crops.take(2)) ...[
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.harvest
+                                      .withValues(alpha: 0.25),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: AppColors.harvest
+                                          .withValues(alpha: 0.5)),
+                                ),
+                                child: Text(c,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.dmSans(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          if (farm.crops.length > 2)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color:
+                                    AppColors.harvest.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color: AppColors.harvest
+                                        .withValues(alpha: 0.5)),
+                              ),
+                              child: Text('+${farm.crops.length - 2}',
+                                  style: GoogleFonts.dmSans(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                        ],
                       )
                     else
                       Container(

@@ -95,8 +95,16 @@ class _AddFarmScreenState extends State<AddFarmScreen> {
   void _addCustomCrop() {
     final crop = _customCropCtrl.text.trim();
     if (crop.isEmpty) return;
+    // Case-insensitive dedup against presets + already-selected, so a re-typed
+    // crop selects the existing chip instead of storing a near-duplicate
+    // (e.g. the "Pilipili kichaaa"/"Pilipili kichaa" pair found in prod).
+    final lower = crop.toLowerCase();
+    final existing = {...kCropOptions, ..._selectedCrops}.firstWhere(
+      (c) => c.toLowerCase() == lower,
+      orElse: () => '',
+    );
     setState(() {
-      _selectedCrops.add(crop);
+      _selectedCrops.add(existing.isNotEmpty ? existing : crop);
       _customCropCtrl.clear();
     });
   }
@@ -251,7 +259,10 @@ class _AddFarmScreenState extends State<AddFarmScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: kCropOptions
+              // Presets first, then custom crops added via "Ongeza zao
+              // lingine" — without the union, a custom crop was saved but
+              // never got a chip, so the add looked like a no-op.
+              children: {...kCropOptions, ..._selectedCrops}
                   .map((crop) => FilterChip(
                         label: Text(crop,
                             style: const TextStyle(fontSize: 12)),

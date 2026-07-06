@@ -283,35 +283,52 @@ class _FarmCard extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // Quick action buttons
+                  // Quick action buttons. Each action is Flexible+FittedBox
+                  // so labels shrink on narrow screens instead of pushing the
+                  // Fungua CTA off the right edge.
                   Row(
                     children: [
-                      _MiniAction(
-                        emoji: '🔬',
-                        label: 'Chunguza',
-                        onTap: () => Navigator.push(context,
-                            MaterialPageRoute(
-                                builder: (_) => const ScanScreen())),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: _MiniAction(
+                            emoji: '🔬',
+                            label: 'Chunguza',
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(
+                                    builder: (_) => const ScanScreen())),
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      _MiniAction(
-                        emoji: '🧪',
-                        label: 'Udongo',
-                        onTap: () => Navigator.push(context,
-                            MaterialPageRoute(
-                                builder: (_) => SoilScreen(
-                                  farmLat: farm.gpsLat,
-                                  farmLng: farm.gpsLng,
-                                  farmName: farm.name,
-                                ))),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: _MiniAction(
+                            emoji: '🧪',
+                            label: 'Udongo',
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(
+                                    builder: (_) => SoilScreen(
+                                      farmLat: farm.gpsLat,
+                                      farmLng: farm.gpsLng,
+                                      farmName: farm.name,
+                                    ))),
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      _MiniAction(
-                        emoji: '💧',
-                        label: 'Umwagiliaji',
-                        onTap: () => Navigator.push(context,
-                            MaterialPageRoute(
-                                builder: (_) => const IrrigationScreen())),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: _MiniAction(
+                            emoji: '💧',
+                            label: 'Umwagiliaji',
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(
+                                    builder: (_) => const IrrigationScreen())),
+                          ),
+                        ),
                       ),
                       const Spacer(),
                       // Open detail arrow
