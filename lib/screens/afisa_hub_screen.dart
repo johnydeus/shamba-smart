@@ -47,11 +47,16 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
   Future<void> _loadFarms() async {
     setState(() { _loading = true; _error = null; });
     try {
-      // Load all farms from Supabase
-      final farmRows = await _db
-          .from('farms')
-          .select()
-          .order('created_at', ascending: false);
+      // Region boundary: an afisa only sees farms in their own region.
+      // RLS enforces this server-side ("afisa reads own-region farms");
+      // the .eq() mirror keeps the query honest and the empty state clear.
+      final officerRegion =
+          context.read<AuthProvider>().currentUser?.region.trim() ?? '';
+      var query = _db.from('farms').select();
+      if (officerRegion.isNotEmpty) {
+        query = query.eq('region', officerRegion);
+      }
+      final farmRows = await query.order('created_at', ascending: false);
 
       final farmerIds = (farmRows as List)
           .map((r) => r['farmer_id'] as String?)
@@ -380,6 +385,9 @@ class _ListTab extends StatelessWidget {
             Text('Hakuna mashamba',
                 style: GoogleFonts.playfairDisplay(
                     color: AppColors.soil, fontSize: 16)),
+            const SizedBox(height: 6),
+            Text('Unaona mashamba ya mkoa wako tu.',
+                style: GoogleFonts.dmSans(color: AppColors.mid, fontSize: 13)),
           ],
         ),
       );
