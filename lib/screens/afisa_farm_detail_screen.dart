@@ -279,7 +279,8 @@ class _Header extends StatelessWidget {
                   border: Border.all(color: Colors.white30),
                 ),
                 child: const Center(
-                    child: Text('🌾', style: TextStyle(fontSize: 30))),
+                    child: Icon(Icons.agriculture_outlined,
+                        color: Colors.white, size: 30)),
               ),
               const SizedBox(width: 14),
               Expanded(

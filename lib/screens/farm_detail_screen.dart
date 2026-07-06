@@ -181,7 +181,9 @@ class _FarmHeader extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.white30),
                 ),
-                child: const Center(child: Text('🌾', style: TextStyle(fontSize: 32))),
+                child: const Center(
+                    child: Icon(Icons.agriculture_outlined,
+                        color: Colors.white, size: 32)),
               ),
               const SizedBox(width: 16),
               Expanded(

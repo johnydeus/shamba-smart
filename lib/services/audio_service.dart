@@ -117,7 +117,7 @@ class _SpeakerButtonState extends State<SpeakerButton> {
             ),
             const SizedBox(width: 6),
             Text(
-              _playing ? 'Simama' : 'Sikiliza 🔊',
+              _playing ? 'Simama' : 'Sikiliza',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,

@@ -374,7 +374,8 @@ class _ListTab extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('🌾', style: TextStyle(fontSize: 48)),
+            Icon(Icons.agriculture_outlined,
+                size: 48, color: AppColors.leaf.withValues(alpha: 0.7)),
             const SizedBox(height: 12),
             Text('Hakuna mashamba',
                 style: GoogleFonts.playfairDisplay(
@@ -427,7 +428,8 @@ class _FarmListCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Center(
-                    child: Text('🌾', style: TextStyle(fontSize: 24))),
+                    child: Icon(Icons.agriculture_outlined,
+                        color: AppColors.leaf, size: 24)),
               ),
               const SizedBox(width: 12),
 
