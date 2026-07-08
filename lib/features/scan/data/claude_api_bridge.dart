@@ -153,6 +153,10 @@ class ClaudeApiBridge {
     map['routing_state'] =
         routing.state == ScanRoutingState.uncertain ? 'uncertain' : 'confident';
     map['escalation_reason'] = routing.escalationReason;
+    // Open-mode accepted result (see gemini_scan_service): tag for Phase 5.
+    if (routing.openAccepted) {
+      map['label_source'] = 'gemini-${routing.tier}-open';
+    }
     return map;
   }
 

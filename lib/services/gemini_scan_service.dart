@@ -8,8 +8,12 @@ class GeminiRoutingResult {
   final String tier; // 'flash-lite' or 'flash'
   final ScanRoutingState state;
   final String? escalationReason; // why Flash was tried; null if never escalated
+  // True when this is a named OPEN-mode result (allowedLabels was empty) that
+  // was accepted as `uncertain` rather than discarded to needsExpert — so
+  // Phase 5 retraining can distinguish open-mode from closed-list labels.
+  final bool openAccepted;
   const GeminiRoutingResult(this.gemini, this.tier, this.state,
-      {this.escalationReason});
+      {this.escalationReason, this.openAccepted = false});
 }
 
 /// Calls the `gemini-proxy` edge function for crop image CLASSIFICATION.
@@ -73,6 +77,21 @@ class GeminiScanService {
     required List<String> allowedLabels,
     void Function()? onEscalate,
   }) async {
+    // Open mode = no closed list (gemini-proxy identified freely from its own
+    // knowledge). A named, symptom-backed open result is worth showing as
+    // `uncertain` (with the human-confirm flow) instead of throwing it away as
+    // needsExpert. Closed-list scans (allowedLabels non-empty) are unaffected.
+    final openMode = allowedLabels.isEmpty;
+    bool openNamed(Map<String, dynamic> g) {
+      if (!openMode) return false;
+      if (_isUnknownLabel(g['top_prediction'] as String?)) return false;
+      final syms = g['symptoms_seen'];
+      final hasSymptoms = syms is List &&
+          syms.any((s) => (s?.toString().trim().isNotEmpty ?? false));
+      final c = (g['confidence'] as num?)?.toDouble() ?? 0;
+      return hasSymptoms && c >= 0.50;
+    }
+
     final g1 = await classify(
       imageBase64: imageBase64,
       cropType: cropType,
@@ -120,6 +139,11 @@ class GeminiScanService {
     if (g2['error'] != null) {
       // Flash failed — judge by the Flash-Lite result we already have.
       final ok = conf1 >= _uncertainMin && !unknown1;
+      if (!ok && openNamed(g1)) {
+        // Named open-mode diagnosis — show it (uncertain) instead of discarding.
+        return GeminiRoutingResult(g1, 'flash-lite', ScanRoutingState.uncertain,
+            escalationReason: reason, openAccepted: true);
+      }
       return GeminiRoutingResult(g1, 'flash-lite',
           ok ? ScanRoutingState.uncertain : ScanRoutingState.needsExpert,
           escalationReason: reason);
@@ -132,6 +156,12 @@ class GeminiScanService {
           ? ScanRoutingState.confident
           : ScanRoutingState.uncertain;
       return GeminiRoutingResult(g2, 'flash', state, escalationReason: reason);
+    }
+    // Named open-mode diagnosis at moderate confidence -> show it (uncertain)
+    // with the human-confirm flow, rather than discarding a correct answer.
+    if (openNamed(g2)) {
+      return GeminiRoutingResult(g2, 'flash', ScanRoutingState.uncertain,
+          escalationReason: reason, openAccepted: true);
     }
     // Both tiers tried, still not confident -> needs expert review.
     return GeminiRoutingResult(g2, 'flash', ScanRoutingState.needsExpert,

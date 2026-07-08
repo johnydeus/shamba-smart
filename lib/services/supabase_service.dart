@@ -108,10 +108,14 @@ class SupabaseService {
           (needsExpert ? 'Unknown' : null);
     }
 
+    // An explicit label_source on the map wins (e.g. open-mode results tagged
+    // 'gemini-<tier>-open' by the scan pipeline); else use the derived value.
+    final explicitLabelSource = resp['label_source'] as String?;
+
     return {
       'model_used': modelUsed,
       'final_label': finalLabel,
-      'label_source': labelSource,
+      'label_source': explicitLabelSource ?? labelSource,
       'escalation_reason':
           resp['escalation_reason'] as String? ?? (needsExpert ? 'needs_expert' : null),
     };

@@ -192,6 +192,12 @@ class _ResultsScreenState extends State<ResultsScreen> {
     map['routing_state'] =
         routing.state == ScanRoutingState.uncertain ? 'uncertain' : 'confident';
     map['escalation_reason'] = routing.escalationReason;
+    // Open-mode (no-taxonomy) accepted result: tag for Phase 5 so retraining
+    // can tell open-identification labels from closed-list ones. Badge/source
+    // stay 'gemini-<tier>' so display + _retrainingMeta model_used are unchanged.
+    if (routing.openAccepted) {
+      map['label_source'] = 'gemini-${routing.tier}-open';
+    }
     return map;
   }
 
