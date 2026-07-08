@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -18,57 +19,77 @@ class SupabaseService {
     double? gpsLng,
     MkulimaResult? mkulimaResult,
   }) async {
-    try {
-      final userId = _client.auth.currentUser?.id;
+    final userId = _client.auth.currentUser?.id;
 
-      // Upload the leaf photo to Supabase Storage
-      String? photoUrl;
-      if (photoPath.isNotEmpty) {
+    // Photo upload — ISOLATED from the insert. A storage failure (e.g. a
+    // missing bucket RLS policy) must never block the diagnosis row: it would
+    // silently drop all retraining data, which is exactly what happened before.
+    // On failure we log visibly (SEVERE) and continue with photo_url = null.
+    String? photoUrl;
+    if (photoPath.isNotEmpty) {
+      try {
         final file = File(photoPath);
         final fileName =
             'diagnoses/${userId ?? 'anon'}/${DateTime.now().millisecondsSinceEpoch}.jpg';
         await _client.storage.from('leaf-photos').upload(fileName, file);
         photoUrl =
             _client.storage.from('leaf-photos').getPublicUrl(fileName);
+      } catch (e, st) {
+        developer.log(
+          'Diagnosis photo upload failed — saving row without photo',
+          name: 'SupabaseService.saveDiagnosis',
+          error: e,
+          stackTrace: st,
+          level: 1000, // SEVERE — visible in logcat/DevTools, incl. release
+        );
       }
+    }
 
-      // Build row — add Mkulima fields if available (requires SQL migration)
-      final row = <String, dynamic>{
-        'farmer_id': userId,
-        'crop_name': cropName,
-        'disease_name_en': claudeResponse['disease_name_en'],
-        'disease_name_sw': claudeResponse['disease_name_sw'],
-        // diagnoses.confidence is double precision. Verification maps carry a
-        // string bucket ('high'/'medium'/'low') for the UI card, so prefer the
-        // numeric confidence_value and never pass a non-num to the column
-        // (a string here fails the whole insert and the row is lost).
-        'confidence': claudeResponse['confidence_value'] ??
-            (claudeResponse['confidence'] is num
-                ? claudeResponse['confidence']
-                : null),
-        'severity': claudeResponse['severity'],
-        'photo_url': photoUrl,
-        'claude_response': claudeResponse,
-        'gps_lat': gpsLat,
-        'gps_lng': gpsLng,
-      };
+    // Build row — add Mkulima fields if available (requires SQL migration)
+    final row = <String, dynamic>{
+      'farmer_id': userId,
+      'crop_name': cropName,
+      'disease_name_en': claudeResponse['disease_name_en'],
+      'disease_name_sw': claudeResponse['disease_name_sw'],
+      // diagnoses.confidence is double precision. Verification maps carry a
+      // string bucket ('high'/'medium'/'low') for the UI card, so prefer the
+      // numeric confidence_value and never pass a non-num to the column
+      // (a string here fails the whole insert and the row is lost).
+      'confidence': claudeResponse['confidence_value'] ??
+          (claudeResponse['confidence'] is num
+              ? claudeResponse['confidence']
+              : null),
+      'severity': claudeResponse['severity'],
+      'photo_url': photoUrl,
+      'claude_response': claudeResponse,
+      'gps_lat': gpsLat,
+      'gps_lng': gpsLng,
+    };
 
-      if (mkulimaResult != null) {
-        row.addAll(mkulimaResult.toSupabaseRow());
-      }
+    if (mkulimaResult != null) {
+      row.addAll(mkulimaResult.toSupabaseRow());
+    }
 
-      // ── Retraining capture (Phase 5): describe EVERY scan's true origin ──
-      // Derived from the shown result map, AFTER the Mkulima addAll above so the
-      // legacy `source`/`model_version` columns are untouched.
-      row.addAll(_retrainingMeta(claudeResponse));
+    // ── Retraining capture (Phase 5): describe EVERY scan's true origin ──
+    // Derived from the shown result map, AFTER the Mkulima addAll above so the
+    // legacy `source`/`model_version` columns are untouched.
+    row.addAll(_retrainingMeta(claudeResponse));
 
+    // Insert — ISOLATED with its own visible error. Runs even when the photo
+    // upload above failed, so retraining data isn't lost to a storage problem.
+    try {
       final inserted =
           await _client.from('diagnoses').insert(row).select('id').limit(1);
       if (inserted.isNotEmpty) return inserted.first['id']?.toString();
       return null;
-    } catch (e) {
-      // Print error but don't crash the app — diagnosis still shows on screen
-      debugPrint('Error saving diagnosis: $e');
+    } catch (e, st) {
+      developer.log(
+        'Diagnosis insert failed',
+        name: 'SupabaseService.saveDiagnosis',
+        error: e,
+        stackTrace: st,
+        level: 1000, // SEVERE
+      );
       return null;
     }
   }
