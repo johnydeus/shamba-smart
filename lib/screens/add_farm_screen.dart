@@ -1,19 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../config/crops.dart';
 import '../models/farm_model.dart';
 import '../providers/farm_provider.dart';
 import '../services/location_service.dart';
 import '../theme/app_colors.dart';
 import 'register_screen.dart' show kRegions;
-
-// Common Tanzania crops for chip selection
-const List<String> kCropOptions = [
-  'Mahindi', 'Nyanya', 'Maharagwe', 'Pilipili hoho', 'Ndizi',
-  'Mchele', 'Muhogo', 'Pamba', 'Alizeti', 'Viazi vitamu',
-  'Vitunguu', 'Mtama', 'Uwele', 'Karoti', 'Kabichi',
-  'Parachichi', 'Embe', 'Kahawa', 'Chai', 'Bia',
-];
 
 class AddFarmScreen extends StatefulWidget {
   final String farmerId;
@@ -99,7 +92,7 @@ class _AddFarmScreenState extends State<AddFarmScreen> {
     // crop selects the existing chip instead of storing a near-duplicate
     // (e.g. the "Pilipili kichaaa"/"Pilipili kichaa" pair found in prod).
     final lower = crop.toLowerCase();
-    final existing = {...kCropOptions, ..._selectedCrops}.firstWhere(
+    final existing = {...kCrops, ..._selectedCrops}.firstWhere(
       (c) => c.toLowerCase() == lower,
       orElse: () => '',
     );
@@ -262,7 +255,7 @@ class _AddFarmScreenState extends State<AddFarmScreen> {
               // Presets first, then custom crops added via "Ongeza zao
               // lingine" — without the union, a custom crop was saved but
               // never got a chip, so the add looked like a no-op.
-              children: {...kCropOptions, ..._selectedCrops}
+              children: {...kCrops, ..._selectedCrops}
                   .map((crop) => FilterChip(
                         label: Text(crop,
                             style: const TextStyle(fontSize: 12)),

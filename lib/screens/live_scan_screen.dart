@@ -11,8 +11,8 @@ import '../providers/scan_provider.dart';
 import '../routes/fade_slide_route.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
+import '../config/crops.dart' show kCrops;
 import 'results_screen.dart';
-import 'scan_screen.dart' show kCrops;
 
 /// Full-screen live-inference scanner.
 ///

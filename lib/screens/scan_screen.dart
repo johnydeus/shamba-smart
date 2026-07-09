@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../config/crops.dart';
 import '../config/feature_flags.dart';
 import '../features/scan/data/scan_taxonomy.dart' show kAutoCrop;
 import '../features/scan/domain/scan_request.dart';
@@ -16,28 +17,6 @@ import '../theme/app_theme.dart';
 import '../widgets/shamba_button.dart';
 import 'live_scan_screen.dart';
 import 'results_screen.dart';
-
-// All Tanzania crops — Ministry of Agriculture, TAHA, TOSCI, TanzaniaInvest
-const List<String> kCrops = [
-  // Nafaka (Cereals)
-  'Mahindi', 'Mchele', 'Ngano', 'Mtama', 'Uwele', 'Ulezi', 'Shayiri',
-  // Mikunde (Legumes)
-  'Maharagwe', 'Choroko', 'Karanga', 'Soya', 'Mbaazi', 'Kunde',
-  // Mbogamboga (Vegetables)
-  'Nyanya', 'Kabichi', 'Sukuma wiki', 'Vitunguu', 'Pilipili hoho',
-  'Pilipili manga', 'Karoti', 'Bamia', 'Tango', 'Bilinganya',
-  'Mchicha', 'Tikiti maji', 'Njegere', 'Maharage ya Kata',
-  // Mazao ya Mizizi (Root crops)
-  'Muhogo', 'Viazi vitamu', 'Viazi',
-  // Matunda (Fruits)
-  'Ndizi', 'Embe', 'Papai', 'Nanasi', 'Avokado', 'Marakuja',
-  'Chungwa', 'Zabibu', 'Stroberri', 'Nazi',
-  // Mazao ya Biashara (Cash crops)
-  'Pamba', 'Alizeti', 'Kahawa', 'Chai', 'Korosho', 'Miwa',
-  'Katani', 'Tumbaku', 'Karafuu', 'Ufuta', 'Pareto',
-  // Viungo (Spices)
-  'Tangawizi', 'Iliki',
-];
 
 // The 3 scan categories the farmer can choose from
 const _scanTypes = [
@@ -73,23 +52,6 @@ const _scanTypes = [
   },
 ];
 
-const Map<String, String> _cropEmojis = {
-  'Mahindi': '🌽',
-  'Mchele': '🍚',
-  'Nyanya': '🍅',
-  'Maharagwe': '🫘',
-  'Ndizi': '🍌',
-  'Muhogo': '🥔',
-  'Pamba': '☁️',
-  'Kahawa': '☕',
-  'Nazi': '🥥',
-  'Tangawizi': '🫚',
-  'Ufuta': '🌱',
-  'Pareto': '🌼',
-  'Iliki': '🌿',
-};
-
-String _cropEmoji(String crop) => _cropEmojis[crop] ?? '🌱';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -444,7 +406,7 @@ class _ScanScreenState extends State<ScanScreen>
                       label: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(isAuto ? '🔎' : _cropEmoji(crop)),
+                          Text(isAuto ? '🔎' : cropEmoji(crop)),
                           const SizedBox(width: 4),
                           Text(isAuto ? 'Tambua Mwenyewe' : crop),
                           if (selected) ...[
