@@ -77,13 +77,12 @@ class GeminiScanService {
     required List<String> allowedLabels,
     void Function()? onEscalate,
   }) async {
-    // Open mode = no closed list (gemini-proxy identified freely from its own
-    // knowledge). A named, symptom-backed open result is worth showing as
-    // `uncertain` (with the human-confirm flow) instead of throwing it away as
-    // needsExpert. Closed-list scans (allowedLabels non-empty) are unaffected.
-    final openMode = allowedLabels.isEmpty;
-    bool openNamed(Map<String, dynamic> g) {
-      if (!openMode) return false;
+    // A named, symptom-backed result from an OPEN-mode call is worth showing as
+    // `uncertain` (with the human-confirm flow) instead of discarding it to
+    // needsExpert. `wasOpen` = whether THAT specific call ran without a closed
+    // list (the escalation can switch to open even if the first call was closed).
+    bool openNamed(Map<String, dynamic> g, bool wasOpen) {
+      if (!wasOpen) return false;
       if (_isUnknownLabel(g['top_prediction'] as String?)) return false;
       final syms = g['symptoms_seen'];
       final hasSymptoms = syms is List &&
@@ -92,6 +91,7 @@ class GeminiScanService {
       return hasSymptoms && c >= 0.50;
     }
 
+    final open1 = allowedLabels.isEmpty; // was the FIRST attempt open?
     final g1 = await classify(
       imageBase64: imageBase64,
       cropType: cropType,
@@ -124,22 +124,34 @@ class GeminiScanService {
       final state = conf1 >= _confidentMin
           ? ScanRoutingState.confident
           : ScanRoutingState.uncertain;
-      return GeminiRoutingResult(g1, 'flash-lite', state);
+      return GeminiRoutingResult(g1, 'flash-lite', state,
+          openAccepted: open1 && !unknown1);
     }
 
-    // Escalate once to Flash (same image + allowedLabels).
+    // FIX #1 — partial-coverage open-retry: if a CLOSED list couldn't match the
+    // image (Unknown / low confidence), the list is likely just incomplete for
+    // this crop (e.g. maize has only 2 diseases listed). Escalate in OPEN mode
+    // so Gemini can NAME the real disease from its own knowledge — this makes
+    // every crop reachable, not only the ones with a bundled taxonomy. For a
+    // hard/poor image (flagged/poor_image) we keep the closed list: a stronger
+    // model on the same constraint is the right move there. Still ONE retry.
+    final escalateOpen =
+        open1 || reason == 'unknown' || reason == 'low_confidence';
+    final escLabels = escalateOpen ? const <String>[] : allowedLabels;
+    final open2 = escLabels.isEmpty;
+
     onEscalate?.call();
     final g2 = await classify(
       imageBase64: imageBase64,
       cropType: cropType,
       problemType: problemType,
-      allowedLabels: allowedLabels,
+      allowedLabels: escLabels,
       modelTier: 'flash',
     );
     if (g2['error'] != null) {
       // Flash failed — judge by the Flash-Lite result we already have.
       final ok = conf1 >= _uncertainMin && !unknown1;
-      if (!ok && openNamed(g1)) {
+      if (!ok && openNamed(g1, open1)) {
         // Named open-mode diagnosis — show it (uncertain) instead of discarding.
         return GeminiRoutingResult(g1, 'flash-lite', ScanRoutingState.uncertain,
             escalationReason: reason, openAccepted: true);
@@ -155,11 +167,12 @@ class GeminiScanService {
       final state = conf2 >= _confidentMin
           ? ScanRoutingState.confident
           : ScanRoutingState.uncertain;
-      return GeminiRoutingResult(g2, 'flash', state, escalationReason: reason);
+      return GeminiRoutingResult(g2, 'flash', state,
+          escalationReason: reason, openAccepted: open2);
     }
     // Named open-mode diagnosis at moderate confidence -> show it (uncertain)
     // with the human-confirm flow, rather than discarding a correct answer.
-    if (openNamed(g2)) {
+    if (openNamed(g2, open2)) {
       return GeminiRoutingResult(g2, 'flash', ScanRoutingState.uncertain,
           escalationReason: reason, openAccepted: true);
     }

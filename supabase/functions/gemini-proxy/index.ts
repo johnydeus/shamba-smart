@@ -59,9 +59,14 @@ invent a disease/pest/weed name that is not in the list.`
 Crop: ${cropType || 'unknown'}
 Problem type to assess: ${problemType || 'disease'}
 
+The image may show ANY part of the plant — leaf, pod, cob/ear, fruit, grain,
+stem, branch, flower, tuber or root. Diagnose the ${problemType || 'disease'}
+from whichever part is shown; do NOT assume it is a leaf, and use symptoms on
+that specific part (spots, rot, lesions, discoloration, wilting, galls, etc.).
+
 ${identificationRule}
 
-Assess image quality (blurry, too dark, too far, leaf not centered, fine).
+Assess image quality (blurry, too dark, too far, subject not centered, fine).
 Set "needs_flash_escalation" to true if the image is hard/ambiguous and a
 stronger model might help. Always write "farmer_safe_message" and
 "recommended_next_action" in simple Swahili.
