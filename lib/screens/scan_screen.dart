@@ -31,10 +31,12 @@ const List<String> kCrops = [
   'Muhogo', 'Viazi vitamu', 'Viazi',
   // Matunda (Fruits)
   'Ndizi', 'Embe', 'Papai', 'Nanasi', 'Avokado', 'Marakuja',
-  'Chungwa', 'Zabibu', 'Stroberri',
+  'Chungwa', 'Zabibu', 'Stroberri', 'Nazi',
   // Mazao ya Biashara (Cash crops)
   'Pamba', 'Alizeti', 'Kahawa', 'Chai', 'Korosho', 'Miwa',
-  'Katani', 'Tumbaku', 'Karafuu',
+  'Katani', 'Tumbaku', 'Karafuu', 'Ufuta', 'Pareto',
+  // Viungo (Spices)
+  'Tangawizi', 'Iliki',
 ];
 
 // The 3 scan categories the farmer can choose from
@@ -80,6 +82,11 @@ const Map<String, String> _cropEmojis = {
   'Muhogo': '🥔',
   'Pamba': '☁️',
   'Kahawa': '☕',
+  'Nazi': '🥥',
+  'Tangawizi': '🫚',
+  'Ufuta': '🌱',
+  'Pareto': '🌼',
+  'Iliki': '🌿',
 };
 
 String _cropEmoji(String crop) => _cropEmojis[crop] ?? '🌱';
