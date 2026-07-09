@@ -44,9 +44,12 @@ function buildPrompt(
     ? `OPEN IDENTIFICATION — identify the actual ${problemType || 'disease'} in the image by
 its real, known species or common name (English), using your own knowledge of
 Tanzanian agriculture. You are NOT restricted to a fixed list. RULES: only
-return a real, established ${problemType} name — NEVER invent one. If you cannot
-identify it with reasonable confidence, set "top_prediction" to "Unknown" and
-"needs_human_confirmation" to true.`
+return a real, established ${problemType} name that affects a crop GROWN IN
+TANZANIA / East Africa — NEVER invent one. If the plant is not a Tanzanian
+agricultural crop (e.g. an ornamental, a wild/non-crop plant, or an exotic
+species not grown in Tanzania), or you cannot identify it with reasonable
+confidence, set "top_prediction" to "Unknown" and "needs_human_confirmation"
+to true.`
     : `TAXONOMY LOCK — you may ONLY choose "top_prediction" and any
 "alternative_predictions[].label" from this exact allowed list:
 ${allowedLabels.length ? allowedLabels.map((l) => `- ${l}`).join('\n') : '(no labels provided)'}
