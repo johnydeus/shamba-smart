@@ -134,8 +134,9 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
     }).toList();
   }
 
-  List<Map<String, dynamic>> get _mappable =>
-      _filtered.where((f) => f['gps_lat'] != null && f['gps_lng'] != null).toList();
+  List<Map<String, dynamic>> get _mappable => _filtered
+      .where((f) => _coord(f['gps_lat']) != null && _coord(f['gps_lng']) != null)
+      .toList();
 
   void _openFarm(Map<String, dynamic> farm) {
     Navigator.push(context, MaterialPageRoute(
@@ -245,6 +246,11 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
 // TAB 1: RAMANI
 // ══════════════════════════════════════════════════════════════════════════════
 
+/// Parse a Supabase-returned coordinate defensively: a `double precision`
+/// column can come back as an int for whole-number values, and `int as double`
+/// throws. Returns null for null/unparseable so the caller skips that farm.
+double? _coord(dynamic v) => v is num ? v.toDouble() : null;
+
 class _MapTab extends StatelessWidget {
   final List<Map<String, dynamic>> farms;
   final ValueChanged<Map<String, dynamic>> onTap;
@@ -270,21 +276,37 @@ class _MapTab extends StatelessWidget {
       );
     }
 
-    // Centre map on first farm
-    final centre = LatLng(
-      farms.first['gps_lat'] as double,
-      farms.first['gps_lng'] as double,
-    );
+    // Coordinates parsed defensively — farms here already passed the _mappable
+    // filter, so both parse to a non-null double.
+    final points = <LatLng>[
+      for (final f in farms)
+        LatLng(_coord(f['gps_lat'])!, _coord(f['gps_lng'])!),
+    ];
+
+    // Fit the camera to show ALL farms at once (smooth); a single farm just
+    // centres at a sensible zoom instead of a zero-size bounds (over-zoom).
+    final MapOptions options;
+    if (points.length == 1) {
+      options = MapOptions(
+        // ignore: deprecated_member_use
+        initialCenter: points.first,
+        // ignore: deprecated_member_use
+        initialZoom: 13,
+      );
+    } else {
+      options = MapOptions(
+        initialCameraFit: CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints(points),
+          padding: const EdgeInsets.all(48),
+          maxZoom: 15,
+        ),
+      );
+    }
 
     return Stack(
       children: [
         FlutterMap(
-          options: MapOptions(
-            // ignore: deprecated_member_use
-            initialCenter: centre,
-            // ignore: deprecated_member_use
-            initialZoom: 9,
-          ),
+          options: options,
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -292,8 +314,8 @@ class _MapTab extends StatelessWidget {
             ),
             MarkerLayer(
               markers: farms.map((farm) {
-                final lat = farm['gps_lat'] as double;
-                final lng = farm['gps_lng'] as double;
+                final lat = _coord(farm['gps_lat'])!;
+                final lng = _coord(farm['gps_lng'])!;
                 final name = farm['name'] as String? ?? 'Shamba';
                 final farmer =
                     '${farm['farmer_first_name']} ${farm['farmer_last_name']}'.trim();
