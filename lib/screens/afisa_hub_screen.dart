@@ -233,7 +233,10 @@ class _AfisaHubScreenState extends State<AfisaHubScreen>
               : TabBarView(
                   controller: _tabs,
                   children: [
-                    _MapTab(farms: _mappable, onTap: _openFarm),
+                    _MapTab(
+                        farms: _mappable,
+                        hiddenNoGps: _filtered.length - _mappable.length,
+                        onTap: _openFarm),
                     _ListTab(farms: _filtered, onTap: _openFarm),
                     _TrainingTab(submissions: _submissions),
                   ],
@@ -253,8 +256,10 @@ double? _coord(dynamic v) => v is num ? v.toDouble() : null;
 
 class _MapTab extends StatelessWidget {
   final List<Map<String, dynamic>> farms;
+  final int hiddenNoGps; // in-region farms without GPS (not shown on the map)
   final ValueChanged<Map<String, dynamic>> onTap;
-  const _MapTab({required this.farms, required this.onTap});
+  const _MapTab(
+      {required this.farms, required this.hiddenNoGps, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +274,12 @@ class _MapTab extends StatelessWidget {
                 style: GoogleFonts.playfairDisplay(
                     color: AppColors.soil, fontSize: 16)),
             const SizedBox(height: 6),
-            Text('Wakulima waweke GPS kwanza',
+            Text(
+                hiddenNoGps > 0
+                    ? 'Mashamba $hiddenNoGps hayana GPS bado — '
+                        'wakulima waweke GPS kwanza'
+                    : 'Wakulima waweke GPS kwanza',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.dmSans(color: AppColors.mid, fontSize: 13)),
           ],
         ),
@@ -380,6 +390,36 @@ class _MapTab extends StatelessWidget {
                     fontWeight: FontWeight.bold)),
           ),
         ),
+        // Some in-region farms have no GPS and can't be shown — say so, so the
+        // officer knows the map isn't the full picture.
+        if (hiddenNoGps > 0)
+          Positioned(
+            left: 12, right: 12, bottom: 12,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.warningBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_off_outlined,
+                      color: AppColors.warning, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mashamba $hiddenNoGps hayana GPS bado — '
+                      'hayaonekani kwenye ramani.',
+                      style: GoogleFonts.dmSans(fontSize: 11.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
