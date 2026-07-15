@@ -62,8 +62,10 @@ class _AfisaFarmDetailScreenState extends State<AfisaFarmDetailScreen>
   String get _region   => widget.farmData['region']   as String? ?? '';
   List<String> get _crops =>
       (widget.farmData['crops'] as List?)?.cast<String>() ?? [];
-  double? get _gpsLat => widget.farmData['gps_lat'] as double?;
-  double? get _gpsLng => widget.farmData['gps_lng'] as double?;
+  // Parse via num: a double-precision column can return as int for whole
+  // numbers, and `int as double?` throws (crashes the soil-analysis button).
+  double? get _gpsLat => (widget.farmData['gps_lat'] as num?)?.toDouble();
+  double? get _gpsLng => (widget.farmData['gps_lng'] as num?)?.toDouble();
 
   // ── AI Advisor ────────────────────────────────────────────────────────────
 
