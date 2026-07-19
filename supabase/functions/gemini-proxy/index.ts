@@ -134,11 +134,21 @@ Deno.serve(async (req) => {
 
   // ── Call Gemini (JSON mode, deterministic) ──
   const url = `${GEMINI_BASE}/${model}:generateContent?key=${geminiKey}`
+  const promptText = buildPrompt(cropType, problemType, allowedLabels)
+  // TEMP DIAG (remove when done): full prompt + inputs, viewable in the
+  // function logs. Never logs the image or the API key.
+  const SCAN_DEBUG = true
+  if (SCAN_DEBUG) {
+    console.log(`[SCAN-DBG][PROXY] model=${model} crop="${cropType}" ` +
+      `problemType=${problemType} labels=${allowedLabels.length} ` +
+      `imgB64Chars=${imageBase64.length}`)
+    console.log(`[SCAN-DBG][PROMPT] ${promptText}`)
+  }
   const payload = {
     contents: [
       {
         parts: [
-          { text: buildPrompt(cropType, problemType, allowedLabels) },
+          { text: promptText },
           { inline_data: { mime_type: mime, data: imageBase64 } },
         ],
       },
@@ -169,6 +179,14 @@ Deno.serve(async (req) => {
   // ── Extract + parse the model's JSON answer ──
   const text: string | undefined =
     geminiData?.candidates?.[0]?.content?.parts?.[0]?.text
+  // TEMP DIAG: Gemini's VERBATIM answer text, before any parsing, plus the
+  // finish reason (catches safety blocks / truncation the app never sees).
+  if (SCAN_DEBUG) {
+    console.log(`[SCAN-DBG][GEMINI-RAW] finishReason=` +
+      `${geminiData?.candidates?.[0]?.finishReason} ` +
+      `promptFeedback=${JSON.stringify(geminiData?.promptFeedback ?? null)}`)
+    console.log(`[SCAN-DBG][GEMINI-TEXT] ${text ?? '(no text)'}`)
+  }
   if (!text) return json({ error: 'Gemini returned no content' }, 502)
 
   let parsed: any

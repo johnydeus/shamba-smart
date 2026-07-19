@@ -1,4 +1,25 @@
+import 'dart:convert';
+import 'package:image/image.dart' as img;
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+// ── TEMPORARY scan diagnostics (remove when done) ───────────────────────────
+// Set false (or delete the _dbg blocks) to silence. Prints chunked lines
+// tagged [SCAN-DBG] via print(), which reaches Android logcat under the
+// `flutter` tag even in a release APK.
+const bool kScanDebugLog = true;
+
+void _dbg(String tag, String msg) {
+  if (!kScanDebugLog) return;
+  const chunk = 800; // logcat truncates very long lines; chunk with markers
+  for (var i = 0; i < msg.length; i += chunk) {
+    final part = msg.substring(i, i + chunk > msg.length ? msg.length : i + chunk);
+    final n = (i ~/ chunk) + 1;
+    final total = ((msg.length - 1) ~/ chunk) + 1;
+    // ignore: avoid_print
+    print('[SCAN-DBG][$tag]${total > 1 ? '($n/$total)' : ''} $part');
+  }
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 /// Routing outcome after Flash-Lite (+ optional Flash escalation).
 enum ScanRoutingState { confident, uncertain, needsExpert, error }
@@ -32,6 +53,24 @@ class GeminiScanService {
     required List<String> allowedLabels,
     String modelTier = 'flash-lite',
   }) async {
+    // (a)+(b) TEMP DIAG: exact image + payload sent to gemini-proxy.
+    if (kScanDebugLog) {
+      try {
+        final bytes = base64Decode(imageBase64);
+        final decoded = img.decodeImage(bytes); // debug-only decode
+        _dbg('IMG',
+            'sent=${(bytes.length / 1024).toStringAsFixed(1)}KB '
+            'dims=${decoded?.width}x${decoded?.height} '
+            '(b64Chars=${imageBase64.length})');
+      } catch (e) {
+        _dbg('IMG', 'dims decode failed: $e');
+      }
+      _dbg('REQ',
+          'tier=$modelTier crop="$cropType" problemType=$problemType '
+          'allowedLabels(${allowedLabels.length})='
+          '${allowedLabels.isEmpty ? '[] (OPEN mode)' : allowedLabels.join(' | ')}');
+    }
+
     try {
       final response = await Supabase.instance.client.functions
           .invoke('gemini-proxy', body: {
@@ -45,9 +84,14 @@ class GeminiScanService {
           // timeout the caller maps {error} to the safe Swahili fallback.
           .timeout(const Duration(seconds: 20));
       final data = response.data;
+      // (c) TEMP DIAG: COMPLETE raw proxy response, verbatim, pre-translation.
+      if (kScanDebugLog) {
+        _dbg('RAW[$modelTier]', data is Map ? jsonEncode(data) : '$data');
+      }
       if (data is Map<String, dynamic>) return data;
       return {'error': 'Unexpected gemini-proxy response'};
     } catch (e) {
+      if (kScanDebugLog) _dbg('RAW[$modelTier]', 'CALL FAILED: $e');
       return {'error': 'gemini-proxy call failed: $e'};
     }
   }
@@ -118,12 +162,18 @@ class GeminiScanService {
     final mustEscalate = reason != null;
     // TODO Phase 4b: also escalate on multi-image disagreement or by user role
     // (Afisa/paid/NGO/government) once those signals are available at scan time.
+    _dbg('ROUTE',
+        'g1(flash-lite): top="${g1['top_prediction']}" conf=$conf1 '
+        'unknown=$unknown1 open1=$open1 escalationReason=${reason ?? 'none'}');
 
     if (!mustEscalate) {
       // 0.60–0.79 -> uncertain (NO escalation per spec); >=0.80 -> confident.
       final state = conf1 >= _confidentMin
           ? ScanRoutingState.confident
           : ScanRoutingState.uncertain;
+      _dbg('ROUTE',
+          'DECISION=$state (no escalation: conf1=$conf1 '
+          '${conf1 >= _confidentMin ? '>= 0.80 confident' : 'in [0.60,0.80) uncertain'})');
       return GeminiRoutingResult(g1, 'flash-lite', state,
           openAccepted: open1 && !unknown1);
     }
@@ -139,6 +189,9 @@ class GeminiScanService {
         open1 || reason == 'unknown' || reason == 'low_confidence';
     final escLabels = escalateOpen ? const <String>[] : allowedLabels;
     final open2 = escLabels.isEmpty;
+    _dbg('ROUTE',
+        'ESCALATING to flash: mode=${open2 ? 'OPEN (labels dropped)' : 'CLOSED (same list)'} '
+        'because reason=$reason');
 
     onEscalate?.call();
     final g2 = await classify(
@@ -153,9 +206,14 @@ class GeminiScanService {
       final ok = conf1 >= _uncertainMin && !unknown1;
       if (!ok && openNamed(g1, open1)) {
         // Named open-mode diagnosis — show it (uncertain) instead of discarding.
+        _dbg('ROUTE',
+            'DECISION=uncertain (flash errored; g1 openNamed accepted)');
         return GeminiRoutingResult(g1, 'flash-lite', ScanRoutingState.uncertain,
             escalationReason: reason, openAccepted: true);
       }
+      _dbg('ROUTE',
+          'DECISION=${ok ? 'uncertain' : 'needsExpert'} (flash errored; '
+          'judged by g1: conf1=$conf1 unknown=$unknown1)');
       return GeminiRoutingResult(g1, 'flash-lite',
           ok ? ScanRoutingState.uncertain : ScanRoutingState.needsExpert,
           escalationReason: reason);
@@ -163,20 +221,31 @@ class GeminiScanService {
 
     final conf2 = (g2['confidence'] as num?)?.toDouble() ?? 0;
     final unknown2 = _isUnknownLabel(g2['top_prediction'] as String?);
+    _dbg('ROUTE',
+        'g2(flash): top="${g2['top_prediction']}" conf=$conf2 '
+        'unknown=$unknown2 open2=$open2');
     if (conf2 >= _uncertainMin && !unknown2) {
       final state = conf2 >= _confidentMin
           ? ScanRoutingState.confident
           : ScanRoutingState.uncertain;
+      _dbg('ROUTE',
+          'DECISION=$state (g2 conf=$conf2 '
+          '${conf2 >= _confidentMin ? '>= 0.80' : 'in [0.60,0.80)'}, not unknown)');
       return GeminiRoutingResult(g2, 'flash', state,
           escalationReason: reason, openAccepted: open2);
     }
     // Named open-mode diagnosis at moderate confidence -> show it (uncertain)
     // with the human-confirm flow, rather than discarding a correct answer.
     if (openNamed(g2, open2)) {
+      _dbg('ROUTE',
+          'DECISION=uncertain (g2 openNamed: named + symptoms + conf>=0.50)');
       return GeminiRoutingResult(g2, 'flash', ScanRoutingState.uncertain,
           escalationReason: reason, openAccepted: true);
     }
     // Both tiers tried, still not confident -> needs expert review.
+    _dbg('ROUTE',
+        'DECISION=needsExpert (g2 conf=$conf2 < 0.60 or unknown=$unknown2, '
+        'and openNamed=false: open2=$open2)');
     return GeminiRoutingResult(g2, 'flash', ScanRoutingState.needsExpert,
         escalationReason: reason);
   }
