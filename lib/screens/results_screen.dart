@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../config/feature_flags.dart';
 import '../core/utils/image_upload_helper.dart';
+import '../features/scan/data/claude_api_bridge.dart';
 import '../features/scan/data/gemini_scan_translator.dart';
 import '../features/scan/data/scan_taxonomy.dart';
 import '../features/scan/domain/scan_request.dart';
@@ -62,6 +63,17 @@ class _ResultsScreenState extends State<ResultsScreen> {
   Map<String, dynamic>? _verification; // Claude's structured verification result
   String? _verifyError;                // human-readable error if Claude call failed
 
+  // Real Gemini tier once verification completes (Mkulima-disabled flow has no
+  // preliminary scanSource at all, since there's no ScanResult before this).
+  String? get _verifiedSourceLabel {
+    final src = _verification?['source'] as String?;
+    return switch (src) {
+      'gemini-flash-lite' => 'Gemini Flash-Lite',
+      'gemini-flash' => 'Gemini Flash',
+      _ => null,
+    };
+  }
+
   @override
   void initState() {
     super.initState();
@@ -97,10 +109,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
       if (!mounted) return;
 
       if (result['error'] == true) {
-        setState(() {
-          _verifying = false;
-          _verifyError = result['message'] as String?;
-        });
+        await _queueForRetryAndSetError(req);
         return;
       }
 
@@ -123,8 +132,33 @@ class _ResultsScreenState extends State<ResultsScreen> {
       return;
     } catch (e) {
       if (!mounted) return;
-      setState(() { _verifying = false; _verifyError = e.toString(); });
+      await _queueForRetryAndSetError(widget.scanRequest);
     }
+  }
+
+  // Gemini is the SOLE classifier (no local Mkulima fallback) — a failure here
+  // means the service itself errored/timed out while ONLINE (scan_screen
+  // already checked connectivity before navigating here), distinct from the
+  // "no internet" case which never reaches this screen. Queue the scan for
+  // automatic retry via the existing outbox/SyncCoordinator so the photo is
+  // never lost, and tell the farmer plainly rather than a generic error.
+  Future<void> _queueForRetryAndSetError(ScanRequest? req) async {
+    if (req != null) {
+      await ClaudeApiBridge().queueEnrichment(
+        imagePath: req.imagePath,
+        cropName: req.cropName,
+        scanType: req.scanType,
+        gpsLat: req.gpsLat,
+        gpsLng: req.gpsLng,
+        region: req.region,
+      );
+    }
+    if (!mounted) return;
+    setState(() {
+      _verifying = false;
+      _verifyError = 'Huduma ya uchunguzi haipatikani kwa sasa. '
+          'Picha yako imehifadhiwa na tutaichunguza tena hivi karibuni.';
+    });
   }
 
   // Gemini classification path for the two-stage disease verify (flag ON only).
@@ -283,8 +317,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
     // error banner shown), it reappears as the offline fallback. Flag OFF and
     // single-stage scans (isVerifying=false, so _verifying never starts) keep
     // today's behavior exactly.
+    // widget.diagnosis.isEmpty: the Mkulima-disabled disease flow navigates
+    // here with NO preliminary at all (Gemini is the sole source of truth) —
+    // never show the prelim block for it, in any state (before/during/after
+    // verification), so a failed verification doesn't reveal a garbage
+    // "Ugonjwa haujulikani" card built from an empty map.
     final hidePrelim = FeatureFlags.useGeminiScan &&
-        (_verifying || _verification != null);
+        (_verifying || _verification != null || diagnosis.isEmpty);
 
     final diseaseSw =
         diagnosis['disease_name_sw'] ?? 'Ugonjwa haujulikani';
@@ -308,7 +347,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
         title: const Text('Matokeo ya Uchunguzi'),
         automaticallyImplyLeading: false,
         actions: [
-          if (!hasError && !isHealthy)
+          // diagnosis.isNotEmpty: don't offer sharing before Gemini's result
+          // exists (the Mkulima-disabled flow starts with an empty map).
+          if (!hasError && !isHealthy && diagnosis.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.share_outlined),
               onPressed: _shareWhatsApp,
@@ -342,6 +383,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 verification: _verification!,
                 mkulimaGuess: widget.mkulimaResult?.jinaSw,
                 onRetry: null, // already verified
+                diagnosisId: _savedDiagnosisId,
+                imagePath: widget.imagePath,
               ),
 
             // ── Offline banner + "Hakiki Tena" button ─────────────────────
@@ -374,7 +417,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
             if (widget.mkulimaResult != null)
               const SizedBox(height: AppSpacing.md),
 
-            if (widget.scanSource != null)
+            // The Mkulima-disabled flow has no preliminary ScanResult, so
+            // widget.scanSource is null until verification finishes — fall
+            // back to the real Gemini tier once it's known.
+            if ((widget.scanSource ?? _verifiedSourceLabel) != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.md),
                 child: Container(
@@ -394,14 +440,14 @@ class _ResultsScreenState extends State<ResultsScreen> {
                       Icon(
                         widget.queuedForEnrichment
                             ? Icons.schedule
-                            : Icons.offline_bolt,
+                            : Icons.auto_awesome,
                         size: 18,
                         color: AppColors.primary,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          widget.scanSource!,
+                          (widget.scanSource ?? _verifiedSourceLabel)!,
                           style: GoogleFonts.poppins(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -1692,11 +1738,15 @@ class _VerificationCard extends StatelessWidget {
   final Map<String, dynamic> verification;
   final String? mkulimaGuess;
   final VoidCallback? onRetry;
+  final String? diagnosisId;
+  final String imagePath;
 
   const _VerificationCard({
     required this.verification,
     this.mkulimaGuess,
     this.onRetry,
+    this.diagnosisId,
+    this.imagePath = '',
   });
 
   Color _confidenceBadgeColor(String conf) {
@@ -1991,6 +2041,22 @@ class _VerificationCard extends StatelessWidget {
               ),
           ],
 
+          // ── Human confirm/correct (retraining capture) ────────────────
+          // Mirrors _MkulimaCard's confirm/reject, but against Gemini's own
+          // label — this is the only confirm/reject surface disease scans
+          // get when Mkulima AI is disabled (it never shows _MkulimaCard).
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: _GeminiFeedbackBar(
+              diagnosisId: diagnosisId,
+              imagePath: imagePath,
+              cropSw: detectedCrop,
+              aiLabelEn: diagEn,
+              aiLabelSw: diagSw,
+              tier: (verification['source'] as String?) ?? 'gemini',
+            ),
+          ),
+
           const SizedBox(height: 16),
         ],
       ),
@@ -2008,6 +2074,292 @@ class _VerificationCard extends StatelessWidget {
       );
     }
     return card;
+  }
+}
+
+// ── Human confirm/correct bar for the Gemini verification card ──────────────
+//
+// This is the retraining-capture UI for disease scans when Mkulima AI is
+// disabled — _MkulimaCard (which carries the legacy version of this) never
+// renders in that flow. "Ndiyo, Sahihi" confirms Gemini's own label;
+// "Hapana, Si Hilo" opens a correction picker. Writes label_source='human'
+// via the same SupabaseService.confirmDiagnosisLabel used by _MkulimaCard.
+class _GeminiFeedbackBar extends StatefulWidget {
+  final String? diagnosisId;
+  final String imagePath;
+  final String cropSw;   // resolved crop (post auto-detect) for taxonomy lookup
+  final String aiLabelEn;
+  final String aiLabelSw;
+  final String tier;     // e.g. 'gemini-flash-lite' — for training_submissions
+
+  const _GeminiFeedbackBar({
+    required this.diagnosisId,
+    required this.imagePath,
+    required this.cropSw,
+    required this.aiLabelEn,
+    required this.aiLabelSw,
+    required this.tier,
+  });
+
+  @override
+  State<_GeminiFeedbackBar> createState() => _GeminiFeedbackBarState();
+}
+
+class _GeminiFeedbackBarState extends State<_GeminiFeedbackBar> {
+  bool? _feedbackPositive;
+  bool _feedbackSubmitted = false;
+
+  Future<void> _confirm() async {
+    setState(() {
+      _feedbackPositive = true;
+      _feedbackSubmitted = true;
+    });
+    SupabaseService.submitTrainingFeedback(
+      diseaseKey: widget.aiLabelEn,
+      isCorrect: true,
+      imagePath: widget.imagePath,
+      cropName: widget.cropSw.isNotEmpty ? widget.cropSw : null,
+      modelVersion: widget.tier,
+    );
+    if (widget.diagnosisId != null) {
+      await SupabaseService.confirmDiagnosisLabel(
+        diagnosisId: widget.diagnosisId!,
+        finalLabel: widget.aiLabelEn,
+      );
+    }
+  }
+
+  Future<void> _reject() async {
+    setState(() {
+      _feedbackPositive = false;
+      _feedbackSubmitted = true;
+    });
+    SupabaseService.submitTrainingFeedback(
+      diseaseKey: widget.aiLabelEn,
+      isCorrect: false,
+      imagePath: widget.imagePath,
+      cropName: widget.cropSw.isNotEmpty ? widget.cropSw : null,
+      modelVersion: widget.tier,
+    );
+
+    if (widget.diagnosisId == null) return;
+
+    await ScanTaxonomy().ensureLoaded();
+    final english = ScanTaxonomy().allowedLabelsForCrop(widget.cropSw);
+    final chipOptions = english
+        .where((e) => e != 'Unknown' && e != 'Healthy')
+        .map((e) => MapEntry(
+            e,
+            ScanTaxonomy().localizeByEnglish(e)?['jina_swahili'] as String? ??
+                e))
+        .toList();
+
+    if (!mounted) return;
+
+    // OPEN-detection crops (no bundled taxonomy — most Tanzanian crops today)
+    // have no chips to offer. Fall back to a free-text field rather than a
+    // dead end: the farmer types the correct name themselves.
+    final String? picked;
+    if (chipOptions.isNotEmpty) {
+      picked = await showModalBottomSheet<String>(
+        context: context,
+        builder: (_) => _CorrectionSheet(options: chipOptions),
+      );
+    } else {
+      picked = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => const _FreeTextCorrectionSheet(),
+      );
+    }
+
+    if (picked != null &&
+        picked.trim().isNotEmpty &&
+        widget.diagnosisId != null) {
+      await SupabaseService.confirmDiagnosisLabel(
+        diagnosisId: widget.diagnosisId!,
+        finalLabel: picked.trim(),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Je, jibu hili ni sahihi?',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: _feedbackSubmitted ? null : _confirm,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  decoration: BoxDecoration(
+                    color: _feedbackPositive == true
+                        ? AppColors.success
+                        : AppColors.success.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border:
+                        Border.all(color: AppColors.success.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('✅', style: TextStyle(fontSize: 14)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Ndiyo, Sahihi',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _feedbackPositive == true
+                              ? Colors.white
+                              : AppColors.success,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: GestureDetector(
+                onTap: _feedbackSubmitted ? null : _reject,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  decoration: BoxDecoration(
+                    color: _feedbackPositive == false
+                        ? AppColors.critical
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: AppColors.critical.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('❌', style: TextStyle(fontSize: 14)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Hapana, Si Hilo',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _feedbackPositive == false
+                              ? Colors.white
+                              : AppColors.critical,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_feedbackPositive != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              _feedbackPositive!
+                  ? 'Asante! Maoni yako yanasaidia kuboresha uchunguzi.'
+                  : 'Asante! Piga picha tena au wasiliana na mtaalamu.',
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Free-text fallback for "Hapana, Si Hilo" when the crop has no bundled
+/// taxonomy (open-detection crops — most Tanzanian crops today). Returns the
+/// typed text, or null if dismissed.
+class _FreeTextCorrectionSheet extends StatefulWidget {
+  const _FreeTextCorrectionSheet();
+
+  @override
+  State<_FreeTextCorrectionSheet> createState() =>
+      _FreeTextCorrectionSheetState();
+}
+
+class _FreeTextCorrectionSheetState extends State<_FreeTextCorrectionSheet> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Ni ugonjwa gani sahihi?',
+                style: GoogleFonts.poppins(
+                    fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(
+                'Hatuna orodha ya zao hili bado — andika jina la ugonjwa '
+                'sahihi (au funga kama hujui).',
+                style: GoogleFonts.poppins(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _ctrl,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText: 'mfano: Ugonjwa wa Kutu',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Funga'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () =>
+                      Navigator.pop(context, _ctrl.text.trim()),
+                  child: const Text('Tuma'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

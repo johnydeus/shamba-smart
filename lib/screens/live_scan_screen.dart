@@ -12,6 +12,7 @@ import '../routes/fade_slide_route.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 import '../config/crops.dart' show kCrops;
+import '../config/feature_flags.dart';
 import 'results_screen.dart';
 
 /// Full-screen live-inference scanner.
@@ -532,7 +533,9 @@ class _LiveScanScreenState extends State<LiveScanScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              'Mkulima AI inachunguza...',
+              FeatureFlags.useMkulimaLocal
+                  ? 'Mkulima AI inachunguza...'
+                  : 'AI inachunguza...',
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,

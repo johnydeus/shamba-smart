@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../config/crops.dart';
 import '../config/feature_flags.dart';
+import '../features/scan/data/claude_api_bridge.dart';
 import '../features/scan/data/scan_taxonomy.dart' show kAutoCrop;
 import '../features/scan/domain/scan_request.dart';
 import '../providers/auth_provider.dart';
@@ -143,7 +144,9 @@ class _ScanScreenState extends State<ScanScreen>
     _bracketCtrl.stop();
     setState(() {
       _analysing = true;
-      _statusMessage = 'Mkulima AI inachunguza picha...';
+      _statusMessage = _selectedScanType == 'ugonjwa' && FeatureFlags.useMkulimaLocal
+          ? 'Mkulima AI inachunguza picha...'
+          : 'Inachunguza picha...';
     });
 
     double? gpsLat;
@@ -169,7 +172,62 @@ class _ScanScreenState extends State<ScanScreen>
       region: region,
     );
 
-    // ── Disease scans: two-stage flow (Mkulima fast → Claude verify) ──────────
+    // ── Disease scans without Mkulima AI: straight to Gemini ──────────────────
+    // FeatureFlags.useMkulimaLocal == false (current default) skips local
+    // inference and the green-pixel gate entirely. Connectivity is checked
+    // FIRST — Gemini is the sole classifier now, so offline must be handled
+    // explicitly (queue + honest message), never a hang or silent failure.
+    if (_selectedScanType == 'ugonjwa' && !FeatureFlags.useMkulimaLocal) {
+      final online = await scanProvider.checkOnline();
+      if (!mounted) return;
+
+      if (!online) {
+        setState(() { _analysing = false; _statusMessage = ''; });
+        _bracketCtrl.repeat(reverse: true);
+        // Save the photo for automatic retry via the existing outbox/
+        // SyncCoordinator (flushes on reconnect / app resume) — the farmer
+        // never has to remember to come back and rescan.
+        await ClaudeApiBridge().queueEnrichment(
+          imagePath: imagePath,
+          cropName: _selectedCrop,
+          scanType: _selectedScanType,
+          gpsLat: gpsLat,
+          gpsLng: gpsLng,
+          region: region,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(seconds: 6),
+            content: Text(
+              'Hakuna mtandao. Picha yako imehifadhiwa na itachunguzwa '
+              'moja kwa moja ukiwa na mtandao.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      setState(() { _analysing = false; _statusMessage = ''; });
+      _bracketCtrl.repeat(reverse: true);
+
+      Navigator.pushReplacement(
+        context,
+        FadeSlideRoute(
+          page: ResultsScreen(
+            diagnosis: const {},
+            imagePath: imagePath,
+            cropName: _selectedCrop,
+            isVerifying: true,
+            scanRequest: request,
+          ),
+        ),
+      );
+      return;
+    }
+
+    // ── Disease scans WITH Mkulima AI (legacy, restorable path) ───────────────
+    // Two-stage flow: Mkulima fast preliminary -> Gemini/Claude verify.
     if (_selectedScanType == 'ugonjwa') {
       var preliminary = await scanProvider.mkulimaOnlyAnalyze(request);
 
@@ -326,7 +384,9 @@ class _ScanScreenState extends State<ScanScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Mkulima AI',
+                          FeatureFlags.useMkulimaLocal
+                              ? 'Mkulima AI'
+                              : 'Shamba Smart AI',
                           style: GoogleFonts.poppins(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -334,7 +394,11 @@ class _ScanScreenState extends State<ScanScreen>
                           ),
                         ),
                         Text(
-                          'Inafanya kazi bila mtandao • Aina 34 za magonjwa',
+                          // Honest per current path: Mkulima's offline claim
+                          // doesn't apply once Gemini is the sole classifier.
+                          FeatureFlags.useMkulimaLocal
+                              ? 'Inafanya kazi bila mtandao • Aina 34 za magonjwa'
+                              : 'Uchunguzi wa kina kwa mtandao',
                           style: GoogleFonts.poppins(
                             fontSize: 10,
                             color: Colors.white70,

@@ -18,4 +18,22 @@ class FeatureFlags {
   /// (A remote override — e.g. a Supabase row — can be layered on later if
   /// needed; a compile-time const is deliberate for now to avoid over-engineering.)
   static const bool useGeminiScan = true;
+
+  /// USE_MKULIMA_LOCAL — master switch for the on-device Mkulima AI (MobileNet)
+  /// classifier in the live scan pipeline.
+  ///
+  /// Default FALSE (disabled, not deleted): Mkulima AI was producing confidently
+  /// WRONG results on real photos (e.g. misidentifying diseased coffee cherries
+  /// as "Healthy Cashew" at 76% confidence) and its green-pixel gate was
+  /// rejecting good photos before Gemini ever saw them. A confidently wrong
+  /// result is more dangerous to a farmer than an honest "unknown", so disease
+  /// scans now go straight to Gemini — no local inference, no green-pixel gate.
+  ///
+  /// NOTE: with useMkulimaLocal=false AND useGeminiScan=true (both current
+  /// defaults), Gemini is the ONLY classifier and there is NO offline scanning
+  /// path. This is intentional until a retrained Mkulima AI (using the
+  /// diagnoses data now being captured) is available to restore as a local
+  /// fallback. All Mkulima code/model/assets remain in the repo untouched —
+  /// flip this back to true to restore the on-device path in one line.
+  static const bool useMkulimaLocal = false;
 }

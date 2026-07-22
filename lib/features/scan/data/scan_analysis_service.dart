@@ -1,5 +1,6 @@
 import 'dart:io';
 import '../../../config/api_keys.dart';
+import '../../../config/feature_flags.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../domain/scan_request.dart';
 import '../domain/scan_result.dart';
@@ -119,8 +120,11 @@ class ScanAnalysisService {
     final isOnline = await _connectivity.checkNow();
     final hasCloud = ApiKeys.hasClaude;
 
-    // ── Disease scans: Mkulima AI first ─────────────────────────────────────
-    if (isUgonjwa) {
+    // ── Disease scans: Mkulima AI first (only when explicitly re-enabled) ────
+    // Default is FeatureFlags.useMkulimaLocal == false — see that flag's doc
+    // for why. Disease scans fall through to the cloud-only path below,
+    // identical to weeds/pests.
+    if (isUgonjwa && FeatureFlags.useMkulimaLocal) {
       final mkulimaResult = await _mkulima.analyze(imageFile);
 
       if (mkulimaResult != null) {
@@ -223,7 +227,12 @@ class ScanAnalysisService {
       );
     }
 
-    // ── Weeds & pests: online cloud only (Mkulima does not cover these) ───────
+    // ── Cloud-only path: Gemini is the SOLE classifier here — reached by
+    // weeds/pests always, and by disease scans when Mkulima AI is disabled.
+    // There is no local fallback, so a failure must be handled honestly: the
+    // scan is queued for automatic retry (existing outbox/SyncCoordinator,
+    // already wired in main.dart) and the farmer is told plainly — never a
+    // silent failure or hang. ─────────────────────────────────────────────────
     if (isOnline && hasCloud) {
       final cloudDiagnosis = await _bridge.enrichOnline(
         imageFile: imageFile,
@@ -231,6 +240,35 @@ class ScanAnalysisService {
         scanType: request.scanType,
         region: request.region,
       );
+
+      if (cloudDiagnosis['error'] == true) {
+        // Online, but the classification service itself failed/timed out —
+        // distinct from "no internet" below. Queue for automatic retry.
+        await _bridge.queueEnrichment(
+          imagePath: request.imagePath,
+          cropName: request.cropName,
+          scanType: request.scanType,
+          gpsLat: request.gpsLat,
+          gpsLng: request.gpsLng,
+          region: request.region,
+        );
+        return ScanResult(
+          diagnosis: {
+            'error': true,
+            'message': 'Huduma ya uchunguzi haipatikani kwa sasa. '
+                'Picha yako imehifadhiwa na tutaichunguza tena hivi karibuni.',
+            'is_healthy': false,
+          },
+          imagePath: request.imagePath,
+          cropName: request.cropName,
+          scanType: request.scanType,
+          source: ScanSource.queued,
+          queuedForEnrichment: true,
+          gpsLat: request.gpsLat,
+          gpsLng: request.gpsLng,
+        );
+      }
+
       return ScanResult(
         diagnosis: cloudDiagnosis,
         imagePath: request.imagePath,
@@ -242,18 +280,44 @@ class ScanAnalysisService {
       );
     }
 
+    if (!hasCloud) {
+      // Config gap (missing key) — not expected in production, no queue needed.
+      return ScanResult(
+        diagnosis: {
+          'error': true,
+          'message': 'Huduma ya uchunguzi haijasanidiwa. Wasiliana na msaada.',
+          'is_healthy': false,
+        },
+        imagePath: request.imagePath,
+        cropName: request.cropName,
+        scanType: request.scanType,
+        source: ScanSource.cloud,
+        gpsLat: request.gpsLat,
+        gpsLng: request.gpsLng,
+      );
+    }
+
+    // No internet — queue the scan so it runs automatically once back online.
+    await _bridge.queueEnrichment(
+      imagePath: request.imagePath,
+      cropName: request.cropName,
+      scanType: request.scanType,
+      gpsLat: request.gpsLat,
+      gpsLng: request.gpsLng,
+      region: request.region,
+    );
     return ScanResult(
       diagnosis: {
         'error': true,
-        'message': !hasCloud
-            ? 'Weka CLAUDE_API_KEY kwenye .env kwa uchunguzi wa magugu/wadudu.'
-            : 'Hakuna mtandao. Gundua ugonjwa (Mkulima AI) inafanya kazi bila mtandao — magugu na wadudu wanahitaji mtandao.',
+        'message': 'Hakuna mtandao. Picha yako imehifadhiwa na '
+            'itachunguzwa moja kwa moja ukiwa na mtandao.',
         'is_healthy': false,
       },
       imagePath: request.imagePath,
       cropName: request.cropName,
       scanType: request.scanType,
-      source: ScanSource.cloud,
+      source: ScanSource.queued,
+      queuedForEnrichment: true,
       gpsLat: request.gpsLat,
       gpsLng: request.gpsLng,
     );
