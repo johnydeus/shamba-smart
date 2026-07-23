@@ -2108,12 +2108,15 @@ class _GeminiFeedbackBar extends StatefulWidget {
 class _GeminiFeedbackBarState extends State<_GeminiFeedbackBar> {
   bool? _feedbackPositive;
   bool _feedbackSubmitted = false;
+  String? _correctionLabel; // set once a "Hapana" correction is chosen
 
   Future<void> _confirm() async {
     setState(() {
       _feedbackPositive = true;
       _feedbackSubmitted = true;
     });
+    // training_submissions capture is independent of the diagnoses row id, so
+    // it always runs (retraining data is never lost even if the row is late).
     SupabaseService.submitTrainingFeedback(
       diseaseKey: widget.aiLabelEn,
       isCorrect: true,
@@ -2142,8 +2145,9 @@ class _GeminiFeedbackBarState extends State<_GeminiFeedbackBar> {
       modelVersion: widget.tier,
     );
 
-    if (widget.diagnosisId == null) return;
-
+    // Open the correction sheet ALWAYS (previously early-returned when the
+    // diagnoses row id was null, so the sheet never opened — the reported
+    // dead "Hapana"). The DB stamp below is what's gated on the id, not the UI.
     await ScanTaxonomy().ensureLoaded();
     final english = ScanTaxonomy().allowedLabelsForCrop(widget.cropSw);
     final chipOptions = english
@@ -2173,13 +2177,15 @@ class _GeminiFeedbackBarState extends State<_GeminiFeedbackBar> {
       );
     }
 
-    if (picked != null &&
-        picked.trim().isNotEmpty &&
-        widget.diagnosisId != null) {
-      await SupabaseService.confirmDiagnosisLabel(
-        diagnosisId: widget.diagnosisId!,
-        finalLabel: picked.trim(),
-      );
+    if (picked != null && picked.trim().isNotEmpty) {
+      final label = picked.trim();
+      if (widget.diagnosisId != null) {
+        await SupabaseService.confirmDiagnosisLabel(
+          diagnosisId: widget.diagnosisId!,
+          finalLabel: label,
+        );
+      }
+      if (mounted) setState(() => _correctionLabel = label);
     }
   }
 
@@ -2201,6 +2207,9 @@ class _GeminiFeedbackBarState extends State<_GeminiFeedbackBar> {
           children: [
             Expanded(
               child: GestureDetector(
+                // opaque: the whole button area is tappable, not just the
+                // text glyphs (deferToChild left the padding dead).
+                behavior: HitTestBehavior.opaque,
                 onTap: _feedbackSubmitted ? null : _confirm,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -2236,6 +2245,7 @@ class _GeminiFeedbackBarState extends State<_GeminiFeedbackBar> {
             const SizedBox(width: 10),
             Expanded(
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: _feedbackSubmitted ? null : _reject,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -2275,8 +2285,10 @@ class _GeminiFeedbackBarState extends State<_GeminiFeedbackBar> {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               _feedbackPositive!
-                  ? 'Asante! Maoni yako yanasaidia kuboresha uchunguzi.'
-                  : 'Asante! Piga picha tena au wasiliana na mtaalamu.',
+                  ? 'Asante! Umethibitisha jibu — maoni yako yanaboresha uchunguzi.'
+                  : _correctionLabel != null
+                      ? 'Asante! Umeweka jibu sahihi: "$_correctionLabel".'
+                      : 'Asante! Maoni yako yamehifadhiwa.',
               style: GoogleFonts.poppins(
                 fontSize: 11,
                 color: AppColors.textSecondary,
